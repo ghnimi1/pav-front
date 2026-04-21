@@ -33,6 +33,8 @@ export interface BreakfastItem {
   minQuantity?: number
   maxQuantity?: number
   availableSupplements?: ProductSupplementConfig[]
+  imageFile?: File
+  removeImage?: boolean
 }
 
 export type FormulaType = "normal" | "healthy" | null
@@ -370,6 +372,31 @@ function getAuthHeaders() {
   }
 }
 
+function getAuthTokenHeader() {
+  const headers = getAuthHeaders()
+  return headers.Authorization ? { Authorization: headers.Authorization } : {}
+}
+
+function buildBreakfastItemFormData(item: Partial<BreakfastItem>) {
+  const formData = new FormData()
+
+  if (item.name !== undefined) formData.append("name", item.name)
+  if (item.description !== undefined) formData.append("description", item.description)
+  if (item.price !== undefined) formData.append("price", String(item.price))
+  if (item.points !== undefined) formData.append("points", String(item.points))
+  if (item.categoryId !== undefined) formData.append("categoryId", item.categoryId)
+  if (item.image !== undefined) formData.append("image", item.image)
+  if (item.isAvailable !== undefined) formData.append("isAvailable", String(item.isAvailable))
+  if (item.isRequired !== undefined) formData.append("isRequired", String(item.isRequired))
+  if (item.minQuantity !== undefined) formData.append("minQuantity", String(item.minQuantity))
+  if (item.maxQuantity !== undefined) formData.append("maxQuantity", String(item.maxQuantity))
+  if (item.availableSupplements !== undefined) formData.append("availableSupplements", JSON.stringify(item.availableSupplements))
+  if (item.removeImage !== undefined) formData.append("removeImage", String(item.removeImage))
+  if (item.imageFile) formData.append("imageFile", item.imageFile)
+
+  return formData
+}
+
 async function bootstrapBreakfastMenu() {
   await Promise.all(
     defaultCategories.map((category) =>
@@ -548,8 +575,8 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
       try {
         const created = await fetchJson<ApiEntity & Omit<BreakfastItem, "id">>("/menu/breakfast/items", {
           method: "POST",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(item),
+          headers: getAuthTokenHeader(),
+          body: buildBreakfastItemFormData(item),
         })
         setItems((prev) => [...prev, mapItem(created)])
       } catch (error) {
@@ -563,10 +590,21 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
       try {
         await fetchJson(`/menu/breakfast/items/${id}`, {
           method: "PUT",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(updates),
+          headers: getAuthTokenHeader(),
+          body: buildBreakfastItemFormData(updates),
         })
-        setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...updates } : item)))
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  ...updates,
+                  imageFile: undefined,
+                  removeImage: undefined,
+                }
+              : item
+          )
+        )
       } catch (error) {
         console.error("Failed to update breakfast item:", error)
       }

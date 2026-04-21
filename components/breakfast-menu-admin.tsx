@@ -104,7 +104,7 @@ export function BreakfastMenuAdmin() {
   // Image upload state
   const [uploadingImage, setUploadingImage] = useState(false)
   
-  // Handle image upload (converts to base64 for localStorage storage)
+  // Handle image upload
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -124,19 +124,19 @@ export function BreakfastMenuAdmin() {
     setUploadingImage(true)
     
     try {
-      // Convert to base64
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        const base64 = reader.result as string
-        setItemDialog(prev => ({
-          ...prev,
-          item: { ...prev.item, image: base64 }
-        }))
-        setUploadingImage(false)
-      }
-      reader.readAsDataURL(file)
+      const previewUrl = URL.createObjectURL(file)
+      setItemDialog(prev => ({
+        ...prev,
+        item: {
+          ...prev.item,
+          image: previewUrl,
+          imageFile: file,
+          removeImage: false,
+        }
+      }))
     } catch (error) {
       console.error('Error uploading image:', error)
+    } finally {
       setUploadingImage(false)
     }
   }
@@ -145,7 +145,7 @@ export function BreakfastMenuAdmin() {
   const handleRemoveImage = () => {
     setItemDialog(prev => ({
       ...prev,
-      item: { ...prev.item, image: undefined }
+      item: { ...prev.item, image: undefined, imageFile: undefined, removeImage: true }
     }))
   }
 
@@ -190,7 +190,9 @@ export function BreakfastMenuAdmin() {
         description: itemDialog.item.description || "",
         price: itemDialog.item.price || 0,
         categoryId: itemDialog.item.categoryId,
-        image: itemDialog.item.image || "",
+        image: itemDialog.item.image,
+        imageFile: itemDialog.item.imageFile,
+        removeImage: itemDialog.item.removeImage,
         isAvailable: itemDialog.item.isAvailable !== false
       })
     } else if (itemDialog.item.id) {
@@ -321,7 +323,7 @@ export function BreakfastMenuAdmin() {
                           {item.image ? (
                             <div className="relative h-14 w-14 rounded-xl overflow-hidden shrink-0">
                               <Image
-                                src={item.image}
+                                src={ `${process.env.NEXT_PUBLIC_API_IMAGE_URL}/menu/${item.image}`}
                                 alt={item.name}
                                 fill
                                 className="object-cover"
@@ -766,12 +768,11 @@ export function BreakfastMenuAdmin() {
                 {itemDialog.item?.image ? (
                   <div className="relative group">
                     <div className="relative h-40 w-full rounded-xl overflow-hidden border-2 border-amber-200 bg-amber-50">
-                      <Image
-                        src={itemDialog.item.image}
-                        alt="Preview"
-                        fill
-                        className="object-cover"
-                      />
+                      <img
+  src={itemDialog.item.image || `${process.env.NEXT_PUBLIC_API_IMAGE_URL}/menu/${itemDialog.item.image}`}
+  alt="Preview"
+  className="h-full w-full object-cover"
+/>
                     </div>
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center gap-3">
                       <label className="cursor-pointer">
