@@ -677,7 +677,7 @@ const calculateSmartDiscount = useMemo(() => {
                       <div className="h-16 w-16 rounded-xl overflow-hidden bg-stone-200 shrink-0">
                         {cartItem.item.image && (
                           <Image
-                            src={cartItem.item.image}
+                            src={`${process.env.NEXT_PUBLIC_API_IMAGE_URL}/menu/${cartItem.item.image}`}
                             alt={cartItem.item.name}
                             width={64}
                             height={64}
