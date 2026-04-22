@@ -119,163 +119,9 @@ const defaultBaseFormulas: BaseFormula[] = [
   },
 ]
 
-const defaultCategories: BreakfastCategory[] = [
-  /* { id: "suggestions", name: "Nos Suggestions", icon: "star", description: "Formules recommandees", order: 0, isActive: true },
-  { id: "boissons-chaudes", name: "Boissons Chaudes", icon: "coffee", description: "Cafe, the et chocolat", order: 1, isActive: true },
-  { id: "boissons-fraiches", name: "Boissons Fraiches", icon: "glass-water", description: "Jus frais et eau", order: 2, isActive: true },
-  { id: "viennoiseries", name: "Viennoiseries", icon: "croissant", description: "Viennoiseries fraiches du jour", order: 3, isActive: true },
-  { id: "sucre", name: "Sucre", icon: "cake", description: "Options sucrees gourmandes", order: 4, isActive: true },
-  { id: "sale", name: "Sale", icon: "egg", description: "Options salees", order: 5, isActive: true },
-  { id: "premium", name: "Premium", icon: "crown", description: "Selection premium", order: 6, isActive: true },
-  { id: "desserts", name: "Desserts", icon: "ice-cream", description: "Desserts et gourmandises", order: 7, isActive: true }, */
-]
+const defaultCategories: BreakfastCategory[] = []
 
-const defaultItems: BreakfastItem[] = [
- /*  { id: "pack-classique", name: "Classique", description: "Cafe + croissant + jus", price: 9, points: 9, categoryId: "suggestions", isAvailable: true, image: "https://images.unsplash.com/photo-1504754524776-8f4f37790ca0?w=400&h=300&fit=crop" },
-  { id: "pack-gourmand", name: "Gourmand", description: "Cafe + croissant + toast + jus", price: 14, points: 14, categoryId: "suggestions", isAvailable: true, image: "https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=400&h=300&fit=crop" },
-  { id: "pack-complet", name: "Complet", description: "Cafe + jus + omelette ou croque + toast", price: 19, points: 19, categoryId: "suggestions", isAvailable: true, image: "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=400&h=300&fit=crop" },
-  {
-    id: "cafe-express",
-    name: "Cafe Express",
-    price: 2.5,
-    points: 3,
-    categoryId: "boissons-chaudes",
-    isAvailable: true,
-    image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=400&h=300&fit=crop",
-    availableSupplements: [
-      { supplementId: "sup-7", isEnabled: true },
-      { supplementId: "sup-8", isEnabled: true },
-      { supplementId: "sup-9", isEnabled: true },
-      { supplementId: "sup-10", isEnabled: true },
-      { supplementId: "sup-11", isEnabled: true },
-    ],
-  },
-  {
-    id: "cafe-creme",
-    name: "Cafe Creme",
-    price: 4,
-    points: 4,
-    categoryId: "boissons-chaudes",
-    isAvailable: true,
-    image: "https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=400&h=300&fit=crop",
-    availableSupplements: [
-      { supplementId: "sup-7", isEnabled: true },
-      { supplementId: "sup-8", isEnabled: true },
-      { supplementId: "sup-9", isEnabled: true },
-      { supplementId: "sup-10", isEnabled: true },
-      { supplementId: "sup-11", isEnabled: true },
-    ],
-  },
-  {
-    id: "cappuccino",
-    name: "Cappuccino",
-    price: 5,
-    points: 5,
-    categoryId: "boissons-chaudes",
-    isAvailable: true,
-    image: "https://images.unsplash.com/photo-1572442388796-11668a67e53d?w=400&h=300&fit=crop",
-    availableSupplements: [
-      { supplementId: "sup-7", isEnabled: true },
-      { supplementId: "sup-8", isEnabled: true },
-      { supplementId: "sup-9", isEnabled: true },
-      { supplementId: "sup-10", isEnabled: true },
-      { supplementId: "sup-11", isEnabled: true },
-    ],
-  },
-  { id: "the", name: "The", price: 3, points: 3, categoryId: "boissons-chaudes", isAvailable: true, image: "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&h=300&fit=crop" },
-  { id: "chocolat-chaud", name: "Chocolat Chaud", price: 5, points: 5, categoryId: "boissons-chaudes", isAvailable: true, image: "https://images.unsplash.com/photo-1542990253-0d0f5be5f0ed?w=400&h=300&fit=crop" },
-  { id: "jus-orange", name: "Jus orange / citronnade", price: 7, points: 7, categoryId: "boissons-fraiches", isAvailable: true, image: "https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=400&h=300&fit=crop" },
-  { id: "jus-fraise", name: "Jus frais fraise", price: 8, points: 8, categoryId: "boissons-fraiches", isAvailable: true, image: "https://images.unsplash.com/photo-1638176066666-ffb2f013c7dd?w=400&h=300&fit=crop" },
-  { id: "jus-kiwi", name: "Jus frais kiwi", price: 8.5, points: 9, categoryId: "boissons-fraiches", isAvailable: true, image: "https://images.unsplash.com/photo-1616671276441-2f2c277b8bf6?w=400&h=300&fit=crop" },
-  { id: "jus-banane", name: "Jus frais banane", price: 9, points: 9, categoryId: "boissons-fraiches", isAvailable: true, image: "https://images.unsplash.com/photo-1571950006966-ea6a3cf18b24?w=400&h=300&fit=crop" },
-  { id: "eau-05", name: "Eau 0.5L", price: 1.5, points: 2, categoryId: "boissons-fraiches", isAvailable: true, image: "https://images.unsplash.com/photo-1548839140-29a749e1cf4d?w=400&h=300&fit=crop" },
-  { id: "eau-1", name: "Eau 1L", price: 3, points: 3, categoryId: "boissons-fraiches", isAvailable: true, image: "https://images.unsplash.com/photo-1560023907-5f339617ea55?w=400&h=300&fit=crop" },
-  {
-    id: "croissant",
-    name: "Croissant nature",
-    price: 2.5,
-    points: 3,
-    categoryId: "viennoiseries",
-    isAvailable: true,
-    image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=400&h=300&fit=crop",
-    availableSupplements: [
-      { supplementId: "sup-16", isEnabled: true },
-      { supplementId: "sup-17", isEnabled: true },
-      { supplementId: "sup-18", isEnabled: true },
-    ],
-  },
-  { id: "pain-chocolat", name: "Pain au chocolat", price: 3.5, points: 4, categoryId: "viennoiseries", isAvailable: true, image: "https://images.unsplash.com/photo-1530610476181-d83430b64dcd?w=400&h=300&fit=crop" },
-  { id: "croissant-amande", name: "Croissant amande", price: 4.5, points: 5, categoryId: "viennoiseries", isAvailable: true, image: "https://images.unsplash.com/photo-1623334044303-241021148842?w=400&h=300&fit=crop" },
-  { id: "croissant-pistache", name: "Croissant pistache", price: 5.5, points: 6, categoryId: "viennoiseries", isAvailable: true, image: "https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=400&h=300&fit=crop" },
-  { id: "toast-beurre", name: "Toast beurre, miel & confiture", price: 4, points: 4, categoryId: "sucre", isAvailable: true, image: "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=400&h=300&fit=crop" },
-  { id: "verrine-cheesecake", name: "Verrine cheesecake", price: 5, points: 5, categoryId: "sucre", isAvailable: true, image: "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=300&fit=crop" },
-  { id: "cookies", name: "Cookies / cookies healthy", price: 4, points: 4, categoryId: "sucre", isAvailable: true, image: "https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=400&h=300&fit=crop" },
-  { id: "pain-cake-nutella", name: "Pain cake Nutella", price: 6, points: 6, categoryId: "sucre", isAvailable: true, image: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=400&h=300&fit=crop" },
-  {
-    id: "pancakes",
-    name: "Pancakes Maison",
-    description: "Pancakes moelleux faits maison",
-    price: 7,
-    points: 7,
-    categoryId: "sucre",
-    isAvailable: true,
-    image: "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&h=300&fit=crop",
-    availableSupplements: [
-      { supplementId: "sup-12", isEnabled: true },
-      { supplementId: "sup-13", isEnabled: true },
-      { supplementId: "sup-9", isEnabled: true },
-      { supplementId: "sup-14", isEnabled: true },
-      { supplementId: "sup-15", isEnabled: true },
-    ],
-  },
-  {
-    id: "crepes",
-    name: "Crepes",
-    description: "Crepes fines et legeres",
-    price: 6,
-    points: 6,
-    categoryId: "sucre",
-    isAvailable: true,
-    image: "https://images.unsplash.com/photo-1519676867240-f03562e64548?w=400&h=300&fit=crop",
-    availableSupplements: [
-      { supplementId: "sup-12", isEnabled: true },
-      { supplementId: "sup-13", isEnabled: true },
-      { supplementId: "sup-9", isEnabled: true },
-      { supplementId: "sup-14", isEnabled: true },
-      { supplementId: "sup-15", isEnabled: true },
-    ],
-  },
-  {
-    id: "omelette",
-    name: "Omelette au choix",
-    price: 8.5,
-    points: 9,
-    categoryId: "sale",
-    isAvailable: true,
-    image: "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=400&h=300&fit=crop",
-    availableSupplements: [
-      { supplementId: "sup-1", isEnabled: true },
-      { supplementId: "sup-2", isEnabled: true },
-      { supplementId: "sup-3", isEnabled: true },
-      { supplementId: "sup-4", isEnabled: true },
-      { supplementId: "sup-5", isEnabled: true },
-      { supplementId: "sup-6", isEnabled: true },
-    ],
-  },
-  { id: "croque-monsieur", name: "Croque-Monsieur", price: 7, points: 7, categoryId: "sale", isAvailable: true, image: "https://images.unsplash.com/photo-1528736235302-52922df5c122?w=400&h=300&fit=crop" },
-  { id: "quiche", name: "Quiche", price: 7, points: 7, categoryId: "sale", isAvailable: true, image: "https://images.unsplash.com/photo-1591985666643-9b1e8be1e63c?w=400&h=300&fit=crop" },
-  { id: "charcuterie-1", name: "Charcuterie 1 personne", description: "Assortiment fromage & charcuterie", price: 10, points: 10, categoryId: "premium", isAvailable: true, image: "https://images.unsplash.com/photo-1626200419199-391ae4be7a41?w=400&h=300&fit=crop" },
-  { id: "charcuterie-2", name: "Charcuterie 2 personnes", description: "Assortiment fromage & charcuterie", price: 18, points: 18, categoryId: "premium", isAvailable: true, image: "https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=400&h=300&fit=crop" },
-  { id: "cheesecake", name: "Cheesecake", price: 7, points: 7, categoryId: "desserts", isAvailable: true, image: "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=300&fit=crop" },
-  { id: "tiramisu", name: "Tiramisu", price: 7, points: 7, categoryId: "desserts", isAvailable: true, image: "https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=400&h=300&fit=crop" },
-  { id: "fondant-chocolat", name: "Fondant chocolat", price: 6, points: 6, categoryId: "desserts", isAvailable: true, image: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=400&h=300&fit=crop" },
-  { id: "verrine", name: "Verrine", price: 5, points: 5, categoryId: "desserts", isAvailable: true, image: "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=400&h=300&fit=crop" },
-  { id: "crepe-nutella", name: "Crepe Nutella ou Speculoos", price: 8, points: 8, categoryId: "desserts", isAvailable: true, image: "https://images.unsplash.com/photo-1519676867240-f03562e64548?w=400&h=300&fit=crop" },
-  { id: "crepe-fruits", name: "Crepe avec fruits ou fruits secs", price: 12, points: 12, categoryId: "desserts", isAvailable: true, image: "https://images.unsplash.com/photo-1484723091739-30a097e8f929?w=400&h=300&fit=crop" },
-  { id: "madeleine", name: "Madeleine", price: 3, points: 3, categoryId: "desserts", isAvailable: true, image: "https://images.unsplash.com/photo-1571115177098-24ec42ed204d?w=400&h=300&fit=crop" },
-  { id: "plateau-sucre-1", name: "Plateau sucre 1 personne", price: 12, points: 12, categoryId: "desserts", isAvailable: true, image: "https://images.unsplash.com/photo-1587668178277-295251f900ce?w=400&h=300&fit=crop" },
-  { id: "plateau-sucre-2", name: "Plateau sucre 2 personnes", price: 22, points: 22, categoryId: "desserts", isAvailable: true, image: "https://images.unsplash.com/photo-1551024601-bec78aea704b?w=400&h=300&fit=crop" }, */
-]
+const defaultItems: BreakfastItem[] = []
 
 interface BreakfastContextType {
   categories: BreakfastCategory[]
@@ -390,7 +236,18 @@ function buildBreakfastItemFormData(item: Partial<BreakfastItem>) {
   if (item.isRequired !== undefined) formData.append("isRequired", String(item.isRequired))
   if (item.minQuantity !== undefined) formData.append("minQuantity", String(item.minQuantity))
   if (item.maxQuantity !== undefined) formData.append("maxQuantity", String(item.maxQuantity))
-  if (item.availableSupplements !== undefined) formData.append("availableSupplements", JSON.stringify(item.availableSupplements))
+  
+   if (item.availableSupplements !== undefined && item.availableSupplements !== null) {
+    const supplementsToSend = item.availableSupplements
+      .filter(supp => supp.isEnabled === true) // Only send enabled supplements
+      .map(supp => ({
+        supplementId: supp.supplementId, // Send as string, backend will convert to ObjectId
+        isEnabled: supp.isEnabled,
+        customPrice: supp.customPrice
+      }))
+    formData.append("availableSupplements", JSON.stringify(supplementsToSend))
+  }
+  
   if (item.removeImage !== undefined) formData.append("removeImage", String(item.removeImage))
   if (item.imageFile) formData.append("imageFile", item.imageFile)
 
@@ -585,31 +442,74 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
     })()
   }
 
-  const updateItem = (id: string, updates: Partial<BreakfastItem>) => {
-    void (async () => {
-      try {
-        await fetchJson(`/menu/breakfast/items/${id}`, {
-          method: "PUT",
-          headers: getAuthTokenHeader(),
-          body: buildBreakfastItemFormData(updates),
-        })
-        setItems((prev) =>
-          prev.map((item) =>
-            item.id === id
-              ? {
-                  ...item,
-                  ...updates,
-                  imageFile: undefined,
-                  removeImage: undefined,
-                }
-              : item
-          )
-        )
-      } catch (error) {
-        console.error("Failed to update breakfast item:", error)
+ const updateItem = (id: string, updates: Partial<BreakfastItem>) => {
+  void (async () => {
+    try {
+      // First, get the current item to preserve existing values
+      const currentItem = items.find(item => item.id === id)
+      if (!currentItem) {
+        console.error("Item not found:", id)
+        return
       }
-    })()
-  }
+
+      // Merge current item with updates
+      const mergedItem: Partial<BreakfastItem> = {
+        name: updates.name !== undefined ? updates.name : currentItem.name,
+        description: updates.description !== undefined ? updates.description : currentItem.description,
+        price: updates.price !== undefined ? updates.price : currentItem.price,
+        points: updates.points !== undefined ? updates.points : currentItem.points,
+        categoryId: updates.categoryId !== undefined ? updates.categoryId : currentItem.categoryId,
+        image: updates.image !== undefined ? updates.image : currentItem.image,
+        isAvailable: updates.isAvailable !== undefined ? updates.isAvailable : currentItem.isAvailable,
+        isRequired: updates.isRequired !== undefined ? updates.isRequired : currentItem.isRequired,
+        minQuantity: updates.minQuantity !== undefined ? updates.minQuantity : currentItem.minQuantity,
+        maxQuantity: updates.maxQuantity !== undefined ? updates.maxQuantity : currentItem.maxQuantity,
+        availableSupplements: updates.availableSupplements !== undefined ? updates.availableSupplements : currentItem.availableSupplements,
+      }
+
+      // Handle image removal
+      if (updates.removeImage) {
+        mergedItem.image = undefined
+        mergedItem.removeImage = true
+      }
+
+      // Handle new image file
+      if (updates.imageFile) {
+        mergedItem.imageFile = updates.imageFile
+      }
+
+      const formData = buildBreakfastItemFormData(mergedItem)
+      
+      const response = await fetch(`${API_BASE_URL}/menu/breakfast/items/${id}`, {
+        method: "PUT",
+        headers: getAuthTokenHeader(),
+        body: formData,
+      })
+      
+      const result = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update')
+      }
+      
+      // Update local state with merged values
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                ...mergedItem,
+                imageFile: undefined,
+                removeImage: undefined,
+              } as BreakfastItem
+            : item
+        )
+      )
+    } catch (error) {
+      console.error("Failed to update breakfast item:", error)
+    }
+  })()
+}
 
   const deleteItem = (id: string) => {
     void (async () => {

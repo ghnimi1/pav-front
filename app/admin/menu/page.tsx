@@ -346,7 +346,7 @@ function MenuAdminContent() {
               <div className="relative h-32 bg-stone-100">
                 {product.image ? (
                   <Image
-                    src={product.image}
+                    src={`${process.env.NEXT_PUBLIC_API_IMAGE_URL}/menu/${product.image}`}
                     alt={product.name}
                     fill
                     className="object-cover"

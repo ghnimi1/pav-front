@@ -1041,7 +1041,7 @@ const calculateSmartDiscount = useMemo(() => {
                         <div className="relative h-14 overflow-hidden bg-stone-100">
                           {item.image ? (
                             <Image
-                              src={item.image}
+                              src={`${process.env.NEXT_PUBLIC_API_IMAGE_URL}/menu/${item.image}`}
                               alt={item.name}
                               fill
                               className="object-cover"

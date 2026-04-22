@@ -18,33 +18,39 @@ interface SupplementsModalProps {
 export function SupplementsModal({ isOpen, onClose, item, onConfirm }: SupplementsModalProps) {
   const { supplements: allSupplements } = useStock()
   const [selectedSupplements, setSelectedSupplements] = useState<Map<string, SelectedSupplement>>(new Map())
-  
+  console.log(allSupplements)
   // Reset selection when item changes
   useEffect(() => {
     setSelectedSupplements(new Map())
   }, [item?.id])
 
   if (!item) return null
-
+console.log(item.availableSupplements)
   // Get available supplements for this item
   const getAvailableSupplements = (): Supplement[] => {
-    if (!item.availableSupplements) return []
+  if (!item.availableSupplements) return []
+  
+  console.log('item.availableSupplements:', item.availableSupplements)
+  console.log('allSupplements:', allSupplements)
+  
+  const result = item.availableSupplements
+    .filter(ps => ps.isEnabled)
+    .map(ps => {
+      const supplement = allSupplements.find(s => s.id === ps.supplementId && s.isActive)
+      console.log(`Looking for ${ps.supplementId}:`, supplement)
+      if (!supplement) return null
+      return ps.customPrice !== undefined 
+        ? { ...supplement, price: ps.customPrice }
+        : supplement
+    })
+    .filter((s): s is Supplement => s !== null)
     
-    return item.availableSupplements
-      .filter(ps => ps.isEnabled)
-      .map(ps => {
-        const supplement = allSupplements.find(s => s.id === ps.supplementId && s.isActive)
-        if (!supplement) return null
-        // Apply custom price if set
-        return ps.customPrice !== undefined 
-          ? { ...supplement, price: ps.customPrice }
-          : supplement
-      })
-      .filter((s): s is Supplement => s !== null)
-  }
+  console.log('Final result:', result)
+  return result
+}
 
   const availableSupplements = getAvailableSupplements()
-
+  
   const incrementSupplement = (supplement: Supplement) => {
     setSelectedSupplements(prev => {
       const newMap = new Map(prev)
@@ -115,7 +121,6 @@ export function SupplementsModal({ isOpen, onClose, item, onConfirm }: Supplemen
     onConfirm(item, [])
     onClose()
   }
-
   // Group supplements by category
   const groupedSupplements = availableSupplements.reduce((acc, sup) => {
     const category = sup.category || "autre"
