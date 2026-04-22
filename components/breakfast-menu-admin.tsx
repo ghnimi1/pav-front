@@ -189,6 +189,7 @@ export function BreakfastMenuAdmin() {
         name: itemDialog.item.name,
         description: itemDialog.item.description || "",
         price: itemDialog.item.price || 0,
+        points: itemDialog.item.points || 0,
         categoryId: itemDialog.item.categoryId,
         image: itemDialog.item.image,
         imageFile: itemDialog.item.imageFile,
@@ -600,7 +601,7 @@ export function BreakfastMenuAdmin() {
                 </Label>
                 <Input
                   type="number"
-                  value={formulaDialog.formula?.points || 0}
+                  value={formulaDialog.formula?.points ?? 0}
                   onChange={(e) => setFormulaDialog(prev => ({
                     ...prev,
                     formula: { ...prev.formula, points: parseInt(e.target.value) || 0 }
@@ -769,7 +770,13 @@ export function BreakfastMenuAdmin() {
                   <div className="relative group">
                     <div className="relative h-40 w-full rounded-xl overflow-hidden border-2 border-amber-200 bg-amber-50">
                       <img
-  src={itemDialog.item.image || `${process.env.NEXT_PUBLIC_API_IMAGE_URL}/menu/${itemDialog.item.image}`}
+  src={
+          itemDialog.item.imageFile 
+            ? URL.createObjectURL(itemDialog.item.imageFile)
+            : itemDialog.item.image.startsWith('http') 
+              ? itemDialog.item.image 
+              : `${process.env.NEXT_PUBLIC_API_IMAGE_URL}/menu/${itemDialog.item.image}`
+        }
   alt="Preview"
   className="h-full w-full object-cover"
 />

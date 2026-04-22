@@ -345,7 +345,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
       client: loyaltyClient ? {
         id: loyaltyClient.id,
         email: loyaltyClient.email,
-        name: `${loyaltyClient.firstName} ${loyaltyClient.lastName}`,
+        name: `${loyaltyClient.name}`,
       } : undefined,
     })
     

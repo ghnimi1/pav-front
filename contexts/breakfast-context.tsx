@@ -120,18 +120,18 @@ const defaultBaseFormulas: BaseFormula[] = [
 ]
 
 const defaultCategories: BreakfastCategory[] = [
-  { id: "suggestions", name: "Nos Suggestions", icon: "star", description: "Formules recommandees", order: 0, isActive: true },
+  /* { id: "suggestions", name: "Nos Suggestions", icon: "star", description: "Formules recommandees", order: 0, isActive: true },
   { id: "boissons-chaudes", name: "Boissons Chaudes", icon: "coffee", description: "Cafe, the et chocolat", order: 1, isActive: true },
   { id: "boissons-fraiches", name: "Boissons Fraiches", icon: "glass-water", description: "Jus frais et eau", order: 2, isActive: true },
   { id: "viennoiseries", name: "Viennoiseries", icon: "croissant", description: "Viennoiseries fraiches du jour", order: 3, isActive: true },
   { id: "sucre", name: "Sucre", icon: "cake", description: "Options sucrees gourmandes", order: 4, isActive: true },
   { id: "sale", name: "Sale", icon: "egg", description: "Options salees", order: 5, isActive: true },
   { id: "premium", name: "Premium", icon: "crown", description: "Selection premium", order: 6, isActive: true },
-  { id: "desserts", name: "Desserts", icon: "ice-cream", description: "Desserts et gourmandises", order: 7, isActive: true },
+  { id: "desserts", name: "Desserts", icon: "ice-cream", description: "Desserts et gourmandises", order: 7, isActive: true }, */
 ]
 
 const defaultItems: BreakfastItem[] = [
-  { id: "pack-classique", name: "Classique", description: "Cafe + croissant + jus", price: 9, points: 9, categoryId: "suggestions", isAvailable: true, image: "https://images.unsplash.com/photo-1504754524776-8f4f37790ca0?w=400&h=300&fit=crop" },
+ /*  { id: "pack-classique", name: "Classique", description: "Cafe + croissant + jus", price: 9, points: 9, categoryId: "suggestions", isAvailable: true, image: "https://images.unsplash.com/photo-1504754524776-8f4f37790ca0?w=400&h=300&fit=crop" },
   { id: "pack-gourmand", name: "Gourmand", description: "Cafe + croissant + toast + jus", price: 14, points: 14, categoryId: "suggestions", isAvailable: true, image: "https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=400&h=300&fit=crop" },
   { id: "pack-complet", name: "Complet", description: "Cafe + jus + omelette ou croque + toast", price: 19, points: 19, categoryId: "suggestions", isAvailable: true, image: "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=400&h=300&fit=crop" },
   {
@@ -274,7 +274,7 @@ const defaultItems: BreakfastItem[] = [
   { id: "crepe-fruits", name: "Crepe avec fruits ou fruits secs", price: 12, points: 12, categoryId: "desserts", isAvailable: true, image: "https://images.unsplash.com/photo-1484723091739-30a097e8f929?w=400&h=300&fit=crop" },
   { id: "madeleine", name: "Madeleine", price: 3, points: 3, categoryId: "desserts", isAvailable: true, image: "https://images.unsplash.com/photo-1571115177098-24ec42ed204d?w=400&h=300&fit=crop" },
   { id: "plateau-sucre-1", name: "Plateau sucre 1 personne", price: 12, points: 12, categoryId: "desserts", isAvailable: true, image: "https://images.unsplash.com/photo-1587668178277-295251f900ce?w=400&h=300&fit=crop" },
-  { id: "plateau-sucre-2", name: "Plateau sucre 2 personnes", price: 22, points: 22, categoryId: "desserts", isAvailable: true, image: "https://images.unsplash.com/photo-1551024601-bec78aea704b?w=400&h=300&fit=crop" },
+  { id: "plateau-sucre-2", name: "Plateau sucre 2 personnes", price: 22, points: 22, categoryId: "desserts", isAvailable: true, image: "https://images.unsplash.com/photo-1551024601-bec78aea704b?w=400&h=300&fit=crop" }, */
 ]
 
 interface BreakfastContextType {

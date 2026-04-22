@@ -1301,7 +1301,7 @@ const initialMenuItems: MenuItem[] = [
 // ============================================
 
 const initialSupplementCategories: SupplementCategory[] = [
-  { id: "fromage", name: "Fromage", color: "bg-yellow-100 text-yellow-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+ /*  { id: "fromage", name: "Fromage", color: "bg-yellow-100 text-yellow-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
   { id: "viande", name: "Viandes", color: "bg-red-100 text-red-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
   { id: "poisson", name: "Poisson", color: "bg-blue-100 text-blue-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
   { id: "legumes", name: "Legumes", color: "bg-green-100 text-green-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
@@ -1313,7 +1313,7 @@ const initialSupplementCategories: SupplementCategory[] = [
   { id: "fruits", name: "Fruits", color: "bg-rose-100 text-rose-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
   { id: "glace", name: "Glace", color: "bg-cyan-100 text-cyan-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
   { id: "confiture", name: "Confiture", color: "bg-purple-100 text-purple-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "autre", name: "Autre", color: "bg-gray-100 text-gray-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "autre", name: "Autre", color: "bg-gray-100 text-gray-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, */
 ]
 
 // ============================================
@@ -1322,7 +1322,7 @@ const initialSupplementCategories: SupplementCategory[] = [
 
 const initialSupplements: Supplement[] = [
   // Supplements pour Omelette
-  {
+/*   {
     id: "sup-1",
     name: "Champignons",
     price: 1.50,
@@ -1522,7 +1522,7 @@ const initialSupplements: Supplement[] = [
     isActive: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-  },
+  }, */
 ]
 
 // ============================================
@@ -1630,7 +1630,7 @@ export function StockProvider({ children }: { children: ReactNode }) {
     }
 
     const stored = {
-      stockCategories: localStorage.getItem("stock-categories"),
+      /* stockCategories: localStorage.getItem("stock-categories"),
       subCategories: localStorage.getItem("sub-categories"),
       products: localStorage.getItem("stock-products"),
       batches: localStorage.getItem("stock-batches"),
@@ -1643,7 +1643,7 @@ export function StockProvider({ children }: { children: ReactNode }) {
       menuCategories: localStorage.getItem("pastry-menu-categories"),
       supplements: localStorage.getItem("pastry-supplements"),
       supplementCategories: localStorage.getItem("pastry-supplement-categories"),
-      offers: localStorage.getItem("pastry-offers"),
+      offers: localStorage.getItem("pastry-offers"), */
     }
 
     setStockCategories(stored.stockCategories ? JSON.parse(stored.stockCategories) : initialStockCategories)

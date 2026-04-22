@@ -57,7 +57,7 @@ import { cn } from "@/lib/utils"
 
 function LoyaltyCardsAdminContent() {
   const router = useRouter()
-  const { showNotification } = useNotification()
+  const { addNotification } = useNotification()
   const { menuItems } = useStock()
   const { items: breakfastItems } = useBreakfast()
   const { 
@@ -264,7 +264,7 @@ function LoyaltyCardsAdminContent() {
   // Save card
   const handleSave = () => {
     if (!formData.name || !formData.productName) {
-      showNotification("Veuillez remplir tous les champs obligatoires", "error")
+      addNotification("Veuillez remplir tous les champs obligatoires", "error")
       return
     }
 
@@ -275,11 +275,11 @@ function LoyaltyCardsAdminContent() {
 
     if (showEditDialog && selectedCard) {
       updateCardConfig(selectedCard.id, cardData)
-      showNotification("Carte mise a jour avec succes", "success")
+      addNotification("Carte mise a jour avec succes", "success")
       setShowEditDialog(false)
     } else {
       createCardConfig(cardData)
-      showNotification("Carte creee avec succes", "success")
+      addNotification("Carte creee avec succes", "success")
       setShowCreateDialog(false)
     }
     
@@ -291,7 +291,7 @@ function LoyaltyCardsAdminContent() {
   const handleDelete = () => {
     if (selectedCard) {
       deleteCardConfig(selectedCard.id)
-      showNotification("Carte supprimee avec succes", "success")
+      addNotification("Carte supprimee avec succes", "success")
       setShowDeleteDialog(false)
       setSelectedCard(null)
     }
