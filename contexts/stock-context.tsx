@@ -11,7 +11,7 @@ export interface StorageLocation {
   name: string
   type: "refrigerator" | "freezer" | "room" | "shelf" | "other"
   description?: string
-  temperature?: string // Ex: "2-4°C", "-18°C"
+  temperature?: string
   capacity?: string
   isActive: boolean
   createdAt: string
@@ -33,7 +33,7 @@ export interface StockCategory {
 
 export interface SubCategory {
   id: string
-  categoryId: string // Reference to parent StockCategory
+  categoryId: string
   name: string
   slug: string
   description?: string
@@ -46,15 +46,15 @@ export interface SubCategory {
 
 export interface Product {
   id: string
-  subCategoryId: string // Reference to parent SubCategory
+  subCategoryId: string
   name: string
   description?: string
   unit: "kg" | "g" | "L" | "ml" | "pieces" | "sachets" | "boites"
   minQuantity: number
   unitPrice: number
-  shelfLifeAfterOpening?: number // Days after opening
+  shelfLifeAfterOpening?: number
   supplierId?: string
-  defaultLocationId?: string // Default storage location for this product
+  defaultLocationId?: string
   image?: string
   isActive: boolean
   createdAt: string
@@ -63,13 +63,13 @@ export interface Product {
 
 export interface Batch {
   id: string
-  productId: string // Reference to Product
+  productId: string
   supplierId?: string
-  locationId?: string // Storage location for this batch
+  locationId?: string
   batchNumber: string
   quantity: number
-  unitCost: number // Cost per unit for this batch
-  receptionDate: string // FIFO order
+  unitCost: number
+  receptionDate: string
   productionDate?: string
   expirationDate: string
   openingDate?: string
@@ -79,10 +79,6 @@ export interface Batch {
   createdAt: string
   updatedAt: string
 }
-
-// ============================================
-// LEGACY INTERFACES (kept for menu system)
-// ============================================
 
 export interface Supplier {
   id: string
@@ -113,7 +109,7 @@ export interface Reward {
 export interface SupplementCategory {
   id: string
   name: string
-  color: string // Tailwind color classes like "bg-amber-100 text-amber-700"
+  color: string
   isActive: boolean
   createdAt: string
   updatedAt: string
@@ -123,10 +119,10 @@ export interface Supplement {
   id: string
   name: string
   price: number
-  points?: number // Points earned when adding this supplement
+  points?: number
   description?: string
   image?: string
-  category?: string // "fromage", "viande", "legumes", "sauce", etc.
+  category?: string
   isActive: boolean
   createdAt: string
   updatedAt: string
@@ -135,7 +131,7 @@ export interface Supplement {
 export interface ProductSupplementConfig {
   supplementId: string
   isEnabled: boolean
-  customPrice?: number // Optional custom price for this specific product
+  customPrice?: number
 }
 
 export interface SelectedSupplement {
@@ -162,8 +158,8 @@ export interface MenuItem {
   allergens: string[]
   isAvailable: boolean
   tags?: string[]
-  supplements?: Supplement[] // Legacy - kept for compatibility
-  availableSupplements?: ProductSupplementConfig[] // New - configurable supplements per product
+  supplements?: Supplement[]
+  availableSupplements?: ProductSupplementConfig[]
   promotion?: Promotion
   createdAt: string
   updatedAt: string
@@ -178,11 +174,10 @@ export interface MenuCategory {
   isActive: boolean
 }
 
-// Offer/Suggestion interface for time-based promotions
 export interface OfferSchedule {
-  daysOfWeek: number[] // 0=Sunday, 1=Monday, ..., 6=Saturday
-  startTime: string // "HH:mm" format
-  endTime: string // "HH:mm" format
+  daysOfWeek: number[]
+  startTime: string
+  endTime: string
 }
 
 export interface OfferItem {
@@ -195,20 +190,19 @@ export interface Offer {
   name: string
   description: string
   image?: string
-  originalPrice: number // Sum of individual items
-  discountedPrice: number // Offer price
+  originalPrice: number
+  discountedPrice: number
   points: number
-  items: OfferItem[] // Products included in offer
+  items: OfferItem[]
   schedule: OfferSchedule
   isActive: boolean
-  validFrom?: string // ISO date
-  validUntil?: string // ISO date
-  maxPerDay?: number // Optional limit
+  validFrom?: string
+  validUntil?: string
+  maxPerDay?: number
   createdAt: string
   updatedAt: string
 }
 
-// Legacy interface for backwards compatibility
 export interface StockItem {
   id: string
   name: string
@@ -234,31 +228,22 @@ export interface Category {
 }
 
 interface StockContextType {
-  // New hierarchy
   stockCategories: StockCategory[]
   subCategories: SubCategory[]
   products: Product[]
   batches: Batch[]
-  
-  // Stock category CRUD
   addStockCategory: (cat: Omit<StockCategory, "id" | "createdAt" | "updatedAt">) => void
   updateStockCategory: (id: string, cat: Partial<StockCategory>) => void
   deleteStockCategory: (id: string) => void
-  
-  // SubCategory CRUD
   addSubCategory: (sub: Omit<SubCategory, "id" | "createdAt" | "updatedAt">) => void
   updateSubCategory: (id: string, sub: Partial<SubCategory>) => void
   deleteSubCategory: (id: string) => void
   getSubCategoriesByCategoryId: (categoryId: string) => SubCategory[]
-  
-  // Product CRUD
   addProduct: (product: Omit<Product, "id" | "createdAt" | "updatedAt">) => void
   updateProduct: (id: string, product: Partial<Product>) => void
   deleteProduct: (id: string) => void
   getProductsBySubCategoryId: (subCategoryId: string) => Product[]
   getProductStock: (productId: string) => number
-  
-  // Batch CRUD (FIFO)
   addBatch: (batch: Omit<Batch, "id" | "createdAt" | "updatedAt">) => void
   updateBatch: (id: string, batch: Partial<Batch>) => void
   deleteBatch: (id: string) => void
@@ -266,19 +251,13 @@ interface StockContextType {
   getBatchesByProduct: (productId: string) => Batch[]
   getActiveBatches: (productId: string) => Batch[]
   consumeFromBatches: (productId: string, quantity: number) => void
-  
-  // Storage Locations CRUD
   storageLocations: StorageLocation[]
   addStorageLocation: (location: Omit<StorageLocation, "id" | "createdAt" | "updatedAt">) => void
   updateStorageLocation: (id: string, location: Partial<StorageLocation>) => void
   deleteStorageLocation: (id: string) => void
   getActiveStorageLocations: () => StorageLocation[]
-  
-  // Alerts
   getExpiringSoonBatches: () => Array<Batch & { productName: string; daysLeft: number }>
   getLowStockProducts: () => Array<Product & { currentStock: number; categoryName: string; subCategoryName: string }>
-  
-  // Legacy compatibility
   items: StockItem[]
   categories: Category[]
   suppliers: Supplier[]
@@ -293,8 +272,6 @@ interface StockContextType {
   deleteSupplier: (id: string) => void
   getLowStockItems: () => StockItem[]
   getArchivedBatches: (productId: string) => Batch[]
-  
-  // Menu
   menuCategories: MenuCategory[]
   menuItems: MenuItem[]
   addMenuCategory: (category: Omit<MenuCategory, "id">) => void
@@ -303,44 +280,156 @@ interface StockContextType {
   addMenuItem: (item: Omit<MenuItem, "id" | "createdAt" | "updatedAt">) => void
   updateMenuItem: (id: string, item: Partial<MenuItem>) => void
   deleteMenuItem: (id: string) => void
-  
-  // Rewards
   rewards: Reward[]
   addReward: (reward: Omit<Reward, "id" | "createdAt" | "updatedAt">) => void
   updateReward: (id: string, reward: Partial<Reward>) => void
   deleteReward: (id: string) => void
   getActiveRewards: () => Reward[]
-  
-  // Supplements
   supplements: Supplement[]
   addSupplement: (supplement: Omit<Supplement, "id" | "createdAt" | "updatedAt">) => void
   updateSupplement: (id: string, supplement: Partial<Supplement>) => void
   deleteSupplement: (id: string) => void
   getActiveSupplements: () => Supplement[]
   getSupplementsForProduct: (productSupplements: ProductSupplementConfig[]) => Supplement[]
-  
-  // Supplement Categories
   supplementCategories: SupplementCategory[]
   addSupplementCategory: (category: Omit<SupplementCategory, "id" | "createdAt" | "updatedAt">) => void
   updateSupplementCategory: (id: string, category: Partial<SupplementCategory>) => void
   deleteSupplementCategory: (id: string) => void
   getActiveSupplementCategories: () => SupplementCategory[]
-  
-  // Offers
   offers: Offer[]
   addOffer: (offer: Omit<Offer, "id" | "createdAt" | "updatedAt">) => void
   updateOffer: (id: string, offer: Partial<Offer>) => void
   deleteOffer: (id: string) => void
   getActiveOffers: () => Offer[]
-  getCurrentOffers: () => Offer[] // Returns offers valid for current day/time
+  getCurrentOffers: () => Offer[]
 }
 
 const StockContext = createContext<StockContextType | undefined>(undefined)
 
-// ============================================
-// INITIAL DATA - STOCK HIERARCHY
-// ============================================
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api").replace(/\/$/, "")
+const AUTH_TOKEN_KEY = "authToken"
 
+async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, init)
+  const payload = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    const error = payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
+      ? payload.error
+      : "Une erreur est survenue"
+    throw new Error(error)
+  }
+
+  if (payload && typeof payload === "object" && "success" in payload && "data" in payload) {
+    return payload.data as T
+  }
+
+  return payload as T
+}
+
+function getAuthHeaders() {
+  if (typeof window === "undefined") return { "Content-Type": "application/json" }
+  const token = localStorage.getItem(AUTH_TOKEN_KEY)
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
+}
+
+// API functions for supplements
+async function fetchSupplements(): Promise<Supplement[]> {
+  try {
+    const data = await fetchJson<Supplement[]>('/menu/supplements/all', {
+      headers: getAuthHeaders(),
+    })
+    return data.map(s => ({
+      ...s,
+      id: (s as any)._id || s.id,
+      createdAt: s.createdAt || new Date().toISOString(),
+      updatedAt: s.updatedAt || new Date().toISOString(),
+    }))
+  } catch (error) {
+    console.error('Failed to fetch supplements:', error)
+    return []
+  }
+}
+
+async function fetchSupplementCategories(): Promise<SupplementCategory[]> {
+  try {
+    const data = await fetchJson<SupplementCategory[]>('/menu/supplement-categories', {
+      headers: getAuthHeaders(),
+    })
+    return data.map(c => ({
+      ...c,
+      id: (c as any)._id || c.id,
+      createdAt: c.createdAt || new Date().toISOString(),
+      updatedAt: c.updatedAt || new Date().toISOString(),
+    }))
+  } catch (error) {
+    console.error('Failed to fetch supplement categories:', error)
+    return []
+  }
+}
+
+async function createSupplementAPI(data: Omit<Supplement, 'id' | 'createdAt' | 'updatedAt'>): Promise<Supplement> {
+  const result = await fetchJson<Supplement>('/menu/supplements', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  })
+  return {
+    ...result,
+    id: (result as any)._id || result.id,
+    createdAt: result.createdAt || new Date().toISOString(),
+    updatedAt: result.updatedAt || new Date().toISOString(),
+  }
+}
+
+async function updateSupplementAPI(id: string, data: Partial<Supplement>): Promise<void> {
+  await fetchJson(`/menu/supplements/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  })
+}
+
+async function deleteSupplementAPI(id: string): Promise<void> {
+  await fetchJson(`/menu/supplements/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  })
+}
+
+async function createSupplementCategoryAPI(data: Omit<SupplementCategory, 'id' | 'createdAt' | 'updatedAt'>): Promise<SupplementCategory> {
+  const result = await fetchJson<SupplementCategory>('/menu/supplement-categories', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  })
+  return {
+    ...result,
+    id: (result as any)._id || result.id,
+    createdAt: result.createdAt || new Date().toISOString(),
+    updatedAt: result.updatedAt || new Date().toISOString(),
+  }
+}
+
+async function updateSupplementCategoryAPI(id: string, data: Partial<SupplementCategory>): Promise<void> {
+  await fetchJson(`/menu/supplement-categories/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  })
+}
+
+async function deleteSupplementCategoryAPI(id: string): Promise<void> {
+  await fetchJson(`/menu/supplement-categories/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  })
+}
+
+// Initial data
 const initialStockCategories: StockCategory[] = [
   {
     id: "cat-1",
@@ -381,471 +470,53 @@ const initialStockCategories: StockCategory[] = [
 ]
 
 const initialSubCategories: SubCategory[] = [
-  // Patisserie sub-categories
-  {
-    id: "sub-1",
-    categoryId: "cat-1",
-    name: "Chocolat",
-    slug: "chocolat",
-    description: "Chocolats et couvertures",
-    icon: "🍫",
-    order: 1,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sub-2",
-    categoryId: "cat-1",
-    name: "Arome",
-    slug: "arome",
-    description: "Aromes et extraits naturels",
-    icon: "🌿",
-    order: 2,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sub-3",
-    categoryId: "cat-1",
-    name: "Puree",
-    slug: "puree",
-    description: "Purees de fruits",
-    icon: "🍓",
-    order: 3,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sub-4",
-    categoryId: "cat-1",
-    name: "Farine",
-    slug: "farine",
-    description: "Farines et poudres",
-    icon: "🌾",
-    order: 4,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sub-5",
-    categoryId: "cat-1",
-    name: "Produits Laitiers",
-    slug: "produits-laitiers",
-    description: "Lait, creme, beurre",
-    icon: "🥛",
-    order: 5,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  // Cafe sub-categories
-  {
-    id: "sub-6",
-    categoryId: "cat-2",
-    name: "Cafe",
-    slug: "cafe-grains",
-    description: "Cafe en grains et moulu",
-    icon: "☕",
-    order: 1,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sub-7",
-    categoryId: "cat-2",
-    name: "The",
-    slug: "the",
-    description: "Thes et infusions",
-    icon: "🍵",
-    order: 2,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sub-8",
-    categoryId: "cat-2",
-    name: "Sirops",
-    slug: "sirops",
-    description: "Sirops pour boissons",
-    icon: "🍯",
-    order: 3,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  // Restaurant sub-categories
-  {
-    id: "sub-9",
-    categoryId: "cat-3",
-    name: "Huile",
-    slug: "huile",
-    description: "Huiles de cuisine",
-    icon: "🫒",
-    order: 1,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sub-10",
-    categoryId: "cat-3",
-    name: "Epices",
-    slug: "epices",
-    description: "Epices et condiments",
-    icon: "🌶️",
-    order: 2,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sub-11",
-    categoryId: "cat-3",
-    name: "Conserves",
-    slug: "conserves",
-    description: "Conserves et bocaux",
-    icon: "🥫",
-    order: 3,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
+  { id: "sub-1", categoryId: "cat-1", name: "Chocolat", slug: "chocolat", description: "Chocolats et couvertures", icon: "🍫", order: 1, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "sub-2", categoryId: "cat-1", name: "Arome", slug: "arome", description: "Aromes et extraits naturels", icon: "🌿", order: 2, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "sub-3", categoryId: "cat-1", name: "Puree", slug: "puree", description: "Purees de fruits", icon: "🍓", order: 3, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "sub-4", categoryId: "cat-1", name: "Farine", slug: "farine", description: "Farines et poudres", icon: "🌾", order: 4, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "sub-5", categoryId: "cat-1", name: "Produits Laitiers", slug: "produits-laitiers", description: "Lait, creme, beurre", icon: "🥛", order: 5, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "sub-6", categoryId: "cat-2", name: "Cafe", slug: "cafe-grains", description: "Cafe en grains et moulu", icon: "☕", order: 1, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "sub-7", categoryId: "cat-2", name: "The", slug: "the", description: "Thes et infusions", icon: "🍵", order: 2, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "sub-8", categoryId: "cat-2", name: "Sirops", slug: "sirops", description: "Sirops pour boissons", icon: "🍯", order: 3, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "sub-9", categoryId: "cat-3", name: "Huile", slug: "huile", description: "Huiles de cuisine", icon: "🫒", order: 1, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "sub-10", categoryId: "cat-3", name: "Epices", slug: "epices", description: "Epices et condiments", icon: "🌶️", order: 2, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "sub-11", categoryId: "cat-3", name: "Conserves", slug: "conserves", description: "Conserves et bocaux", icon: "🥫", order: 3, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
 ]
 
 const initialStorageLocations: StorageLocation[] = [
-  {
-    id: "loc-1",
-    name: "Refrigerateur 1",
-    type: "refrigerator",
-    description: "Refrigerateur principal pour produits laitiers",
-    temperature: "2-4°C",
-    capacity: "500L",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "loc-2",
-    name: "Refrigerateur 2",
-    type: "refrigerator",
-    description: "Refrigerateur secondaire pour fruits et legumes",
-    temperature: "4-6°C",
-    capacity: "400L",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "loc-3",
-    name: "Congelateur",
-    type: "freezer",
-    description: "Congelateur pour produits surgeles",
-    temperature: "-18°C",
-    capacity: "300L",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "loc-4",
-    name: "Chambre Froide",
-    type: "room",
-    description: "Chambre froide positive",
-    temperature: "0-4°C",
-    capacity: "2000L",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "loc-5",
-    name: "Chambre de Stock 1",
-    type: "room",
-    description: "Stock sec - farines et sucres",
-    temperature: "Ambiante",
-    capacity: "Grande",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "loc-6",
-    name: "Chambre de Stock 2",
-    type: "room",
-    description: "Stock sec - conserves et emballages",
-    temperature: "Ambiante",
-    capacity: "Grande",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "loc-7",
-    name: "Etagere Aromes",
-    type: "shelf",
-    description: "Etagere pour aromes et extraits",
-    temperature: "Ambiante",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
+  { id: "loc-1", name: "Refrigerateur 1", type: "refrigerator", description: "Refrigerateur principal pour produits laitiers", temperature: "2-4°C", capacity: "500L", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "loc-2", name: "Refrigerateur 2", type: "refrigerator", description: "Refrigerateur secondaire pour fruits et legumes", temperature: "4-6°C", capacity: "400L", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "loc-3", name: "Congelateur", type: "freezer", description: "Congelateur pour produits surgeles", temperature: "-18°C", capacity: "300L", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "loc-4", name: "Chambre Froide", type: "room", description: "Chambre froide positive", temperature: "0-4°C", capacity: "2000L", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "loc-5", name: "Chambre de Stock 1", type: "room", description: "Stock sec - farines et sucres", temperature: "Ambiante", capacity: "Grande", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "loc-6", name: "Chambre de Stock 2", type: "room", description: "Stock sec - conserves et emballages", temperature: "Ambiante", capacity: "Grande", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "loc-7", name: "Etagere Aromes", type: "shelf", description: "Etagere pour aromes et extraits", temperature: "Ambiante", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
 ]
 
 const initialProducts: Product[] = [
-  // Chocolat products
-  {
-    id: "prod-1",
-    subCategoryId: "sub-1",
-    name: "Chocolat Blanc",
-    description: "Chocolat blanc de couverture 35%",
-    unit: "kg",
-    minQuantity: 5,
-    unitPrice: 25.0,
-    shelfLifeAfterOpening: 180,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "prod-2",
-    subCategoryId: "sub-1",
-    name: "Chocolat Noir 70%",
-    description: "Chocolat noir de couverture 70% cacao",
-    unit: "kg",
-    minQuantity: 5,
-    unitPrice: 28.5,
-    shelfLifeAfterOpening: 180,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "prod-3",
-    subCategoryId: "sub-1",
-    name: "Chocolat au Lait",
-    description: "Chocolat au lait de couverture 40%",
-    unit: "kg",
-    minQuantity: 5,
-    unitPrice: 24.0,
-    shelfLifeAfterOpening: 180,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  // Arome products
-  {
-    id: "prod-4",
-    subCategoryId: "sub-2",
-    name: "Arome Caramel",
-    description: "Arome naturel caramel concentre",
-    unit: "L",
-    minQuantity: 2,
-    unitPrice: 35.0,
-    shelfLifeAfterOpening: 365,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "prod-5",
-    subCategoryId: "sub-2",
-    name: "Extrait de Vanille",
-    description: "Extrait de vanille de Madagascar",
-    unit: "L",
-    minQuantity: 1,
-    unitPrice: 85.0,
-    shelfLifeAfterOpening: 365,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "prod-6",
-    subCategoryId: "sub-2",
-    name: "Arome Fraise",
-    description: "Arome naturel fraise",
-    unit: "L",
-    minQuantity: 2,
-    unitPrice: 32.0,
-    shelfLifeAfterOpening: 365,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  // Cafe products
-  {
-    id: "prod-7",
-    subCategoryId: "sub-6",
-    name: "Cafe Poudre Arabica",
-    description: "Cafe moulu 100% Arabica",
-    unit: "kg",
-    minQuantity: 3,
-    unitPrice: 18.0,
-    shelfLifeAfterOpening: 30,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "prod-8",
-    subCategoryId: "sub-6",
-    name: "Cafe Grains Premium",
-    description: "Cafe en grains torrefaction artisanale",
-    unit: "kg",
-    minQuantity: 5,
-    unitPrice: 22.0,
-    shelfLifeAfterOpening: 60,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  // Huile products
-  {
-    id: "prod-9",
-    subCategoryId: "sub-9",
-    name: "Huile Olive Extra Vierge",
-    description: "Huile d'olive extra vierge premiere pression",
-    unit: "L",
-    minQuantity: 10,
-    unitPrice: 12.0,
-    shelfLifeAfterOpening: 180,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "prod-10",
-    subCategoryId: "sub-9",
-    name: "Huile Tournesol",
-    description: "Huile de tournesol pour friture",
-    unit: "L",
-    minQuantity: 20,
-    unitPrice: 3.5,
-    shelfLifeAfterOpening: 90,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  // Produits laitiers
-  {
-    id: "prod-11",
-    subCategoryId: "sub-5",
-    name: "Beurre AOP",
-    description: "Beurre doux AOP 82% MG",
-    unit: "kg",
-    minQuantity: 10,
-    unitPrice: 12.5,
-    shelfLifeAfterOpening: 7,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "prod-12",
-    subCategoryId: "sub-5",
-    name: "Creme Liquide 35%",
-    description: "Creme liquide UHT 35% MG",
-    unit: "L",
-    minQuantity: 5,
-    unitPrice: 3.5,
-    shelfLifeAfterOpening: 3,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
+  { id: "prod-1", subCategoryId: "sub-1", name: "Chocolat Blanc", description: "Chocolat blanc de couverture 35%", unit: "kg", minQuantity: 5, unitPrice: 25.0, shelfLifeAfterOpening: 180, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prod-2", subCategoryId: "sub-1", name: "Chocolat Noir 70%", description: "Chocolat noir de couverture 70% cacao", unit: "kg", minQuantity: 5, unitPrice: 28.5, shelfLifeAfterOpening: 180, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prod-3", subCategoryId: "sub-1", name: "Chocolat au Lait", description: "Chocolat au lait de couverture 40%", unit: "kg", minQuantity: 5, unitPrice: 24.0, shelfLifeAfterOpening: 180, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prod-4", subCategoryId: "sub-2", name: "Arome Caramel", description: "Arome naturel caramel concentre", unit: "L", minQuantity: 2, unitPrice: 35.0, shelfLifeAfterOpening: 365, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prod-5", subCategoryId: "sub-2", name: "Extrait de Vanille", description: "Extrait de vanille de Madagascar", unit: "L", minQuantity: 1, unitPrice: 85.0, shelfLifeAfterOpening: 365, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prod-6", subCategoryId: "sub-2", name: "Arome Fraise", description: "Arome naturel fraise", unit: "L", minQuantity: 2, unitPrice: 32.0, shelfLifeAfterOpening: 365, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prod-7", subCategoryId: "sub-6", name: "Cafe Poudre Arabica", description: "Cafe moulu 100% Arabica", unit: "kg", minQuantity: 3, unitPrice: 18.0, shelfLifeAfterOpening: 30, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prod-8", subCategoryId: "sub-6", name: "Cafe Grains Premium", description: "Cafe en grains torrefaction artisanale", unit: "kg", minQuantity: 5, unitPrice: 22.0, shelfLifeAfterOpening: 60, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prod-9", subCategoryId: "sub-9", name: "Huile Olive Extra Vierge", description: "Huile d'olive extra vierge premiere pression", unit: "L", minQuantity: 10, unitPrice: 12.0, shelfLifeAfterOpening: 180, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prod-10", subCategoryId: "sub-9", name: "Huile Tournesol", description: "Huile de tournesol pour friture", unit: "L", minQuantity: 20, unitPrice: 3.5, shelfLifeAfterOpening: 90, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prod-11", subCategoryId: "sub-5", name: "Beurre AOP", description: "Beurre doux AOP 82% MG", unit: "kg", minQuantity: 10, unitPrice: 12.5, shelfLifeAfterOpening: 7, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prod-12", subCategoryId: "sub-5", name: "Creme Liquide 35%", description: "Creme liquide UHT 35% MG", unit: "L", minQuantity: 5, unitPrice: 3.5, shelfLifeAfterOpening: 3, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
 ]
 
 const initialBatches: Batch[] = [
-  // Chocolat Blanc batches
-  {
-    id: "batch-1",
-    productId: "prod-1",
-    batchNumber: "CHB-2026-001",
-    quantity: 10,
-    receptionDate: "2026-01-15",
-    productionDate: "2026-01-10",
-    expirationDate: "2026-07-15",
-    isOpened: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "batch-2",
-    productId: "prod-1",
-    batchNumber: "CHB-2026-002",
-    quantity: 5,
-    receptionDate: "2026-02-01",
-    productionDate: "2026-01-25",
-    expirationDate: "2026-08-01",
-    isOpened: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  // Chocolat Noir batches
-  {
-    id: "batch-3",
-    productId: "prod-2",
-    batchNumber: "CHN-2026-001",
-    quantity: 8,
-    receptionDate: "2026-01-10",
-    productionDate: "2026-01-05",
-    expirationDate: "2026-07-10",
-    isOpened: true,
-    openingDate: "2026-01-20",
-    expirationAfterOpening: "2026-07-10",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  // Cafe Poudre batch
-  {
-    id: "batch-4",
-    productId: "prod-7",
-    batchNumber: "CAF-2026-001",
-    quantity: 5,
-    receptionDate: "2026-03-01",
-    productionDate: "2026-02-20",
-    expirationDate: "2026-08-20",
-    isOpened: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  // Beurre AOP batch (expires soon)
-  {
-    id: "batch-5",
-    productId: "prod-11",
-    batchNumber: "BEU-2026-001",
-    quantity: 15,
-    receptionDate: "2026-03-20",
-    productionDate: "2026-03-18",
-    expirationDate: "2026-04-10",
-    isOpened: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  // Creme batch
-  {
-    id: "batch-6",
-    productId: "prod-12",
-    batchNumber: "CRE-2026-001",
-    quantity: 8,
-    receptionDate: "2026-03-22",
-    productionDate: "2026-03-20",
-    expirationDate: "2026-04-05",
-    isOpened: true,
-    openingDate: "2026-03-23",
-    expirationAfterOpening: "2026-03-26",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
+  { id: "batch-1", productId: "prod-1", batchNumber: "CHB-2026-001", quantity: 10, unitCost: 22.0, receptionDate: "2026-01-15", productionDate: "2026-01-10", expirationDate: "2026-07-15", isOpened: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "batch-2", productId: "prod-1", batchNumber: "CHB-2026-002", quantity: 5, unitCost: 23.0, receptionDate: "2026-02-01", productionDate: "2026-01-25", expirationDate: "2026-08-01", isOpened: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "batch-3", productId: "prod-2", batchNumber: "CHN-2026-001", quantity: 8, unitCost: 26.0, receptionDate: "2026-01-10", productionDate: "2026-01-05", expirationDate: "2026-07-10", isOpened: true, openingDate: "2026-01-20", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "batch-4", productId: "prod-7", batchNumber: "CAF-2026-001", quantity: 5, unitCost: 16.0, receptionDate: "2026-03-01", productionDate: "2026-02-20", expirationDate: "2026-08-20", isOpened: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "batch-5", productId: "prod-11", batchNumber: "BEU-2026-001", quantity: 15, unitCost: 11.5, receptionDate: "2026-03-20", productionDate: "2026-03-18", expirationDate: "2026-04-10", isOpened: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "batch-6", productId: "prod-12", batchNumber: "CRE-2026-001", quantity: 8, unitCost: 3.2, receptionDate: "2026-03-22", productionDate: "2026-03-20", expirationDate: "2026-04-05", isOpened: true, openingDate: "2026-03-23", expirationAfterOpening: "2026-03-26", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
 ]
 
-// Legacy initial data
 const initialLegacyCategories: Category[] = [
   { id: "1", name: "Farines", slug: "farines", icon: "🌾", color: "#f59e0b", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
   { id: "2", name: "Sucres", slug: "sucres", icon: "🍬", color: "#ec4899", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
@@ -854,66 +525,14 @@ const initialLegacyCategories: Category[] = [
 const initialLegacyItems: StockItem[] = []
 
 const initialSuppliers: Supplier[] = [
-  {
-    id: "sup-1",
-    name: "Valrhona",
-    contactName: "Sophie Martin",
-    email: "pro@valrhona.com",
-    phone: "+33 4 75 56 20 00",
-    address: "26600 Tain-l'Hermitage",
-    notes: "Chocolats de haute qualite",
-    status: "active",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sup-2",
-    name: "Lavazza",
-    contactName: "Marco Rossi",
-    email: "contact@lavazza.com",
-    phone: "+39 011 2398 111",
-    notes: "Fournisseur cafe premium",
-    status: "active",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sup-3",
-    name: "Isigny Sainte-Mere",
-    contactName: "Jean Bernard",
-    email: "contact@isigny.com",
-    phone: "+33 2 31 51 33 00",
-    notes: "Produits laitiers AOP",
-    status: "active",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
+  { id: "sup-1", name: "Valrhona", contactName: "Sophie Martin", email: "pro@valrhona.com", phone: "+33 4 75 56 20 00", address: "26600 Tain-l'Hermitage", notes: "Chocolats de haute qualite", status: "active", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "sup-2", name: "Lavazza", contactName: "Marco Rossi", email: "contact@lavazza.com", phone: "+39 011 2398 111", notes: "Fournisseur cafe premium", status: "active", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "sup-3", name: "Isigny Sainte-Mere", contactName: "Jean Bernard", email: "contact@isigny.com", phone: "+33 2 31 51 33 00", notes: "Produits laitiers AOP", status: "active", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
 ]
 
 const initialRewards: Reward[] = [
-  {
-    id: "r1",
-    name: "Croissant Gratuit",
-    description: "Un croissant artisanal offert",
-    pointsCost: 50,
-    type: "free_item",
-    value: "1 croissant",
-    image: "/golden-croissant.png",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "r2",
-    name: "Reduction 5 TND",
-    description: "5 TND de reduction sur votre prochaine commande",
-    pointsCost: 100,
-    type: "discount",
-    value: "5 TND",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
+  { id: "r1", name: "Croissant Gratuit", description: "Un croissant artisanal offert", pointsCost: 50, type: "free_item", value: "1 croissant", image: "/golden-croissant.png", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "r2", name: "Reduction 5 TND", description: "5 TND de reduction sur votre prochaine commande", pointsCost: 100, type: "discount", value: "5 TND", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
 ]
 
 const initialMenuCategories: MenuCategory[] = [
@@ -926,684 +545,25 @@ const initialMenuCategories: MenuCategory[] = [
 ]
 
 const initialMenuItems: MenuItem[] = [
-  // ===== PETIT DEJEUNER =====
-  {
-    id: "0",
-    name: "Petit Dejeuner Gourmand pour 2",
-    description: "Assortiment complet pour deux personnes",
-    price: 32.0,
-    points: 32,
-    category: "petit-dejeuner",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Gluten", "Lait", "Oeufs"],
-    isAvailable: true,
-    tags: ["Pour 2 personnes", "Complet"],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  // ===== VIENNOISERIES =====
-  {
-    id: "1",
-    name: "Croissant Artisanal",
-    description: "Croissant pur beurre croustillant et fondant",
-    price: 4.5,
-    points: 5,
-    category: "viennoiseries",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Gluten", "Lait"],
-    isAvailable: true,
-    availableSupplements: [
-      { supplementId: "sup-16", isEnabled: true },
-      { supplementId: "sup-17", isEnabled: true },
-      { supplementId: "sup-18", isEnabled: true },
-    ],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    name: "Pain au Chocolat",
-    description: "Viennoiserie pur beurre garnie de chocolat noir",
-    price: 5.5,
-    points: 6,
-    category: "viennoiseries",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Gluten", "Lait"],
-    isAvailable: true,
-    availableSupplements: [
-      { supplementId: "sup-16", isEnabled: true },
-      { supplementId: "sup-9", isEnabled: true },
-    ],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "3",
-    name: "Croissant aux Amandes",
-    description: "Croissant garni de creme d'amandes et amandes effilees",
-    price: 7.0,
-    points: 7,
-    category: "viennoiseries",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Gluten", "Lait", "Fruits a coque"],
-    isAvailable: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "4",
-    name: "Chausson aux Pommes",
-    description: "Pate feuilletee garnie de compote de pommes maison",
-    price: 5.0,
-    points: 5,
-    category: "viennoiseries",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Gluten", "Lait"],
-    isAvailable: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "5",
-    name: "Brioche Pur Beurre",
-    description: "Brioche moelleuse faite maison",
-    price: 4.0,
-    points: 4,
-    category: "viennoiseries",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Gluten", "Lait", "Oeufs"],
-    isAvailable: true,
-    availableSupplements: [
-      { supplementId: "sup-17", isEnabled: true },
-      { supplementId: "sup-18", isEnabled: true },
-    ],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  // ===== PATISSERIES =====
-  {
-    id: "6",
-    name: "Tarte au Citron Meringuee",
-    description: "Tarte au citron avec meringue italienne flambee",
-    price: 12.0,
-    points: 12,
-    category: "patisseries",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Gluten", "Lait", "Oeufs"],
-    isAvailable: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "7",
-    name: "Eclair au Chocolat",
-    description: "Eclair garni de creme patissiere au chocolat noir",
-    price: 8.0,
-    points: 8,
-    category: "patisseries",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Gluten", "Lait", "Oeufs"],
-    isAvailable: true,
-    availableSupplements: [
-      { supplementId: "sup-9", isEnabled: true },
-    ],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "8",
-    name: "Paris-Brest",
-    description: "Couronne en pate a choux garnie de creme pralinee",
-    price: 14.0,
-    points: 14,
-    category: "patisseries",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Gluten", "Lait", "Oeufs", "Fruits a coque"],
-    isAvailable: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "9",
-    name: "Millefeuille Vanille",
-    description: "Trois couches de pate feuilletee caramelisee et creme vanille",
-    price: 11.0,
-    points: 11,
-    category: "patisseries",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Gluten", "Lait", "Oeufs"],
-    isAvailable: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "10",
-    name: "Fraisier",
-    description: "Genoise, creme mousseline et fraises fraiches",
-    price: 15.0,
-    points: 15,
-    category: "patisseries",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Gluten", "Lait", "Oeufs"],
-    isAvailable: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "11",
-    name: "Opera",
-    description: "Biscuit joconde, ganache chocolat et cafe",
-    price: 13.0,
-    points: 13,
-    category: "patisseries",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Gluten", "Lait", "Oeufs"],
-    isAvailable: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "12",
-    name: "Tarte aux Fruits Rouges",
-    description: "Pate sucree, creme patissiere et fruits rouges frais",
-    price: 14.0,
-    points: 14,
-    category: "patisseries",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Gluten", "Lait", "Oeufs"],
-    isAvailable: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  // ===== SPECIALITES TUNISIENNES =====
-  {
-    id: "13",
-    name: "Makroudh aux Dattes",
-    description: "Semoule, dattes et miel - specialite tunisienne",
-    price: 3.5,
-    points: 4,
-    category: "specialites-tunisiennes",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Gluten"],
-    isAvailable: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "14",
-    name: "Baklawa",
-    description: "Pate filo, pistaches et sirop de miel",
-    price: 4.0,
-    points: 4,
-    category: "specialites-tunisiennes",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Gluten", "Fruits a coque"],
-    isAvailable: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "15",
-    name: "Samsa aux Amandes",
-    description: "Feuillete aux amandes et fleur d'oranger",
-    price: 3.5,
-    points: 4,
-    category: "specialites-tunisiennes",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Gluten", "Fruits a coque"],
-    isAvailable: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "16",
-    name: "Kaak Warka",
-    description: "Petits gateaux secs aux amandes",
-    price: 4.5,
-    points: 5,
-    category: "specialites-tunisiennes",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Gluten", "Oeufs", "Fruits a coque"],
-    isAvailable: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "17",
-    name: "Zlabia",
-    description: "Beignets au miel croustillants",
-    price: 3.0,
-    points: 3,
-    category: "specialites-tunisiennes",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Gluten"],
-    isAvailable: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  // ===== THES & INFUSIONS =====
-  {
-    id: "18",
-    name: "The a la Menthe",
-    description: "The vert a la menthe fraiche",
-    price: 4.0,
-    points: 4,
-    category: "thes-infusions",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: [],
-    isAvailable: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "19",
-    name: "The aux Pignons",
-    description: "The tunisien traditionnel aux pignons de pin",
-    price: 5.0,
-    points: 5,
-    category: "thes-infusions",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Fruits a coque"],
-    isAvailable: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "20",
-    name: "Cafe Turc",
-    description: "Cafe turc prepare a la demande",
-    price: 3.5,
-    points: 4,
-    category: "thes-infusions",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: [],
-    isAvailable: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "21",
-    name: "Cappuccino",
-    description: "Espresso, lait mousseux et cacao",
-    price: 5.5,
-    points: 6,
-    category: "thes-infusions",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Lait"],
-    isAvailable: true,
-    availableSupplements: [
-      { supplementId: "sup-9", isEnabled: true },
-      { supplementId: "sup-10", isEnabled: true },
-    ],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  // ===== BOISSONS =====
-  {
-    id: "22",
-    name: "Jus d'Orange Frais",
-    description: "Oranges pressees a la minute",
-    price: 6.0,
-    points: 6,
-    category: "boissons",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: [],
-    isAvailable: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "23",
-    name: "Smoothie Fruits Rouges",
-    description: "Fraises, framboises, myrtilles et yaourt",
-    price: 8.0,
-    points: 8,
-    category: "boissons",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Lait"],
-    isAvailable: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "24",
-    name: "Citronnade Maison",
-    description: "Citrons frais, menthe et sucre de canne",
-    price: 5.0,
-    points: 5,
-    category: "boissons",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: [],
-    isAvailable: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "25",
-    name: "Milkshake Chocolat",
-    description: "Glace vanille, lait et chocolat belge",
-    price: 7.5,
-    points: 8,
-    category: "boissons",
-    image: "/placeholder.svg?height=200&width=200",
-    allergens: ["Lait"],
-    isAvailable: true,
-    availableSupplements: [
-      { supplementId: "sup-9", isEnabled: true },
-    ],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
+  { id: "0", name: "Petit Dejeuner Gourmand pour 2", description: "Assortiment complet pour deux personnes", price: 32.0, points: 32, category: "petit-dejeuner", image: "/placeholder.svg", allergens: ["Gluten", "Lait", "Oeufs"], isAvailable: true, tags: ["Pour 2 personnes", "Complet"], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "1", name: "Croissant Artisanal", description: "Croissant pur beurre croustillant et fondant", price: 4.5, points: 5, category: "viennoiseries", image: "/placeholder.svg", allergens: ["Gluten", "Lait"], isAvailable: true, availableSupplements: [{ supplementId: "sup-16", isEnabled: true }, { supplementId: "sup-17", isEnabled: true }, { supplementId: "sup-18", isEnabled: true }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "2", name: "Pain au Chocolat", description: "Viennoiserie pur beurre garnie de chocolat noir", price: 5.5, points: 6, category: "viennoiseries", image: "/placeholder.svg", allergens: ["Gluten", "Lait"], isAvailable: true, availableSupplements: [{ supplementId: "sup-16", isEnabled: true }, { supplementId: "sup-9", isEnabled: true }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
 ]
 
-// ============================================
-// INITIAL SUPPLEMENT CATEGORIES DATA
-// ============================================
+const initialSupplementCategories: SupplementCategory[] = []
 
-const initialSupplementCategories: SupplementCategory[] = [
- /*  { id: "fromage", name: "Fromage", color: "bg-yellow-100 text-yellow-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "viande", name: "Viandes", color: "bg-red-100 text-red-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "poisson", name: "Poisson", color: "bg-blue-100 text-blue-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "legumes", name: "Legumes", color: "bg-green-100 text-green-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "herbes", name: "Herbes", color: "bg-emerald-100 text-emerald-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "lait", name: "Lait", color: "bg-stone-100 text-stone-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "topping", name: "Topping", color: "bg-pink-100 text-pink-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "sirop", name: "Sirop", color: "bg-amber-100 text-amber-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "cafe", name: "Cafe", color: "bg-orange-100 text-orange-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "fruits", name: "Fruits", color: "bg-rose-100 text-rose-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "glace", name: "Glace", color: "bg-cyan-100 text-cyan-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "confiture", name: "Confiture", color: "bg-purple-100 text-purple-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "autre", name: "Autre", color: "bg-gray-100 text-gray-700", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, */
-]
+const initialSupplements: Supplement[] = []
 
-// ============================================
-// INITIAL SUPPLEMENTS DATA
-// ============================================
+const initialOffers: Offer[] = []
 
-const initialSupplements: Supplement[] = [
-  // Supplements pour Omelette
-/*   {
-    id: "sup-1",
-    name: "Champignons",
-    price: 1.50,
-    points: 2,
-    description: "Champignons frais sautés",
-    category: "legumes",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sup-2",
-    name: "Fromage",
-    price: 1.00,
-    points: 1,
-    description: "Fromage gratiné",
-    category: "fromage",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sup-3",
-    name: "Thon",
-    price: 2.00,
-    points: 2,
-    description: "Thon émietté",
-    category: "poisson",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sup-4",
-    name: "Jambon",
-    price: 1.50,
-    points: 2,
-    description: "Jambon de dinde",
-    category: "viande",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sup-5",
-    name: "Légumes",
-    price: 1.00,
-    points: 1,
-    description: "Mélange de légumes frais",
-    category: "legumes",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sup-6",
-    name: "Herbes fraîches",
-    price: 0.50,
-    points: 1,
-    description: "Persil, ciboulette, basilic",
-    category: "herbes",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  // Supplements pour Café
-  {
-    id: "sup-7",
-    name: "Lait de soja",
-    price: 0.50,
-    points: 1,
-    description: "Lait végétal de soja",
-    category: "lait",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sup-8",
-    name: "Lait d'avoine",
-    price: 0.50,
-    points: 1,
-    description: "Lait végétal d'avoine",
-    category: "lait",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sup-9",
-    name: "Chantilly",
-    price: 1.00,
-    points: 1,
-    description: "Crème chantilly maison",
-    category: "topping",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sup-10",
-    name: "Sirop caramel",
-    price: 0.50,
-    points: 1,
-    description: "Sirop de caramel",
-    category: "sirop",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sup-11",
-    name: "Shot espresso",
-    price: 1.00,
-    points: 1,
-    description: "Un shot d'espresso supplémentaire",
-    category: "cafe",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  // Supplements pour Crêpes/Pancakes
-  {
-    id: "sup-12",
-    name: "Nutella",
-    price: 1.50,
-    points: 2,
-    description: "Pâte à tartiner chocolat-noisettes",
-    category: "topping",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sup-13",
-    name: "Fruits frais",
-    price: 2.00,
-    points: 2,
-    description: "Assortiment de fruits frais de saison",
-    category: "fruits",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sup-14",
-    name: "Sirop d'érable",
-    price: 1.00,
-    points: 1,
-    description: "Sirop d'érable pur",
-    category: "sirop",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sup-15",
-    name: "Glace vanille",
-    price: 2.00,
-    points: 2,
-    description: "Boule de glace vanille",
-    category: "glace",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  // Supplements pour Croissant/Viennoiseries
-  {
-    id: "sup-16",
-    name: "Amandes effilées",
-    price: 1.00,
-    points: 1,
-    description: "Amandes grillées",
-    category: "topping",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sup-17",
-    name: "Chocolat fondu",
-    price: 1.00,
-    points: 1,
-    description: "Chocolat noir fondu",
-    category: "topping",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "sup-18",
-    name: "Confiture maison",
-    price: 0.75,
-    points: 1,
-    description: "Confiture artisanale aux fruits",
-    category: "confiture",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }, */
-]
-
-// ============================================
-// INITIAL OFFERS DATA
-// ============================================
-
-const initialOffers: Offer[] = [
-  {
-    id: "offer-1",
-    name: "Petit Dejeuner Complet",
-    description: "Croissant + Cafe + Jus d'orange frais",
-    image: "/breakfast-offer.jpg",
-    originalPrice: 12.50,
-    discountedPrice: 9.90,
-    points: 15,
-    items: [
-      { itemId: "1", quantity: 1 }, // Croissant
-      { itemId: "cafe-1", quantity: 1 },
-    ],
-    schedule: {
-      daysOfWeek: [1, 2, 3, 4, 5], // Lundi à Vendredi
-      startTime: "07:00",
-      endTime: "11:00",
-    },
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "offer-2",
-    name: "Gouter Gourmand",
-    description: "Pain au chocolat + Chocolat chaud",
-    image: "/gouter-offer.jpg",
-    originalPrice: 8.00,
-    discountedPrice: 6.50,
-    points: 10,
-    items: [
-      { itemId: "2", quantity: 1 }, // Pain au chocolat
-    ],
-    schedule: {
-      daysOfWeek: [0, 1, 2, 3, 4, 5, 6], // Tous les jours
-      startTime: "15:00",
-      endTime: "18:00",
-    },
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "offer-3",
-    name: "Weekend Brunch",
-    description: "Formule brunch complete pour 2 personnes",
-    image: "/brunch-offer.jpg",
-    originalPrice: 35.00,
-    discountedPrice: 28.00,
-    points: 40,
-    items: [],
-    schedule: {
-      daysOfWeek: [0, 6], // Samedi et Dimanche
-      startTime: "10:00",
-      endTime: "14:00",
-    },
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-]
-
-// ============================================
-// PROVIDER COMPONENT
-// ============================================
+const DATA_VERSION = "v2.0"
 
 export function StockProvider({ children }: { children: ReactNode }) {
-  // New hierarchy state
   const [stockCategories, setStockCategories] = useState<StockCategory[]>([])
   const [subCategories, setSubCategories] = useState<SubCategory[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [batches, setBatches] = useState<Batch[]>([])
   const [storageLocations, setStorageLocations] = useState<StorageLocation[]>([])
-  
-  // Legacy state
   const [items, setItems] = useState<StockItem[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -1614,52 +574,87 @@ export function StockProvider({ children }: { children: ReactNode }) {
   const [supplementCategories, setSupplementCategories] = useState<SupplementCategory[]>([])
   const [offers, setOffers] = useState<Offer[]>([])
 
-  // Data version - increment this to force reload of menu data
-  const DATA_VERSION = "v2.0"
-
-  // Load from localStorage
+  // Load data from API and localStorage
   useEffect(() => {
-    // Check data version - if different, clear menu-related data and reload
-    const storedVersion = localStorage.getItem("pastry-data-version")
-    if (storedVersion !== DATA_VERSION) {
-      // Clear old menu data to force reload with new initial data
-      localStorage.removeItem("pastry-menu-items")
-      localStorage.removeItem("pastry-menu-categories")
-      localStorage.removeItem("pastry-offers")
-      localStorage.setItem("pastry-data-version", DATA_VERSION)
+    let cancelled = false
+
+    const loadData = async () => {
+      try {
+        const hasToken = !!localStorage.getItem(AUTH_TOKEN_KEY)
+        
+        if (hasToken) {
+          // Load supplement categories from API
+          const apiSupplementCategories = await fetchSupplementCategories()
+          if (!cancelled && apiSupplementCategories.length > 0) {
+            setSupplementCategories(apiSupplementCategories)
+          } else if (!cancelled && apiSupplementCategories.length === 0) {
+            setSupplementCategories(initialSupplementCategories)
+          }
+
+          // Load supplements from API
+          const apiSupplements = await fetchSupplements()
+          if (!cancelled && apiSupplements.length > 0) {
+            setSupplements(apiSupplements)
+          } else if (!cancelled && apiSupplements.length === 0) {
+            setSupplements(initialSupplements)
+          }
+        } else {
+          setSupplementCategories(initialSupplementCategories)
+          setSupplements(initialSupplements)
+        }
+
+        // Load other data from localStorage
+        const storedVersion = localStorage.getItem("pastry-data-version")
+        if (storedVersion !== DATA_VERSION) {
+          localStorage.removeItem("pastry-menu-items")
+          localStorage.removeItem("pastry-menu-categories")
+          localStorage.removeItem("pastry-offers")
+          localStorage.setItem("pastry-data-version", DATA_VERSION)
+        }
+
+        const stored = {
+          stockCategories: localStorage.getItem("stock-categories"),
+          subCategories: localStorage.getItem("sub-categories"),
+          products: localStorage.getItem("stock-products"),
+          batches: localStorage.getItem("stock-batches"),
+          storageLocations: localStorage.getItem("storage-locations"),
+          items: localStorage.getItem("pastry-stock"),
+          categories: localStorage.getItem("pastry-categories"),
+          suppliers: localStorage.getItem("pastry-suppliers"),
+          rewards: localStorage.getItem("pastry-rewards"),
+          menuItems: localStorage.getItem("pastry-menu-items"),
+          menuCategories: localStorage.getItem("pastry-menu-categories"),
+          offers: localStorage.getItem("pastry-offers"),
+        }
+
+        if (!cancelled) {
+          setStockCategories(stored.stockCategories ? JSON.parse(stored.stockCategories) : initialStockCategories)
+          setSubCategories(stored.subCategories ? JSON.parse(stored.subCategories) : initialSubCategories)
+          setProducts(stored.products ? JSON.parse(stored.products) : initialProducts)
+          setBatches(stored.batches ? JSON.parse(stored.batches) : initialBatches)
+          setStorageLocations(stored.storageLocations ? JSON.parse(stored.storageLocations) : initialStorageLocations)
+          setItems(stored.items ? JSON.parse(stored.items) : initialLegacyItems)
+          setCategories(stored.categories ? JSON.parse(stored.categories) : initialLegacyCategories)
+          setSuppliers(stored.suppliers ? JSON.parse(stored.suppliers) : initialSuppliers)
+          setRewards(stored.rewards ? JSON.parse(stored.rewards) : initialRewards)
+          setMenuItems(stored.menuItems ? JSON.parse(stored.menuItems) : initialMenuItems)
+          setMenuCategories(stored.menuCategories ? JSON.parse(stored.menuCategories) : initialMenuCategories)
+          setOffers(stored.offers ? JSON.parse(stored.offers) : initialOffers)
+        }
+      } catch (error) {
+        console.error("Failed to load data:", error)
+        if (!cancelled) {
+          setSupplementCategories(initialSupplementCategories)
+          setSupplements(initialSupplements)
+        }
+      }
     }
 
-    const stored = {
-      /* stockCategories: localStorage.getItem("stock-categories"),
-      subCategories: localStorage.getItem("sub-categories"),
-      products: localStorage.getItem("stock-products"),
-      batches: localStorage.getItem("stock-batches"),
-      storageLocations: localStorage.getItem("storage-locations"),
-      items: localStorage.getItem("pastry-stock"),
-      categories: localStorage.getItem("pastry-categories"),
-      suppliers: localStorage.getItem("pastry-suppliers"),
-      rewards: localStorage.getItem("pastry-rewards"),
-      menuItems: localStorage.getItem("pastry-menu-items"),
-      menuCategories: localStorage.getItem("pastry-menu-categories"),
-      supplements: localStorage.getItem("pastry-supplements"),
-      supplementCategories: localStorage.getItem("pastry-supplement-categories"),
-      offers: localStorage.getItem("pastry-offers"), */
-    }
+    loadData()
 
-    setStockCategories(stored.stockCategories ? JSON.parse(stored.stockCategories) : initialStockCategories)
-    setSubCategories(stored.subCategories ? JSON.parse(stored.subCategories) : initialSubCategories)
-    setProducts(stored.products ? JSON.parse(stored.products) : initialProducts)
-    setBatches(stored.batches ? JSON.parse(stored.batches) : initialBatches)
-    setStorageLocations(stored.storageLocations ? JSON.parse(stored.storageLocations) : initialStorageLocations)
-    setItems(stored.items ? JSON.parse(stored.items) : initialLegacyItems)
-    setCategories(stored.categories ? JSON.parse(stored.categories) : initialLegacyCategories)
-    setSuppliers(stored.suppliers ? JSON.parse(stored.suppliers) : initialSuppliers)
-    setRewards(stored.rewards ? JSON.parse(stored.rewards) : initialRewards)
-    setMenuItems(stored.menuItems ? JSON.parse(stored.menuItems) : initialMenuItems)
-    setMenuCategories(stored.menuCategories ? JSON.parse(stored.menuCategories) : initialMenuCategories)
-    setSupplements(stored.supplements ? JSON.parse(stored.supplements) : initialSupplements)
-    setSupplementCategories(stored.supplementCategories ? JSON.parse(stored.supplementCategories) : initialSupplementCategories)
-    setOffers(stored.offers ? JSON.parse(stored.offers) : initialOffers)
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   // Save to localStorage
@@ -1674,14 +669,9 @@ export function StockProvider({ children }: { children: ReactNode }) {
   useEffect(() => { localStorage.setItem("pastry-rewards", JSON.stringify(rewards)) }, [rewards])
   useEffect(() => { localStorage.setItem("pastry-menu-items", JSON.stringify(menuItems)) }, [menuItems])
   useEffect(() => { localStorage.setItem("pastry-menu-categories", JSON.stringify(menuCategories)) }, [menuCategories])
-  useEffect(() => { if (supplementCategories.length) localStorage.setItem("pastry-supplement-categories", JSON.stringify(supplementCategories)) }, [supplementCategories])
-  useEffect(() => { if (supplements.length) localStorage.setItem("pastry-supplements", JSON.stringify(supplements)) }, [supplements])
   useEffect(() => { if (offers.length) localStorage.setItem("pastry-offers", JSON.stringify(offers)) }, [offers])
 
-  // ============================================
-  // STOCK CATEGORY CRUD
-  // ============================================
-  
+  // Stock Category CRUD
   const addStockCategory = (cat: Omit<StockCategory, "id" | "createdAt" | "updatedAt">) => {
     const newCat: StockCategory = {
       ...cat,
@@ -1693,22 +683,16 @@ export function StockProvider({ children }: { children: ReactNode }) {
   }
 
   const updateStockCategory = (id: string, updates: Partial<StockCategory>) => {
-    setStockCategories(prev => prev.map(cat => 
-      cat.id === id ? { ...cat, ...updates, updatedAt: new Date().toISOString() } : cat
-    ))
+    setStockCategories(prev => prev.map(cat => cat.id === id ? { ...cat, ...updates, updatedAt: new Date().toISOString() } : cat))
   }
 
   const deleteStockCategory = (id: string) => {
-    // Also delete sub-categories and their products
     const subs = subCategories.filter(s => s.categoryId === id)
     subs.forEach(sub => deleteSubCategory(sub.id))
     setStockCategories(prev => prev.filter(cat => cat.id !== id))
   }
 
-  // ============================================
-  // SUBCATEGORY CRUD
-  // ============================================
-
+  // SubCategory CRUD
   const addSubCategory = (sub: Omit<SubCategory, "id" | "createdAt" | "updatedAt">) => {
     const newSub: SubCategory = {
       ...sub,
@@ -1720,13 +704,10 @@ export function StockProvider({ children }: { children: ReactNode }) {
   }
 
   const updateSubCategory = (id: string, updates: Partial<SubCategory>) => {
-    setSubCategories(prev => prev.map(sub => 
-      sub.id === id ? { ...sub, ...updates, updatedAt: new Date().toISOString() } : sub
-    ))
+    setSubCategories(prev => prev.map(sub => sub.id === id ? { ...sub, ...updates, updatedAt: new Date().toISOString() } : sub))
   }
 
   const deleteSubCategory = (id: string) => {
-    // Also delete products and their batches
     const prods = products.filter(p => p.subCategoryId === id)
     prods.forEach(prod => deleteProduct(prod.id))
     setSubCategories(prev => prev.filter(sub => sub.id !== id))
@@ -1736,10 +717,7 @@ export function StockProvider({ children }: { children: ReactNode }) {
     return subCategories.filter(s => s.categoryId === categoryId).sort((a, b) => a.order - b.order)
   }
 
-  // ============================================
-  // PRODUCT CRUD
-  // ============================================
-
+  // Product CRUD
   const addProduct = (product: Omit<Product, "id" | "createdAt" | "updatedAt">) => {
     const newProduct: Product = {
       ...product,
@@ -1751,13 +729,10 @@ export function StockProvider({ children }: { children: ReactNode }) {
   }
 
   const updateProduct = (id: string, updates: Partial<Product>) => {
-    setProducts(prev => prev.map(prod => 
-      prod.id === id ? { ...prod, ...updates, updatedAt: new Date().toISOString() } : prod
-    ))
+    setProducts(prev => prev.map(prod => prod.id === id ? { ...prod, ...updates, updatedAt: new Date().toISOString() } : prod))
   }
 
   const deleteProduct = (id: string) => {
-    // Also delete batches
     setBatches(prev => prev.filter(b => b.productId !== id))
     setProducts(prev => prev.filter(prod => prod.id !== id))
   }
@@ -1770,10 +745,7 @@ export function StockProvider({ children }: { children: ReactNode }) {
     return batches.filter(b => b.productId === productId).reduce((sum, b) => sum + b.quantity, 0)
   }
 
-  // ============================================
-  // STORAGE LOCATION CRUD
-  // ============================================
-
+  // Storage Location CRUD
   const addStorageLocation = (loc: Omit<StorageLocation, "id" | "createdAt" | "updatedAt">) => {
     const newLoc: StorageLocation = {
       ...loc,
@@ -1785,9 +757,7 @@ export function StockProvider({ children }: { children: ReactNode }) {
   }
 
   const updateStorageLocation = (id: string, updates: Partial<StorageLocation>) => {
-    setStorageLocations(prev => prev.map(loc => 
-      loc.id === id ? { ...loc, ...updates, updatedAt: new Date().toISOString() } : loc
-    ))
+    setStorageLocations(prev => prev.map(loc => loc.id === id ? { ...loc, ...updates, updatedAt: new Date().toISOString() } : loc))
   }
 
   const deleteStorageLocation = (id: string) => {
@@ -1798,10 +768,7 @@ export function StockProvider({ children }: { children: ReactNode }) {
     return storageLocations.filter(loc => loc.isActive)
   }
 
-  // ============================================
-  // BATCH CRUD (FIFO)
-  // ============================================
-
+  // Batch CRUD
   const addBatch = (batch: Omit<Batch, "id" | "createdAt" | "updatedAt">) => {
     const newBatch: Batch = {
       ...batch,
@@ -1813,9 +780,7 @@ export function StockProvider({ children }: { children: ReactNode }) {
   }
 
   const updateBatch = (id: string, updates: Partial<Batch>) => {
-    setBatches(prev => prev.map(b => 
-      b.id === id ? { ...b, ...updates, updatedAt: new Date().toISOString() } : b
-    ))
+    setBatches(prev => prev.map(b => b.id === id ? { ...b, ...updates, updatedAt: new Date().toISOString() } : b))
   }
 
   const deleteBatch = (id: string) => {
@@ -1843,24 +808,17 @@ export function StockProvider({ children }: { children: ReactNode }) {
   }
 
   const getBatchesByProduct = (productId: string) => {
-    return batches
-      .filter(b => b.productId === productId)
-      .sort((a, b) => new Date(a.receptionDate).getTime() - new Date(b.receptionDate).getTime())
+    return batches.filter(b => b.productId === productId).sort((a, b) => new Date(a.receptionDate).getTime() - new Date(b.receptionDate).getTime())
   }
 
   const getActiveBatches = (productId: string) => {
-    return batches
-      .filter(b => b.productId === productId && b.quantity > 0)
-      .sort((a, b) => new Date(a.receptionDate).getTime() - new Date(b.receptionDate).getTime())
+    return batches.filter(b => b.productId === productId && b.quantity > 0).sort((a, b) => new Date(a.receptionDate).getTime() - new Date(b.receptionDate).getTime())
   }
 
   const getArchivedBatches = (productId: string) => {
-    return batches
-      .filter(b => b.productId === productId && b.isOpened)
-      .sort((a, b) => new Date(a.openingDate || "").getTime() - new Date(b.openingDate || "").getTime())
+    return batches.filter(b => b.productId === productId && b.isOpened).sort((a, b) => new Date(a.openingDate || "").getTime() - new Date(b.openingDate || "").getTime())
   }
 
-  // Consume from batches using FIFO
   const consumeFromBatches = (productId: string, quantity: number) => {
     const activeBatches = getActiveBatches(productId)
     let remaining = quantity
@@ -1878,55 +836,44 @@ export function StockProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // ============================================
-  // ALERTS
-  // ============================================
-
+  // Alerts
   const getExpiringSoonBatches = () => {
     const thirtyDaysFromNow = new Date()
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30)
     const today = new Date()
 
-    return batches
-      .filter(batch => {
-        const expDate = batch.isOpened && batch.expirationAfterOpening
-          ? new Date(batch.expirationAfterOpening)
-          : new Date(batch.expirationDate)
-        return expDate <= thirtyDaysFromNow && expDate >= today && batch.quantity > 0
-      })
-      .map(batch => {
-        const expDate = batch.isOpened && batch.expirationAfterOpening
-          ? new Date(batch.expirationAfterOpening)
-          : new Date(batch.expirationDate)
-        const daysLeft = Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-        const product = products.find(p => p.id === batch.productId)
-        return { ...batch, productName: product?.name || "", daysLeft }
-      })
-      .sort((a, b) => a.daysLeft - b.daysLeft)
+    return batches.filter(batch => {
+      const expDate = batch.isOpened && batch.expirationAfterOpening
+        ? new Date(batch.expirationAfterOpening)
+        : new Date(batch.expirationDate)
+      return expDate <= thirtyDaysFromNow && expDate >= today && batch.quantity > 0
+    }).map(batch => {
+      const expDate = batch.isOpened && batch.expirationAfterOpening
+        ? new Date(batch.expirationAfterOpening)
+        : new Date(batch.expirationDate)
+      const daysLeft = Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+      const product = products.find(p => p.id === batch.productId)
+      return { ...batch, productName: product?.name || "", daysLeft }
+    }).sort((a, b) => a.daysLeft - b.daysLeft)
   }
 
   const getLowStockProducts = () => {
-    return products
-      .filter(product => {
-        const stock = getProductStock(product.id)
-        return stock <= product.minQuantity && product.isActive
-      })
-      .map(product => {
-        const subCat = subCategories.find(s => s.id === product.subCategoryId)
-        const cat = stockCategories.find(c => c.id === subCat?.categoryId)
-        return {
-          ...product,
-          currentStock: getProductStock(product.id),
-          categoryName: cat?.name || "",
-          subCategoryName: subCat?.name || "",
-        }
-      })
+    return products.filter(product => {
+      const stock = getProductStock(product.id)
+      return stock <= product.minQuantity && product.isActive
+    }).map(product => {
+      const subCat = subCategories.find(s => s.id === product.subCategoryId)
+      const cat = stockCategories.find(c => c.id === subCat?.categoryId)
+      return {
+        ...product,
+        currentStock: getProductStock(product.id),
+        categoryName: cat?.name || "",
+        subCategoryName: subCat?.name || "",
+      }
+    })
   }
 
-  // ============================================
-  // LEGACY CRUD
-  // ============================================
-
+  // Legacy CRUD
   const addItem = (item: Omit<StockItem, "id" | "lastUpdated">) => {
     const newItem: StockItem = { ...item, id: Date.now().toString(), lastUpdated: new Date().toISOString() }
     setItems(prev => [...prev, newItem])
@@ -1968,10 +915,7 @@ export function StockProvider({ children }: { children: ReactNode }) {
 
   const getLowStockItems = () => items.filter(item => item.quantity <= item.minQuantity)
 
-  // ============================================
-  // MENU CRUD
-  // ============================================
-
+  // Menu CRUD
   const addMenuCategory = (category: Omit<MenuCategory, "id">) => {
     const newCat: MenuCategory = { ...category, id: Date.now().toString() }
     setMenuCategories(prev => [...prev, newCat])
@@ -1998,10 +942,7 @@ export function StockProvider({ children }: { children: ReactNode }) {
     setMenuItems(prev => prev.filter(item => item.id !== id))
   }
 
-  // ============================================
-  // REWARDS CRUD
-  // ============================================
-
+  // Rewards CRUD
   const addReward = (reward: Omit<Reward, "id" | "createdAt" | "updatedAt">) => {
     const newReward: Reward = { ...reward, id: `r${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
     setRewards(prev => [...prev, newReward])
@@ -2017,79 +958,102 @@ export function StockProvider({ children }: { children: ReactNode }) {
 
   const getActiveRewards = () => rewards.filter(r => r.isActive)
 
-  // ============================================
-  // SUPPLEMENTS CRUD
-  // ============================================
-
-  const addSupplement = (supplement: Omit<Supplement, "id" | "createdAt" | "updatedAt">) => {
-    const newSupplement: Supplement = { 
-      ...supplement, 
-      id: `sup-${Date.now()}`, 
-      createdAt: new Date().toISOString(), 
-      updatedAt: new Date().toISOString() 
+  // Supplements CRUD with API
+  const addSupplement = async (supplement: Omit<Supplement, "id" | "createdAt" | "updatedAt">) => {
+    try {
+      const newSupplement = await createSupplementAPI(supplement)
+      setSupplements(prev => [...prev, newSupplement])
+    } catch (error) {
+      console.error("Failed to create supplement:", error)
+      const newSupplement: Supplement = {
+        ...supplement,
+        id: `sup-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+      setSupplements(prev => [...prev, newSupplement])
     }
-    setSupplements(prev => [...prev, newSupplement])
   }
 
-  const updateSupplement = (id: string, updates: Partial<Supplement>) => {
-    setSupplements(prev => prev.map(s => s.id === id ? { ...s, ...updates, updatedAt: new Date().toISOString() } : s))
+  const updateSupplement = async (id: string, updates: Partial<Supplement>) => {
+    try {
+      await updateSupplementAPI(id, updates)
+      setSupplements(prev => prev.map(s => s.id === id ? { ...s, ...updates, updatedAt: new Date().toISOString() } : s))
+    } catch (error) {
+      console.error("Failed to update supplement:", error)
+      setSupplements(prev => prev.map(s => s.id === id ? { ...s, ...updates, updatedAt: new Date().toISOString() } : s))
+    }
   }
 
-  const deleteSupplement = (id: string) => {
-    setSupplements(prev => prev.filter(s => s.id !== id))
+  const deleteSupplement = async (id: string) => {
+    try {
+      await deleteSupplementAPI(id)
+      setSupplements(prev => prev.filter(s => s.id !== id))
+    } catch (error) {
+      console.error("Failed to delete supplement:", error)
+      setSupplements(prev => prev.filter(s => s.id !== id))
+    }
   }
 
   const getActiveSupplements = () => supplements.filter(s => s.isActive)
 
   const getSupplementsForProduct = (productSupplements: ProductSupplementConfig[]) => {
     if (!productSupplements) return []
-    return productSupplements
-      .filter(ps => ps.isEnabled)
-      .map(ps => {
-        const supplement = supplements.find(s => s.id === ps.supplementId && s.isActive)
-        if (!supplement) return null
-        // Apply custom price if set
-        return ps.customPrice !== undefined 
-          ? { ...supplement, price: ps.customPrice }
-          : supplement
-      })
-      .filter((s): s is Supplement => s !== null)
+    return productSupplements.filter(ps => ps.isEnabled).map(ps => {
+      const supplement = supplements.find(s => s.id === ps.supplementId && s.isActive)
+      if (!supplement) return null
+      return ps.customPrice !== undefined ? { ...supplement, price: ps.customPrice } : supplement
+    }).filter((s): s is Supplement => s !== null)
   }
 
-  // ============================================
-  // SUPPLEMENT CATEGORIES CRUD
-  // ============================================
-
-  const addSupplementCategory = (category: Omit<SupplementCategory, "id" | "createdAt" | "updatedAt">) => {
-    const newCategory: SupplementCategory = { 
-      ...category, 
-      id: `supcat-${Date.now()}`, 
-      createdAt: new Date().toISOString(), 
-      updatedAt: new Date().toISOString() 
+  // Supplement Categories CRUD with API
+  const addSupplementCategory = async (category: Omit<SupplementCategory, "id" | "createdAt" | "updatedAt">) => {
+    try {
+      const newCategory = await createSupplementCategoryAPI(category)
+      setSupplementCategories(prev => [...prev, newCategory])
+    } catch (error) {
+      console.error("Failed to create supplement category:", error)
+      const newCategory: SupplementCategory = {
+        ...category,
+        id: `supcat-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+      setSupplementCategories(prev => [...prev, newCategory])
     }
-    setSupplementCategories(prev => [...prev, newCategory])
   }
 
-  const updateSupplementCategory = (id: string, updates: Partial<SupplementCategory>) => {
-    setSupplementCategories(prev => prev.map(c => c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c))
+  const updateSupplementCategory = async (id: string, updates: Partial<SupplementCategory>) => {
+    try {
+      await updateSupplementCategoryAPI(id, updates)
+      setSupplementCategories(prev => prev.map(c => c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c))
+    } catch (error) {
+      console.error("Failed to update supplement category:", error)
+      setSupplementCategories(prev => prev.map(c => c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c))
+    }
   }
 
-  const deleteSupplementCategory = (id: string) => {
-    // Don't allow deleting if supplements are using this category
+  const deleteSupplementCategory = async (id: string) => {
     const inUse = supplements.some(s => s.category === id)
     if (inUse) {
       console.warn(`Cannot delete category ${id}: still in use by supplements`)
       return
     }
-    setSupplementCategories(prev => prev.filter(c => c.id !== id))
+
+    try {
+      await deleteSupplementCategoryAPI(id)
+      setSupplementCategories(prev => prev.filter(c => c.id !== id))
+    } catch (error) {
+      console.error("Failed to delete supplement category:", error)
+      if (!(error instanceof Error && error.message.includes('utilisent'))) {
+        setSupplementCategories(prev => prev.filter(c => c.id !== id))
+      }
+    }
   }
 
   const getActiveSupplementCategories = () => supplementCategories.filter(c => c.isActive)
 
-  // ============================================
-  // OFFERS CRUD
-  // ============================================
-
+  // Offers CRUD
   const addOffer = (offer: Omit<Offer, "id" | "createdAt" | "updatedAt">) => {
     const newOffer: Offer = {
       ...offer,
@@ -2112,23 +1076,16 @@ export function StockProvider({ children }: { children: ReactNode }) {
 
   const getCurrentOffers = () => {
     const now = new Date()
-    const currentDay = now.getDay() // 0=Sunday, 1=Monday, etc.
+    const currentDay = now.getDay()
     const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
 
     return offers.filter(offer => {
       if (!offer.isActive) return false
-
-      // Check day of week
       if (!offer.schedule.daysOfWeek.includes(currentDay)) return false
-
-      // Check time range
       const { startTime, endTime } = offer.schedule
       if (currentTime < startTime || currentTime > endTime) return false
-
-      // Check valid dates if set
       if (offer.validFrom && new Date(offer.validFrom) > now) return false
       if (offer.validUntil && new Date(offer.validUntil) < now) return false
-
       return true
     })
   }
@@ -2136,7 +1093,6 @@ export function StockProvider({ children }: { children: ReactNode }) {
   return (
     <StockContext.Provider
       value={{
-        // New hierarchy
         stockCategories,
         subCategories,
         products,
@@ -2162,13 +1118,11 @@ export function StockProvider({ children }: { children: ReactNode }) {
         consumeFromBatches,
         getExpiringSoonBatches,
         getLowStockProducts,
-        // Storage Locations
         storageLocations,
         addStorageLocation,
         updateStorageLocation,
         deleteStorageLocation,
         getActiveStorageLocations,
-        // Legacy
         items,
         categories,
         suppliers,
@@ -2183,7 +1137,6 @@ export function StockProvider({ children }: { children: ReactNode }) {
         deleteSupplier,
         getLowStockItems,
         getArchivedBatches,
-        // Menu
         menuCategories,
         menuItems,
         addMenuCategory,
@@ -2192,26 +1145,22 @@ export function StockProvider({ children }: { children: ReactNode }) {
         addMenuItem,
         updateMenuItem,
         deleteMenuItem,
-        // Rewards
         rewards,
         addReward,
         updateReward,
         deleteReward,
         getActiveRewards,
-        // Supplements
         supplements,
         addSupplement,
         updateSupplement,
         deleteSupplement,
         getActiveSupplements,
         getSupplementsForProduct,
-        // Supplement Categories
         supplementCategories,
         addSupplementCategory,
         updateSupplementCategory,
         deleteSupplementCategory,
         getActiveSupplementCategories,
-        // Offers
         offers,
         addOffer,
         updateOffer,
