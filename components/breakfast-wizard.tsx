@@ -47,6 +47,7 @@ import {
   PercentIcon,
   GiftIcon,
   TrendingDownIcon,
+  TagIcon,
 } from "lucide-react"
 
 // Icon mapping for categories
@@ -106,36 +107,36 @@ export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
   const [showFormulaStep, setShowFormulaStep] = useState(false) // For mandatory formula selection in compose mode
   const [supplementsModalOpen, setSupplementsModalOpen] = useState(false)
   const [selectedItemForSupplements, setSelectedItemForSupplements] = useState<BreakfastItem | null>(null)
-  
+
   // Get client loyalty data
   const loyaltyClient = user?.role === "client" && user?.email ? getClientByEmail(user.email) : null
   const clientPoints = loyaltyClient?.loyaltyPoints ?? 0
-  
+
   // ============================================
   // SMART PROGRESSIVE DISCOUNT SYSTEM (Configurable)
   // ============================================
   // Uses the discount context which can be configured from admin panel
-  
+
   // Use discount context - it will use its own fallback if not in provider
   const discountContext = useDiscount()
-  
-const calculateSmartDiscount = useMemo(() => {
+
+  const calculateSmartDiscount = useMemo(() => {
     const formulaPrice = getFormulaPrice()
     const subtotal = cartTotal + formulaPrice
     const itemCount = cartItemsCount + (selectedFormula ? 1 : 0)
-    
+
     // Use the discount context calculation
     return discountContext.calculateDiscount(subtotal, itemCount)
   }, [cartTotal, cartItemsCount, selectedFormula, getFormulaPrice, discountContext])
-  
+
   // Subtotal before discount
   const subtotal = useMemo(() => cartTotal + getFormulaPrice(), [cartTotal, getFormulaPrice])
-  
+
   // Final total after discount
   const finalTotal = useMemo(() => {
     return Math.round((subtotal - calculateSmartDiscount.discountAmount) * 100) / 100
   }, [subtotal, calculateSmartDiscount.discountAmount])
-  
+
   // Total points to earn
   const totalPoints = useMemo(() => cartTotalPoints + getFormulaPoints(), [cartTotalPoints, getFormulaPoints])
 
@@ -195,20 +196,20 @@ const calculateSmartDiscount = useMemo(() => {
   // Handle order submission
   const handleSubmitOrder = () => {
     if (cartItemsCount === 0 && !selectedFormula) return
-    
+
     // Calculate totals including formula
     const formulaPrice = getFormulaPrice()
     const formulaPoints = getFormulaPoints()
     const totalPrice = cartTotal + formulaPrice
     const totalPoints = cartTotalPoints + formulaPoints
-    
+
     // Create order in breakfast context
     createOrder(customerNote, {
       id: loyaltyClient?.id,
       email: user?.email,
       name: user?.name,
     })
-    
+
     // Build items array including formula if selected
     const orderItems = [
       // Add formula as first item if selected
@@ -234,11 +235,11 @@ const calculateSmartDiscount = useMemo(() => {
         categoryId: cartItem.item.categoryId,
       })),
     ]
-    
+
     // Calculate final price with smart discount
     const discountAmount = calculateSmartDiscount.discountAmount
     const finalPriceAfterDiscount = totalPrice - discountAmount
-    
+
     // Also add to unified sales for the admin dashboard
     addSale({
       type: "breakfast",
@@ -261,7 +262,7 @@ const calculateSmartDiscount = useMemo(() => {
       tableNumber: tableNumber || undefined,
       customerNote: customerNote || undefined,
     })
-    
+
     setShowCartSummary(false)
     setShowOrderSuccess(true)
     setCustomerNote("")
@@ -511,11 +512,10 @@ const calculateSmartDiscount = useMemo(() => {
                   </div>
                 )}
                 <div className="relative p-6">
-                  <div className={`h-14 w-14 rounded-2xl flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform ${
-                    formula.type === "healthy" 
-                      ? "bg-gradient-to-br from-green-500 to-emerald-500 shadow-green-500/30" 
+                  <div className={`h-14 w-14 rounded-2xl flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform ${formula.type === "healthy"
+                      ? "bg-gradient-to-br from-green-500 to-emerald-500 shadow-green-500/30"
                       : "bg-gradient-to-br from-amber-500 to-orange-500 shadow-amber-500/30"
-                  }`}>
+                    }`}>
                     {formula.type === "healthy" ? (
                       <LeafIcon className="h-7 w-7 text-white" />
                     ) : (
@@ -524,22 +524,21 @@ const calculateSmartDiscount = useMemo(() => {
                   </div>
                   <h2 className="text-xl font-bold text-stone-900 mb-2">{formula.name}</h2>
                   <p className="text-stone-600 text-sm mb-4">{formula.description}</p>
-                  
+
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <span className="text-2xl font-bold text-stone-900">{formula.price.toFixed(1)} <span className="text-sm font-normal text-stone-500">TND</span></span>
-                      {formula.points > 0 && (
+                      {formula.points! > 0 && (
                         <Badge className="bg-emerald-100 text-emerald-700 border-0">
                           <CoinsIcon className="h-3 w-3 mr-1" />
                           +{formula.points} pts
                         </Badge>
                       )}
                     </div>
-                    <div className={`h-10 w-10 rounded-full flex items-center justify-center transition-all ${
-                      formula.type === "healthy"
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center transition-all ${formula.type === "healthy"
                         ? "bg-emerald-100 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white"
                         : "bg-amber-100 text-amber-600 group-hover:bg-amber-500 group-hover:text-white"
-                    }`}>
+                      }`}>
                       <ArrowRightIcon className="h-5 w-5" />
                     </div>
                   </div>
@@ -630,11 +629,10 @@ const calculateSmartDiscount = useMemo(() => {
             <Card className="rounded-3xl overflow-hidden shadow-lg border-0 mb-4 bg-gradient-to-r from-emerald-50 to-teal-50">
               <div className="p-4">
                 <div className="flex items-center gap-4">
-                  <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${
-                    selectedFormula === "healthy" 
-                      ? "bg-green-500" 
+                  <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${selectedFormula === "healthy"
+                      ? "bg-green-500"
                       : "bg-amber-500"
-                  }`}>
+                    }`}>
                     {selectedFormula === "healthy" ? (
                       <LeafIcon className="h-6 w-6 text-white" />
                     ) : (
@@ -664,7 +662,7 @@ const calculateSmartDiscount = useMemo(() => {
               <h2 className="font-semibold text-lg text-stone-900 mb-4">
                 {wizardMode === "compose" && selectedFormula ? "Extras ajoutes" : "Votre commande"}
               </h2>
-              
+
               {cart.length === 0 && !selectedFormula ? (
                 <div className="text-center py-8">
                   <PackageIcon className="h-12 w-12 mx-auto text-stone-300 mb-3" />
@@ -774,7 +772,7 @@ const calculateSmartDiscount = useMemo(() => {
                       Ajoutez {calculateSmartDiscount.nextTier.amountNeeded} TND pour debloquer
                     </p>
                     <p className="text-xs text-emerald-600">
-                      Reduction {calculateSmartDiscount.nextTier.name} de {calculateSmartDiscount.nextTier.discount}% 
+                      Reduction {calculateSmartDiscount.nextTier.name} de {calculateSmartDiscount.nextTier.discount}%
                     </p>
                   </div>
                 </div>
@@ -792,7 +790,7 @@ const calculateSmartDiscount = useMemo(() => {
                   <span className="text-white font-medium">{getFormulaPrice().toFixed(2)} TND</span>
                 </div>
               )}
-              
+
               {/* Extras Subtotal */}
               {cart.length > 0 && (
                 <div className="flex items-center justify-between mb-3">
@@ -800,7 +798,7 @@ const calculateSmartDiscount = useMemo(() => {
                   <span className="text-white font-medium">{cartTotal.toFixed(2)} TND</span>
                 </div>
               )}
-              
+
               {/* Subtotal before discount */}
               {(cartTotal + getFormulaPrice()) > 0 && (
                 <div className="flex items-center justify-between mb-3">
@@ -808,7 +806,7 @@ const calculateSmartDiscount = useMemo(() => {
                   <span className="text-white font-medium">{(cartTotal + getFormulaPrice()).toFixed(2)} TND</span>
                 </div>
               )}
-              
+
               {/* Smart Discount Display */}
               {calculateSmartDiscount.discountAmount > 0 && calculateSmartDiscount.tier && (
                 <motion.div
@@ -828,7 +826,7 @@ const calculateSmartDiscount = useMemo(() => {
                     </div>
                     <span className="text-white font-bold text-lg">-{calculateSmartDiscount.discountAmount.toFixed(2)} TND</span>
                   </div>
-                  
+
                   {/* Next tier encouragement */}
                   {calculateSmartDiscount.nextTier && (
                     <div className="flex items-center gap-2 text-white/70 text-xs px-2">
@@ -840,14 +838,14 @@ const calculateSmartDiscount = useMemo(() => {
                   )}
                 </motion.div>
               )}
-              
+
               <div className="flex items-center justify-between mb-4">
                 <span className="text-white/80">Points a gagner</span>
                 <span className="text-white font-medium">+{cartTotalPoints + getFormulaPoints()} pts</span>
               </div>
-              
+
               <div className="h-px bg-white/20 mb-4" />
-              
+
               {/* Final Total */}
               <div className="flex items-center justify-between mb-6">
                 <span className="text-xl font-bold text-white">Total</span>
@@ -860,7 +858,7 @@ const calculateSmartDiscount = useMemo(() => {
                   <span className="text-3xl font-bold text-white">{finalTotal.toFixed(2)} TND</span>
                 </div>
               </div>
-              
+
               {/* Savings summary */}
               {calculateSmartDiscount.discountAmount > 0 && (
                 <div className="mb-4 text-center">
@@ -870,7 +868,7 @@ const calculateSmartDiscount = useMemo(() => {
                   </Badge>
                 </div>
               )}
-              
+
               <Button
                 onClick={handleSubmitOrder}
                 disabled={cartItemsCount === 0 && !selectedFormula}
@@ -913,7 +911,7 @@ const calculateSmartDiscount = useMemo(() => {
               <ChevronLeftIcon className="h-5 w-5" />
               {isFirstStep ? "Retour" : "Precedent"}
             </button>
-            
+
             <h1 className="text-lg font-semibold text-stone-900">
               {wizardMode === "suggestions" ? "Nos Suggestions" : "Composer"}
             </h1>
@@ -948,7 +946,7 @@ const calculateSmartDiscount = useMemo(() => {
               const isActive = index === currentStepIndex
               const isCompleted = index < currentStepIndex
               const hasItemsInCart = cart.some(c => c.item.categoryId === step.categoryId)
-              
+
               return (
                 <button
                   key={step.id}
@@ -958,8 +956,8 @@ const calculateSmartDiscount = useMemo(() => {
                     isActive
                       ? "bg-amber-500 text-white shadow-lg shadow-amber-500/30"
                       : isCompleted
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-stone-100 text-stone-600 hover:bg-stone-200"
                   )}
                 >
                   <span className="flex items-center justify-center">
@@ -1021,7 +1019,8 @@ const calculateSmartDiscount = useMemo(() => {
                 {currentItems.map((item, index) => {
                   const quantity = getItemQuantity(item.id)
                   const isInCart = quantity > 0
-                
+                  const hasSupplements = item.availableSupplements && item.availableSupplements.length > 0
+
                   return (
                     <motion.div
                       key={item.id}
@@ -1052,7 +1051,7 @@ const calculateSmartDiscount = useMemo(() => {
                               <CoffeeIcon className="h-6 w-6 text-stone-300" />
                             </div>
                           )}
-                          
+
                           {/* Price Badge */}
                           <div className="absolute top-1 right-1">
                             <span className="bg-white/90 text-amber-600 text-[9px] font-bold px-1 py-0.5 rounded">
@@ -1082,7 +1081,13 @@ const calculateSmartDiscount = useMemo(() => {
                         {/* Content - Compact */}
                         <div className="p-1.5">
                           <p className="font-medium text-xs text-stone-800 truncate mb-1">{item.name}</p>
-
+                          {/* Supplements indicator - MOVED HERE outside the image div */}
+                          {hasSupplements && (
+                            <div className="flex items-center gap-1 mb-1 text-[9px] text-amber-600">
+                              <TagIcon className="h-2.5 w-2.5" />
+                              <span>Supplements disponibles</span>
+                            </div>
+                          )}
                           {/* Add/Remove Buttons - Compact */}
                           {isInCart ? (
                             <div className="flex items-center justify-between bg-stone-100 rounded p-0.5">
@@ -1134,7 +1139,7 @@ const calculateSmartDiscount = useMemo(() => {
                     <span className="text-xs sm:text-sm text-stone-500">Sous-total:</span>
                     <span className="font-medium text-stone-700 text-sm">{subtotal.toFixed(2)} TND</span>
                   </div>
-                  
+
                   {/* Discount Badge - Compact on mobile */}
                   {calculateSmartDiscount.discountAmount > 0 && calculateSmartDiscount.tier && (
                     <div className="flex items-center gap-1 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-emerald-50 border border-emerald-200 mt-0.5 sm:mt-0">
@@ -1147,7 +1152,7 @@ const calculateSmartDiscount = useMemo(() => {
                     </div>
                   )}
                 </div>
-                
+
                 {/* Right: Total + Points */}
                 <div className="flex items-center gap-2 sm:gap-4">
                   {/* Points - Compact on mobile */}
@@ -1156,7 +1161,7 @@ const calculateSmartDiscount = useMemo(() => {
                     <span className="font-semibold text-amber-700 text-xs sm:text-sm">+{totalPoints}</span>
                     <span className="hidden sm:inline text-amber-700 text-xs">pts</span>
                   </div>
-                  
+
                   {/* Final Total */}
                   <div className="flex items-baseline gap-1 sm:gap-2">
                     {calculateSmartDiscount.discountAmount > 0 && (
@@ -1166,7 +1171,7 @@ const calculateSmartDiscount = useMemo(() => {
                   </div>
                 </div>
               </div>
-              
+
               {/* Encouragement message - Compact on mobile */}
               {calculateSmartDiscount.nextTier && subtotal > 0 && (
                 <div className="mt-1.5 flex items-center gap-1.5 text-[10px] sm:text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
@@ -1179,7 +1184,7 @@ const calculateSmartDiscount = useMemo(() => {
             </div>
           </div>
         )}
-        
+
         {/* Navigation Row - Compact on mobile */}
         <div className="p-2 sm:p-4">
           <div className="max-w-6xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
@@ -1202,8 +1207,8 @@ const calculateSmartDiscount = useMemo(() => {
                     index === currentStepIndex
                       ? "w-5 sm:w-8 bg-amber-500"
                       : index < currentStepIndex
-                      ? "w-1.5 sm:w-2 bg-emerald-500"
-                      : "w-1.5 sm:w-2 bg-stone-200"
+                        ? "w-1.5 sm:w-2 bg-emerald-500"
+                        : "w-1.5 sm:w-2 bg-stone-200"
                   )}
                 />
               ))}
