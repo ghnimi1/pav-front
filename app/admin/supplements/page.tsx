@@ -397,7 +397,7 @@ function AdminSupplementsContent() {
               return (
                 <div key={categoryId}>
                   <div className="flex items-center gap-2 mb-3">
-                    <Badge className={category.color}>{category.name}</Badge>
+                    <Badge className={category?.color}>{category.name}</Badge>
                     <span className="text-sm text-stone-500">{categorySupplements.length} supplement(s)</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
