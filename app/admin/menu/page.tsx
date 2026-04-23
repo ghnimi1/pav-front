@@ -64,7 +64,7 @@ interface UnifiedProduct {
 
 function MenuAdminContent() {
   const router = useRouter()
-  const { showNotification } = useNotification()
+  const { addNotification } = useNotification()
   const { menuItems, menuCategories, supplements, updateMenuItem } = useStock()
   const { items: breakfastItems, categories: breakfastCategories, updateItem } = useBreakfast()
   
@@ -205,7 +205,7 @@ function MenuAdminContent() {
       updateItem(editingProduct.id, { availableSupplements: supplementConfigs })
     }
 
-    showNotification("success", "Supplements mis a jour avec succes")
+    addNotification("success", "Supplements mis a jour avec succes")
     setShowSupplementsDialog(false)
     setEditingProduct(null)
   }
@@ -217,7 +217,7 @@ function MenuAdminContent() {
     } else {
       updateItem(product.id, { isAvailable: !product.isAvailable })
     }
-    showNotification("success", `${product.name} ${!product.isAvailable ? "active" : "desactive"}`)
+    addNotification("success", `${product.name} ${!product.isAvailable ? "active" : "desactive"}`)
   }
 
   // Count enabled supplements for a product

@@ -1244,7 +1244,7 @@ export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
             setSelectedItemForSupplements(null)
           }}
           item={selectedItemForSupplements}
-          onConfirm={(supplements) => {
+          onConfirm={(selectedItemForSupplements,supplements) => {
             handleAddItemWithSupplements(selectedItemForSupplements, supplements)
             setSupplementsModalOpen(false)
             setSelectedItemForSupplements(null)
