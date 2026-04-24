@@ -132,6 +132,13 @@ export interface ProductSupplementConfig {
   supplementId: string
   isEnabled: boolean
   customPrice?: number
+  id?: string
+  name?: string
+  price?: number
+  description?: string
+  points?: number
+  category?: string
+  isactive?: boolean
 }
 
 export interface SelectedSupplement {
@@ -395,6 +402,8 @@ async function fetchMenuItems(): Promise<MenuItem[]> {
     return data.map(item => ({
       ...item,
       id: (item as any)._id || item.id,
+      category: (item as any).categoryId || item.category,
+      availableSupplements: (item as any).availableSupplements || (item as any).supplements || [],
     }))
   } catch (error) {
     console.error('Failed to fetch menu items:', error)
@@ -1127,7 +1136,7 @@ export function StockProvider({ children }: { children: ReactNode }) {
       formData.append('name', item.name)
       formData.append('description', item.description)
       formData.append('price', item.price.toString())
-      if (item.points) formData.append('points', item.points.toString())
+      if (item.points !== undefined) formData.append('points', item.points.toString())
       formData.append('categoryId', item.category)
       formData.append('allergens', JSON.stringify(item.allergens || []))
       formData.append('isAvailable', String(item.isAvailable))
@@ -1136,7 +1145,9 @@ export function StockProvider({ children }: { children: ReactNode }) {
       } else if (item.image && typeof item.image === 'string') {
         formData.append('image', item.image)
       }
-      if (item.supplements) {
+      if (item.availableSupplements) {
+        formData.append('availableSupplements', JSON.stringify(item.availableSupplements))
+      } else if (item.supplements) {
         formData.append('supplements', JSON.stringify(item.supplements))
       }
       if (item.promotion) {
@@ -1144,7 +1155,14 @@ export function StockProvider({ children }: { children: ReactNode }) {
       }
 
       const newItem = await createMenuItemAPI(formData)
-      setMenuItems(prev => [...prev, { ...newItem, createdAt: newItem.createdAt || new Date().toISOString(), updatedAt: newItem.updatedAt || new Date().toISOString() }])
+      setMenuItems(prev => [...prev, {
+        ...newItem,
+        id: (newItem as any)._id || newItem.id,
+        category: (newItem as any).categoryId || newItem.category,
+        availableSupplements: (newItem as any).availableSupplements || (newItem as any).supplements || [],
+        createdAt: newItem.createdAt || new Date().toISOString(),
+        updatedAt: newItem.updatedAt || new Date().toISOString(),
+      }])
     } catch (error) {
       console.error("Failed to create menu item:", error)
       const newItem: MenuItem = {
@@ -1160,22 +1178,24 @@ export function StockProvider({ children }: { children: ReactNode }) {
   const updateMenuItem = async (id: string, updates: Partial<MenuItem>) => {
     try {
       const formData = new FormData()
-      if (updates.name) formData.append('name', updates.name)
-      if (updates.description) formData.append('description', updates.description)
-      if (updates.price) formData.append('price', updates.price.toString())
-      if (updates.points) formData.append('points', updates.points.toString())
-      if (updates.category) formData.append('categoryId', updates.category)
-      if (updates.allergens) formData.append('allergens', JSON.stringify(updates.allergens))
+      if (updates.name !== undefined) formData.append('name', updates.name)
+      if (updates.description !== undefined) formData.append('description', updates.description)
+      if (updates.price !== undefined) formData.append('price', updates.price.toString())
+      if (updates.points !== undefined) formData.append('points', updates.points.toString())
+      if (updates.category !== undefined) formData.append('categoryId', updates.category)
+      if (updates.allergens !== undefined) formData.append('allergens', JSON.stringify(updates.allergens))
       if (updates.isAvailable !== undefined) formData.append('isAvailable', String(updates.isAvailable))
       if (updates.image instanceof File) {
         formData.append('imageFile', updates.image)
       } else if (updates.image === undefined || updates.image === null) {
         formData.append('removeImage', 'true')
       }
-      if (updates.supplements) {
+      if (updates.availableSupplements !== undefined) {
+        formData.append('availableSupplements', JSON.stringify(updates.availableSupplements))
+      } else if (updates.supplements !== undefined) {
         formData.append('supplements', JSON.stringify(updates.supplements))
       }
-      if (updates.promotion) {
+      if (updates.promotion !== undefined) {
         formData.append('promotion', JSON.stringify(updates.promotion))
       }
 

@@ -109,19 +109,19 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
   const activeCategories = useMemo(() => {
     return menuCategories.filter(cat => cat.isActive).sort((a, b) => a.order - b.order)
   }, [menuCategories])
-  
+  console.log(activeCategories,"activeCategories")
   // Navigation steps: Offers (if any) + All categories
   const navigationSteps = useMemo(() => {
-    const steps: { id: string; slug: string; name: string; type: "offers" | "category" }[] = []
+    const steps: { id: string; name: string; type: "offers" | "category" }[] = []
     
     // Add offers step if there are current offers
     if (currentOffers.length > 0) {
-      steps.push({ id: "offers", slug: "all", name: "Offres", type: "offers" })
+      steps.push({ id: "all", name: "Offres", type: "offers" })
     }
     
-    // Add all active categories - use slug for filtering
+    // Add all active categories - use category id for filtering
     activeCategories.forEach(cat => {
-      steps.push({ id: cat.id, slug: cat.slug, name: cat.name, type: "category" })
+      steps.push({ id: cat.id, name: cat.name, type: "category" })
     })
     
     return steps
@@ -131,7 +131,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
   
   // Sync categoryStepIndex with selectedCategory when clicking tabs
   useEffect(() => {
-    const currentStepIndex = navigationSteps.findIndex(step => step.slug === selectedCategory)
+    const currentStepIndex = navigationSteps.findIndex(step => step.id === selectedCategory)
     if (currentStepIndex !== -1 && currentStepIndex !== categoryStepIndex) {
       setCategoryStepIndex(currentStepIndex)
     }
@@ -146,7 +146,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
       const nextIndex = categoryStepIndex + 1
       setCategoryStepIndex(nextIndex)
       const nextStep = navigationSteps[nextIndex]
-      setSelectedCategory(nextStep.slug)
+      setSelectedCategory(nextStep.id)
     }
   }
   
@@ -426,20 +426,20 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
             >
               Tout voir
             </Button>
-            {activeCategories.map(cat => (
-              <Button
-                key={cat.id}
-                variant={selectedCategory === cat.slug ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedCategory(cat.slug)}
-                className={cn(
-                  "shrink-0",
-                  selectedCategory === cat.slug && "bg-stone-900 text-white"
-                )}
-              >
-                {cat.icon} {cat.name}
-              </Button>
-            ))}
+           {activeCategories.map(cat => (
+  <Button
+    key={cat.id}
+    variant={selectedCategory === cat.id ? "default" : "outline"}  // Use cat.id, not cat.slug
+    size="sm"
+    onClick={() => setSelectedCategory(cat.id)}  // Use cat.id
+    className={cn(
+      "shrink-0",
+      selectedCategory === cat.id && "bg-stone-900 text-white"
+    )}
+  >
+    {cat.icon} {cat.name}
+  </Button>
+))}
           </div>
         </div>
       </div>
@@ -1265,7 +1265,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                     key={step.id}
                     onClick={() => {
                       setCategoryStepIndex(index)
-                      setSelectedCategory(step.slug)
+                      setSelectedCategory(step.id)
                     }}
                     className={cn(
                       "h-1.5 sm:h-2 rounded-full transition-all",

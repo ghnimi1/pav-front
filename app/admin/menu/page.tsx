@@ -119,7 +119,7 @@ function MenuAdminContent() {
     const categories: { id: string; name: string; source: string }[] = []
     
     menuCategories.forEach(cat => {
-      categories.push({ id: cat.slug, name: cat.name, source: "patisserie" })
+      categories.push({ id: cat.id, name: cat.name, source: "patisserie" })
     })
     
     breakfastCategories.forEach(cat => {
@@ -228,7 +228,7 @@ function MenuAdminContent() {
   // Get category name
   const getCategoryName = (product: UnifiedProduct): string => {
     if (product.source === "patisserie") {
-      return menuCategories.find(c => c.slug === product.category)?.name || product.category
+      return menuCategories.find(c => c.id === product.category)?.name || product.category
     }
     return breakfastCategories.find(c => c.id === product.category)?.name || product.category
   }

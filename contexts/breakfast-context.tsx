@@ -10,6 +10,13 @@ export interface ProductSupplementConfig {
   supplementId: string
   isEnabled: boolean
   customPrice?: number
+    id?: string
+  name?: string
+  price?: number
+  description?: string
+  points?: number
+  category?: string
+  isactive?: boolean
 }
 
 export interface SelectedSupplement {

@@ -814,9 +814,9 @@ function OrderPageContent() {
                 return (
                   <Button
                     key={category.id}
-                    variant={selectedCategory === category.slug ? "default" : "outline"}
-                    className={`rounded-full shrink-0 gap-2 ${selectedCategory === category.slug ? "bg-amber-500 hover:bg-amber-600" : "border-stone-200 hover:border-amber-300 hover:bg-amber-50"}`}
-                    onClick={() => setSelectedCategory(category.slug)}
+                    variant={selectedCategory === category.id ? "default" : "outline"}
+                    className={`rounded-full shrink-0 gap-2 ${selectedCategory === category.id ? "bg-amber-500 hover:bg-amber-600" : "border-stone-200 hover:border-amber-300 hover:bg-amber-50"}`}
+                    onClick={() => setSelectedCategory(category.id)}
                   >
                     {getCategoryIcon(category.slug)}
                     {category.name}

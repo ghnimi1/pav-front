@@ -28,26 +28,20 @@ export function SupplementsModal({ isOpen, onClose, item, onConfirm }: Supplemen
 console.log(item.availableSupplements)
   // Get available supplements for this item
   const getAvailableSupplements = (): Supplement[] => {
-  if (!item.availableSupplements) return []
-  
-  console.log('item.availableSupplements:', item.availableSupplements)
-  console.log('allSupplements:', allSupplements)
-  
-  const result = item.availableSupplements
-    .filter(ps => ps.isEnabled)
-    .map(ps => {
-      const supplement = allSupplements.find(s => s.id === ps.supplementId && s.isActive)
-      console.log(`Looking for ${ps.supplementId}:`, supplement)
-      if (!supplement) return null
-      return ps.customPrice !== undefined 
-        ? { ...supplement, price: ps.customPrice }
-        : supplement
-    })
-    .filter((s): s is Supplement => s !== null)
+    if (!item.availableSupplements) return []
     
-  console.log('Final result:', result)
-  return result
-}
+    return item.availableSupplements
+      .filter(ps => ps.isEnabled)
+      .map(ps => {
+        const supplement = allSupplements.find(s => s.id === ps.supplementId && s.isActive)
+        if (!supplement) return null
+        // Apply custom price if set
+        return ps.customPrice !== undefined 
+          ? { ...supplement, price: ps.customPrice }
+          : supplement
+      })
+      .filter((s): s is Supplement => s !== null)
+  }
 
   const availableSupplements = getAvailableSupplements()
   
