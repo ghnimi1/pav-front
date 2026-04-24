@@ -703,19 +703,19 @@ const initialRewards: Reward[] = [
   { id: "r2", name: "Reduction 5 TND", description: "5 TND de reduction sur votre prochaine commande", pointsCost: 100, type: "discount", value: "5 TND", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
 ]
 
-const initialMenuCategories: MenuCategory[] = [
+const initialMenuCategories: MenuCategory[] = [/* 
   { id: "0", name: "Petit dejeuner", slug: "petit-dejeuner", icon: "🍳", order: 0, isActive: true },
   { id: "1", name: "Viennoiseries", slug: "viennoiseries", icon: "🥐", order: 1, isActive: true },
   { id: "2", name: "Patisseries", slug: "patisseries", icon: "🎂", order: 2, isActive: true },
   { id: "3", name: "Specialites Tunisiennes", slug: "specialites-tunisiennes", icon: "⭐", order: 3, isActive: true },
   { id: "4", name: "Thes & Infusions", slug: "thes-infusions", icon: "☕", order: 4, isActive: true },
-  { id: "5", name: "Boissons", slug: "boissons", icon: "🥤", order: 5, isActive: true },
+  { id: "5", name: "Boissons", slug: "boissons", icon: "🥤", order: 5, isActive: true }, */
 ]
 
 const initialMenuItems: MenuItem[] = [
-  { id: "0", name: "Petit Dejeuner Gourmand pour 2", description: "Assortiment complet pour deux personnes", price: 32.0, points: 32, category: "0", image: "/placeholder.svg", allergens: ["Gluten", "Lait", "Oeufs"], isAvailable: true, tags: ["Pour 2 personnes", "Complet"], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  /* { id: "0", name: "Petit Dejeuner Gourmand pour 2", description: "Assortiment complet pour deux personnes", price: 32.0, points: 32, category: "0", image: "/placeholder.svg", allergens: ["Gluten", "Lait", "Oeufs"], isAvailable: true, tags: ["Pour 2 personnes", "Complet"], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
   { id: "1", name: "Croissant Artisanal", description: "Croissant pur beurre croustillant et fondant", price: 4.5, points: 5, category: "1", image: "/placeholder.svg", allergens: ["Gluten", "Lait"], isAvailable: true, availableSupplements: [{ supplementId: "sup-16", isEnabled: true }, { supplementId: "sup-17", isEnabled: true }, { supplementId: "sup-18", isEnabled: true }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "2", name: "Pain au Chocolat", description: "Viennoiserie pur beurre garnie de chocolat noir", price: 5.5, points: 6, category: "1", image: "/placeholder.svg", allergens: ["Gluten", "Lait"], isAvailable: true, availableSupplements: [{ supplementId: "sup-16", isEnabled: true }, { supplementId: "sup-9", isEnabled: true }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "2", name: "Pain au Chocolat", description: "Viennoiserie pur beurre garnie de chocolat noir", price: 5.5, points: 6, category: "1", image: "/placeholder.svg", allergens: ["Gluten", "Lait"], isAvailable: true, availableSupplements: [{ supplementId: "sup-16", isEnabled: true }, { supplementId: "sup-9", isEnabled: true }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, */
 ]
 
 const initialSupplementCategories: SupplementCategory[] = []

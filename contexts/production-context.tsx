@@ -319,7 +319,7 @@ const getInitialShowcaseItems = (): ShowcaseItem[] => {
 }
 
 const initialRecipes: Recipe[] = [
-{
+/* {
     id: "rec-1",
     name: "Croissant Beurre",
     description: "Croissant traditionnel au beurre",
@@ -518,7 +518,7 @@ const initialRecipes: Recipe[] = [
     isActive: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-  },
+  }, */
 ]
 
 export function ProductionProvider({ children }: { children: ReactNode }) {
@@ -533,7 +533,7 @@ export function ProductionProvider({ children }: { children: ReactNode }) {
   const [sales, setSales] = useState<Sale[]>([])
   
   // Load from localStorage
-  useEffect(() => {
+/*   useEffect(() => {
     const stored = {
       recipeCategories: localStorage.getItem("recipe-categories"),
       recipes: localStorage.getItem("recipes"),
@@ -549,7 +549,7 @@ export function ProductionProvider({ children }: { children: ReactNode }) {
     setProductionOrders(stored.productionOrders ? JSON.parse(stored.productionOrders) : [])
     setShowcaseItems(stored.showcaseItems ? JSON.parse(stored.showcaseItems) : getInitialShowcaseItems())
     setSales(stored.sales ? JSON.parse(stored.sales) : [])
-  }, [])
+  }, []) 
   
   // Save to localStorage
   useEffect(() => { if (recipeCategories.length) localStorage.setItem("recipe-categories", JSON.stringify(recipeCategories)) }, [recipeCategories])
@@ -558,7 +558,7 @@ export function ProductionProvider({ children }: { children: ReactNode }) {
   useEffect(() => { localStorage.setItem("production-orders", JSON.stringify(productionOrders)) }, [productionOrders])
   useEffect(() => { localStorage.setItem("showcase-items", JSON.stringify(showcaseItems)) }, [showcaseItems])
   useEffect(() => { localStorage.setItem("sales", JSON.stringify(sales)) }, [sales])
-  
+  */
   // ============================================
   // RECIPE CATEGORIES CRUD
   // ============================================
