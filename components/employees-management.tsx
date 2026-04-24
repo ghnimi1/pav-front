@@ -48,6 +48,7 @@ export function EmployeesManagement() {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(12)
   const [showPassword, setShowPassword] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [formData, setFormData] = useState({
     name: "",
@@ -96,7 +97,7 @@ export function EmployeesManagement() {
     }
   }
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!formData.name || !formData.email || !formData.password) {
       return
     }
@@ -106,7 +107,8 @@ export function EmployeesManagement() {
       return
     }
 
-    addEmployee({
+    setIsSubmitting(true)
+    const success = await addEmployee({
       name: formData.name,
       email: formData.email,
       phone: formData.phone || undefined,
@@ -116,34 +118,51 @@ export function EmployeesManagement() {
       isActive: formData.isActive,
     })
 
+    setIsSubmitting(false)
+    if (!success) {
+      return
+    }
+
     setIsAddDialogOpen(false)
     resetForm()
   }
 
-  const handleEdit = () => {
+  const handleEdit = async () => {
     if (!selectedEmployee || !formData.name || !formData.email) {
       return
     }
 
-    updateEmployee(selectedEmployee.id, {
+    setIsSubmitting(true)
+    const success = await updateEmployee(selectedEmployee.id, {
       name: formData.name,
       email: formData.email,
       phone: formData.phone || undefined,
-      password: formData.password || selectedEmployee.password,
       role: formData.role,
       permissions: formData.permissions,
       isActive: formData.isActive,
+      ...(formData.password ? { password: formData.password } : {}),
     })
+
+    setIsSubmitting(false)
+    if (!success) {
+      return
+    }
 
     setIsEditDialogOpen(false)
     setSelectedEmployee(null)
     resetForm()
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedEmployee) return
 
-    deleteEmployee(selectedEmployee.id)
+    setIsSubmitting(true)
+    const success = await deleteEmployee(selectedEmployee.id)
+    setIsSubmitting(false)
+    if (!success) {
+      return
+    }
+
     setIsDeleteDialogOpen(false)
     setSelectedEmployee(null)
   }
@@ -544,7 +563,7 @@ export function EmployeesManagement() {
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
               Annuler
             </Button>
-            <Button onClick={handleAdd} className="bg-purple-600 hover:bg-purple-700">
+            <Button onClick={() => void handleAdd()} className="bg-purple-600 hover:bg-purple-700" disabled={isSubmitting}>
               Ajouter l&apos;employe
             </Button>
           </DialogFooter>
@@ -696,7 +715,7 @@ export function EmployeesManagement() {
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Annuler
             </Button>
-            <Button onClick={handleEdit} className="bg-purple-600 hover:bg-purple-700">
+            <Button onClick={() => void handleEdit()} className="bg-purple-600 hover:bg-purple-700" disabled={isSubmitting}>
               Enregistrer
             </Button>
           </DialogFooter>
@@ -780,7 +799,7 @@ export function EmployeesManagement() {
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
               Annuler
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
+            <Button variant="destructive" onClick={() => void handleDelete()} disabled={isSubmitting}>
               Supprimer
             </Button>
           </DialogFooter>
