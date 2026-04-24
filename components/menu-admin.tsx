@@ -538,6 +538,7 @@ function MenuAdminContent() {
     </div>
   )
 }
+export { MenuAdminContent }
 
 export default function MenuAdminPage() {
   return (

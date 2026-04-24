@@ -1532,6 +1532,7 @@ const handleSaveProduct = async () => {
     </div>
   )
 }
+export { MenuClientAdminContent }
 
 export default function MenuClientAdminPage() {
   return (

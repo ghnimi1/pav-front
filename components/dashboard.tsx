@@ -27,11 +27,12 @@ import { ShowcasesManagement } from "./showcases-management"
 import { ProductionManagement } from "./production-management"
 import { ShowcaseStock } from "./showcase-stock"
 import { SalesPOS } from "./sales-pos"
-import { BreakfastOrdersManagement } from "./breakfast-orders-management"
+import { MenuClientAdminContent } from "./menu-client-admin-content"
 import { BreakfastMenuAdmin } from "./breakfast-menu-admin"
 import { UnifiedSalesManagement } from "./unified-sales-management"
 import { useAuth } from "@/contexts/auth-context"
 import { ShieldAlertIcon } from "lucide-react"
+import { MenuAdminContent } from "./menu-admin"
 
 type NavItem =
   | "dashboard"
@@ -59,6 +60,8 @@ type NavItem =
   | "referrals"
   | "staff-pos"
   | "employees"
+  | "menu-client"
+  | "menu-admin"
 
 export function Dashboard() {
   const [currentView, setCurrentView] = useState<NavItem>("dashboard")
@@ -179,6 +182,10 @@ export function Dashboard() {
           {currentView === "clients-management" && canAccess("clients") && <ClientsManagement />}
 
           {currentView === "clients" && canAccess("clients_loyalty") && <ClientsLoyaltyManagement />}
+
+           {currentView === "menu-client" && canAccess("menu") && <MenuClientAdminContent />}
+
+            {currentView === "menu-admin" && canAccess("menu") && <MenuAdminContent />}
 
           {currentView === "rewards" && canAccess("rewards") && <RewardsManagement />}
 

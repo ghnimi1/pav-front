@@ -155,7 +155,7 @@ export function Sidebar({ currentView, onViewChange, isOpen, onClose, isAdmin }:
       adminOnly: true,
       permission: "articles",
       section: "production",
-      href: "/admin/menu-client",
+      //href: "/admin/menu-client",
     },
     {
       id: "menu-admin",
@@ -164,7 +164,7 @@ export function Sidebar({ currentView, onViewChange, isOpen, onClose, isAdmin }:
       adminOnly: true,
       permission: "articles",
       section: "production",
-      href: "/admin/menu",
+      //href: "/admin/menu",
     },
     // Stock Section
     {
