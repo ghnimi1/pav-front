@@ -44,7 +44,7 @@ export interface BreakfastItem {
   removeImage?: boolean
 }
 
-export type FormulaType = "normal" | "healthy" | null
+export type FormulaType = "normal" | "healthy" | "vegan" | "premium" | "enfants" | any
 
 export interface BaseFormula {
   id: string
@@ -52,9 +52,11 @@ export interface BaseFormula {
   description: string
   price: number
   points?: number
-  type: "normal" | "healthy"
+  type: "normal" | "healthy" | "vegan" | "premium" | "enfants",
   image?: string
   isActive?: boolean
+  imageFile?: File
+  removeImage?: boolean
 }
 
 export interface BreakfastCategory {
@@ -139,7 +141,9 @@ interface BreakfastContextType {
   selectFormula: (type: FormulaType) => void
   getFormulaPrice: () => number
   getFormulaPoints: () => number
+  addFormula: (formula: Omit<BaseFormula, "id">) => void
   updateFormula: (id: string, formula: Partial<BaseFormula>) => void
+  deleteFormula: (id: string) => void
   addCategory: (category: Omit<BreakfastCategory, "id">) => void
   updateCategory: (id: string, category: Partial<BreakfastCategory>) => void
   deleteCategory: (id: string) => void
@@ -257,6 +261,22 @@ function buildBreakfastItemFormData(item: Partial<BreakfastItem>) {
   
   if (item.removeImage !== undefined) formData.append("removeImage", String(item.removeImage))
   if (item.imageFile) formData.append("imageFile", item.imageFile)
+
+  return formData
+}
+
+function buildBreakfastFormulaFormData(formula: Partial<BaseFormula>) {
+  const formData = new FormData()
+
+  if (formula.name !== undefined) formData.append("name", formula.name)
+  if (formula.description !== undefined) formData.append("description", formula.description)
+  if (formula.price !== undefined) formData.append("price", String(formula.price))
+  if (formula.points !== undefined) formData.append("points", String(formula.points))
+  if (formula.type !== undefined && formula.type !== null) formData.append("type", formula.type)
+  if (formula.image !== undefined) formData.append("image", formula.image)
+  if (formula.isActive !== undefined) formData.append("isActive", String(formula.isActive))
+  if (formula.removeImage !== undefined) formData.append("removeImage", String(formula.removeImage))
+  if (formula.imageFile) formData.append("imageFile", formula.imageFile)
 
   return formData
 }
@@ -546,17 +566,88 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
     return baseFormulas.find((formula) => formula.type === selectedFormula && formula.isActive !== false)?.points || 0
   }
 
+  const addFormula = (formula: Omit<BaseFormula, "id">) => {
+    void (async () => {
+      try {
+        const created = await fetchJson<ApiEntity & Omit<BaseFormula, "id">>("/menu/breakfast/formulas", {
+          method: "POST",
+          headers: getAuthTokenHeader(),
+          body: buildBreakfastFormulaFormData(formula),
+        })
+        setBaseFormulas((prev) => [...prev, mapFormula(created)])
+      } catch (error) {
+        console.error("Failed to create breakfast formula:", error)
+      }
+    })()
+  }
+
   const updateFormula = (id: string, updates: Partial<BaseFormula>) => {
     void (async () => {
       try {
-        await fetchJson(`/menu/breakfast/formulas/${id}`, {
+        const currentFormula = baseFormulas.find((formula) => formula.id === id)
+        if (!currentFormula) {
+          console.error("Formula not found:", id)
+          return
+        }
+
+        const mergedFormula: Partial<BaseFormula> = {
+          name: updates.name !== undefined ? updates.name : currentFormula.name,
+          description: updates.description !== undefined ? updates.description : currentFormula.description,
+          price: updates.price !== undefined ? updates.price : currentFormula.price,
+          points: updates.points !== undefined ? updates.points : currentFormula.points,
+          type: updates.type !== undefined ? updates.type : currentFormula.type,
+          image: updates.image !== undefined ? updates.image : currentFormula.image,
+          isActive: updates.isActive !== undefined ? updates.isActive : currentFormula.isActive,
+        }
+
+        if (updates.removeImage) {
+          mergedFormula.image = undefined
+          mergedFormula.removeImage = true
+        }
+
+        if (updates.imageFile) {
+          mergedFormula.imageFile = updates.imageFile
+        }
+
+        await fetch(`${API_BASE_URL}/menu/breakfast/formulas/${id}`, {
           method: "PUT",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(updates),
+          headers: getAuthTokenHeader(),
+          body: buildBreakfastFormulaFormData(mergedFormula),
+        }).then(async (response) => {
+          const result = await response.json().catch(() => null)
+          if (!response.ok) {
+            throw new Error(result?.error || "Failed to update formula")
+          }
         })
-        setBaseFormulas((prev) => prev.map((formula) => (formula.id === id ? { ...formula, ...updates } : formula)))
+
+        setBaseFormulas((prev) =>
+          prev.map((formula) =>
+            formula.id === id
+              ? {
+                  ...formula,
+                  ...mergedFormula,
+                  imageFile: undefined,
+                  removeImage: undefined,
+                }
+              : formula
+          )
+        )
       } catch (error) {
         console.error("Failed to update breakfast formula:", error)
+      }
+    })()
+  }
+
+  const deleteFormula = (id: string) => {
+    void (async () => {
+      try {
+        await fetchJson(`/menu/breakfast/formulas/${id}`, {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        })
+        setBaseFormulas((prev) => prev.filter((formula) => formula.id !== id))
+      } catch (error) {
+        console.error("Failed to delete breakfast formula:", error)
       }
     })()
   }
@@ -719,7 +810,9 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
         selectFormula,
         getFormulaPrice,
         getFormulaPoints,
+        addFormula,
         updateFormula,
+        deleteFormula,
         addCategory,
         updateCategory,
         deleteCategory,

@@ -48,6 +48,7 @@ import {
   GiftIcon,
   TrendingDownIcon,
   TagIcon,
+  SmileIcon,
 } from "lucide-react"
 
 // Icon mapping for categories
@@ -71,6 +72,12 @@ interface WizardStep {
   icon: string
   description: string
   categoryId: string
+}
+
+const getFormulaImageSrc = (image?: string) => {
+  if (!image) return undefined
+  if (image.startsWith("http")) return image
+  return `${process.env.NEXT_PUBLIC_API_IMAGE_URL}/menu/${image}`
 }
 
 export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
@@ -504,7 +511,7 @@ export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
                 {formula.image && (
                   <div className="absolute inset-0">
                     <Image
-                      src={formula.image}
+                      src={getFormulaImageSrc(formula.image)!}
                       alt={formula.name}
                       fill
                       className="object-cover opacity-20 group-hover:opacity-30 transition-opacity"
@@ -512,15 +519,28 @@ export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
                   </div>
                 )}
                 <div className="relative p-6">
-                  <div className={`h-14 w-14 rounded-2xl flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform ${formula.type === "healthy"
+                  <div className={`h-14 w-14 rounded-2xl flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform ${
+                    formula.type === "healthy" 
                       ? "bg-gradient-to-br from-green-500 to-emerald-500 shadow-green-500/30"
+                      : formula.type === "vegan"
+                      ? "bg-gradient-to-br from-red-500 to-pink-500 shadow-red-500/30"
+                      : formula.type === "premium"
+                      ? "bg-gradient-to-br from-purple-500 to-pink-500 shadow-purple-500/30"
+                      : formula.type === "enfants"
+                      ? "bg-gradient-to-br from-pink-500 to-rose-500 shadow-pink-500/30"
                       : "bg-gradient-to-br from-amber-500 to-orange-500 shadow-amber-500/30"
-                    }`}>
-                    {formula.type === "healthy" ? (
-                      <LeafIcon className="h-7 w-7 text-white" />
-                    ) : (
-                      <CoffeeIcon className="h-7 w-7 text-white" />
-                    )}
+         }`}>
+                  {formula.type === "healthy" ? (
+                    <LeafIcon className="h-7 w-7 text-white" />
+                  ) : formula.type === "vegan" ? (
+                    <HeartIcon className="h-7 w-7 text-white" />
+                  ) : formula.type === "premium" ? (
+                    <CrownIcon className="h-7 w-7 text-white" />
+                  ) : formula.type === "enfants" ? (
+                    <SmileIcon className="h-7 w-7 text-white" />
+                  ) : (
+                    <CoffeeIcon className="h-7 w-7 text-white" />
+                  )}
                   </div>
                   <h2 className="text-xl font-bold text-stone-900 mb-2">{formula.name}</h2>
                   <p className="text-stone-600 text-sm mb-4">{formula.description}</p>
@@ -535,12 +555,19 @@ export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
                         </Badge>
                       )}
                     </div>
-                    <div className={`h-10 w-10 rounded-full flex items-center justify-center transition-all ${formula.type === "healthy"
-                        ? "bg-emerald-100 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white"
-                        : "bg-amber-100 text-amber-600 group-hover:bg-amber-500 group-hover:text-white"
-                      }`}>
-                      <ArrowRightIcon className="h-5 w-5" />
-                    </div>
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center transition-all ${
+                    formula.type === "healthy"
+                      ? "bg-emerald-100 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white"
+                      : formula.type === "vegan"
+                      ? "bg-red-100 text-red-600 group-hover:bg-red-500 group-hover:text-white"
+                      : formula.type === "premium"
+                      ? "bg-purple-100 text-purple-600 group-hover:bg-purple-500 group-hover:text-white"
+                      : formula.type === "enfants"
+                      ? "bg-pink-100 text-pink-600 group-hover:bg-pink-500 group-hover:text-white"
+                      : "bg-amber-100 text-amber-600 group-hover:bg-amber-500 group-hover:text-white"
+                  }`}>
+                    <ArrowRightIcon className="h-5 w-5" />
+                  </div>
                   </div>
                 </div>
               </motion.button>
@@ -629,15 +656,28 @@ export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
             <Card className="rounded-3xl overflow-hidden shadow-lg border-0 mb-4 bg-gradient-to-r from-emerald-50 to-teal-50">
               <div className="p-4">
                 <div className="flex items-center gap-4">
-                  <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${selectedFormula === "healthy"
-                      ? "bg-green-500"
-                      : "bg-amber-500"
-                    }`}>
-                    {selectedFormula === "healthy" ? (
-                      <LeafIcon className="h-6 w-6 text-white" />
-                    ) : (
-                      <CoffeeIcon className="h-6 w-6 text-white" />
-                    )}
+                  <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${
+            selectedFormula.type === "healthy"
+              ? "bg-green-500"
+              : selectedFormula.type === "vegan"
+              ? "bg-red-500"
+              : selectedFormula.type === "premium"
+              ? "bg-purple-500"
+              : selectedFormula.type === "enfants"
+              ? "bg-pink-500"
+              : "bg-amber-500"
+          }`}>
+            {selectedFormula.type === "healthy" ? (
+              <LeafIcon className="h-6 w-6 text-white" />
+            ) : selectedFormula.type === "vegan" ? (
+              <HeartIcon className="h-6 w-6 text-white" />
+            ) : selectedFormula.type === "premium" ? (
+              <CrownIcon className="h-6 w-6 text-white" />
+            ) : selectedFormula.type === "enfants" ? (
+              <SmileIcon className="h-6 w-6 text-white" />
+            ) : (
+              <CoffeeIcon className="h-6 w-6 text-white" />
+            )}
                   </div>
                   <div className="flex-1">
                     <p className="text-xs text-stone-500 uppercase tracking-wider">Formule de base</p>

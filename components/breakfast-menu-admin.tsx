@@ -34,7 +34,9 @@ import {
   Trash2Icon,
   LeafIcon,
   SparklesIcon,
-  CoinsIcon
+  CoinsIcon,
+  HeartIcon,
+  SmileIcon
 } from "lucide-react"
 import Image from "next/image"
 
@@ -55,12 +57,21 @@ const getIconComponent = (iconName: string) => {
   return option?.icon || <StarIcon className="h-4 w-4" />
 }
 
+const getFormulaImageSrc = (formula?: Partial<BaseFormula> | null) => {
+  if (formula?.imageFile) return URL.createObjectURL(formula.imageFile)
+  if (!formula?.image) return undefined
+  if (formula.image.startsWith("http")) return formula.image
+  return `${process.env.NEXT_PUBLIC_API_IMAGE_URL}/menu/${formula.image}`
+}
+
 export function BreakfastMenuAdmin() {
   const {
     categories,
     items,
     baseFormulas,
+    addFormula,
     updateFormula,
+    deleteFormula,
     addCategory,
     updateCategory,
     deleteCategory,
@@ -96,7 +107,7 @@ export function BreakfastMenuAdmin() {
   // Delete confirmation
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean
-    type: "category" | "item"
+    type: "category" | "item" | "formula"
     id: string
     name: string
   } | null>(null)
@@ -146,6 +157,44 @@ export function BreakfastMenuAdmin() {
     setItemDialog(prev => ({
       ...prev,
       item: { ...prev.item, image: undefined, imageFile: undefined, removeImage: true }
+    }))
+  }
+
+  const handleFormulaImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith("image/")) {
+      alert("Veuillez selectionner une image")
+      return
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("L'image ne doit pas depasser 2MB")
+      return
+    }
+
+    setUploadingImage(true)
+
+    try {
+      setFormulaDialog((prev) => ({
+        ...prev,
+        formula: {
+          ...prev.formula,
+          image: prev.formula?.image,
+          imageFile: file,
+          removeImage: false,
+        },
+      }))
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
+  const handleRemoveFormulaImage = () => {
+    setFormulaDialog((prev) => ({
+      ...prev,
+      formula: { ...prev.formula, image: undefined, imageFile: undefined, removeImage: true },
     }))
   }
 
@@ -209,6 +258,8 @@ export function BreakfastMenuAdmin() {
     
     if (deleteDialog.type === "category") {
       deleteCategory(deleteDialog.id)
+    } else if (deleteDialog.type === "formula") {
+      deleteFormula(deleteDialog.id)
     } else {
       deleteItem(deleteDialog.id)
     }
@@ -218,8 +269,26 @@ export function BreakfastMenuAdmin() {
   
   // Formula handlers
   const handleSaveFormula = () => {
-    if (!formulaDialog.formula?.id) return
-    updateFormula(formulaDialog.formula.id, formulaDialog.formula)
+    if (!formulaDialog.formula?.name || !formulaDialog.formula.description || !formulaDialog.formula.type) {
+      return
+    }
+
+    if (formulaDialog.formula?.id) {
+      updateFormula(formulaDialog.formula.id, formulaDialog.formula)
+    } else {
+      addFormula({
+        name: formulaDialog.formula.name,
+        description: formulaDialog.formula.description,
+        price: formulaDialog.formula.price || 0,
+        points: formulaDialog.formula.points || 0,
+        type: formulaDialog.formula.type,
+        image: formulaDialog.formula.image,
+        imageFile: formulaDialog.formula.imageFile,
+        removeImage: formulaDialog.formula.removeImage,
+        isActive: formulaDialog.formula.isActive !== false,
+      })
+    }
+
     setFormulaDialog({ open: false, formula: null })
   }
 
@@ -464,78 +533,144 @@ export function BreakfastMenuAdmin() {
           </div>
         </TabsContent>
         
-        {/* Formulas Tab */}
+          {/* Formulas Tab */}
         <TabsContent value="formulas" className="mt-6">
-          <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200">
-            <p className="text-sm text-amber-800">
-              Les formules de base sont obligatoires pour chaque commande petit dejeuner. 
-              Vous pouvez modifier le nom, la description, le prix et les points de chaque formule.
-            </p>
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-stone-900 mb-1">Gestion des Formules</h2>
+                <p className="text-sm text-stone-500">Les 2 formules de base (Classique et Healthy) sont obligatoires. Vous pouvez ajouter des formules supplementaires.</p>
+              </div>
+              <Button 
+                onClick={() => setFormulaDialog({ 
+                  open: true, 
+                  formula: { 
+                    name: "", 
+                    description: "", 
+                    price: 0, 
+                    type: "normal",
+                    points: 0
+                  } 
+                })}
+                className="bg-amber-500 hover:bg-amber-600 gap-2"
+              >
+                <PlusIcon className="h-4 w-4" />
+                Ajouter une Formule
+              </Button>
+            </div>
+            
+            <div className="p-4 rounded-xl bg-amber-50 border border-amber-200">
+              <p className="text-sm text-amber-800">
+                Vous pouvez modifier le nom, la description, le prix et les points de chaque formule. 
+                Les formules de base ne peuvent pas etre supprimees.
+              </p>
+            </div>
           </div>
           
           <div className="grid gap-4 md:grid-cols-2">
-            {baseFormulas.map(formula => (
-              <Card 
-                key={formula.id} 
-                className={`overflow-hidden transition-all hover:shadow-lg ${
-                  formula.type === "healthy" 
-                    ? "border-green-200 bg-gradient-to-br from-green-50 to-emerald-50" 
-                    : "border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50"
-                }`}
-              >
-                <CardContent className="p-0">
-                  {/* Formula image */}
-                  {formula.image && (
-                    <div className="relative h-32 w-full">
-                      <Image
-                        src={formula.image}
-                        alt={formula.name}
-                        fill
-                        className="object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+            {baseFormulas.map(formula => {
+              const isBaseFormula = formula.id === "formula-normal" || formula.id === "formula-healthy"
+              return (
+                <Card 
+                  key={formula.id} 
+                  className={`overflow-hidden transition-all hover:shadow-lg ${
+                    formula.type === "healthy" 
+                      ? "border-green-200 bg-gradient-to-br from-green-50 to-emerald-50"
+                      : formula.type === "vegan"
+                      ? "border-red-200 bg-gradient-to-br from-red-50 to-pink-50"
+                      : formula.type === "premium"
+                      ? "border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50"
+                      : formula.type === "enfants"
+                      ? "border-pink-200 bg-gradient-to-br from-pink-50 to-rose-50"
+                      : "border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50"
+                  }`}
+                >
+                  <CardContent className="p-0">
+                    {/* Formula image */}
+                    {formula.image && (
+                      <div className="relative h-32 w-full">
+                        <Image
+                          src={getFormulaImageSrc(formula)!}
+                          alt={formula.name}
+                          fill
+                          className="object-cover"
+                        />
+                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                       <div className="absolute top-3 left-3">
                         <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                          formula.type === "healthy" ? "bg-green-500" : "bg-amber-500"
+                          formula.type === "healthy" 
+                            ? "bg-green-500" 
+                            : formula.type === "vegan"
+                            ? "bg-red-500"
+                            : formula.type === "premium"
+                            ? "bg-purple-500"
+                            : formula.type === "enfants"
+                            ? "bg-pink-500"
+                            : "bg-amber-500"
                         }`}>
                           {formula.type === "healthy" ? (
                             <LeafIcon className="h-5 w-5 text-white" />
+                          ) : formula.type === "vegan" ? (
+                            <HeartIcon className="h-5 w-5 text-white" />
+                          ) : formula.type === "premium" ? (
+                            <CrownIcon className="h-5 w-5 text-white" />
+                          ) : formula.type === "enfants" ? (
+                            <SmileIcon className="h-5 w-5 text-white" />
                           ) : (
                             <CoffeeIcon className="h-5 w-5 text-white" />
                           )}
                         </div>
                       </div>
-                    </div>
-                  )}
-                  
-                  <div className="p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h3 className="font-bold text-lg text-stone-900">{formula.name}</h3>
-                        <p className="text-sm text-stone-600">{formula.description}</p>
+                        {isBaseFormula && (
+                          <div className="absolute top-3 right-3 px-2 py-1 bg-blue-500 text-white text-xs font-semibold rounded-full">
+                            Base
+                          </div>
+                        )}
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setFormulaDialog({ open: true, formula })}
-                      >
-                        <EditIcon className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    )}
                     
-                    <div className="flex items-center gap-3 mt-3">
-                      <span className="text-xl font-bold text-amber-600">{formula.price.toFixed(2)} TND</span>
-                      {formula.points !== undefined && formula.points > 0 && (
-                        <span className="flex items-center gap-1 text-sm font-medium text-emerald-600 bg-emerald-100 px-2.5 py-1 rounded-full">
-                          <CoinsIcon className="h-3.5 w-3.5" />
-                          {formula.points} pts
-                        </span>
-                      )}
+                    <div className="p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <h3 className="font-bold text-lg text-stone-900">{formula.name}</h3>
+                          <p className="text-sm text-stone-600">{formula.description}</p>
+                        </div>
+                        <div className="flex items-center gap-1 ml-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setFormulaDialog({ open: true, formula })}
+                            className="hover:bg-amber-100"
+                          >
+                            <EditIcon className="h-4 w-4" />
+                          </Button>
+                          {!isBaseFormula && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDeleteDialog({ open: true, type: "formula", id: formula.id, name: formula.name })}
+                              className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3 mt-3">
+                        <span className="text-xl font-bold text-amber-600">{formula.price.toFixed(2)} TND</span>
+                        {formula.points !== undefined && formula.points > 0 && (
+                          <span className="flex items-center gap-1 text-sm font-medium text-emerald-600 bg-emerald-100 px-2.5 py-1 rounded-full">
+                            <CoinsIcon className="h-3.5 w-3.5" />
+                            {formula.points} pts
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         </TabsContent>
       </Tabs>
@@ -550,7 +685,7 @@ export function BreakfastMenuAdmin() {
               ) : (
                 <CoffeeIcon className="h-5 w-5 text-amber-600" />
               )}
-              Modifier la Formule
+              {formulaDialog.formula?.id ? "Modifier la Formule" : "Nouvelle Formule"}
             </DialogTitle>
           </DialogHeader>
           
@@ -563,7 +698,7 @@ export function BreakfastMenuAdmin() {
                   ...prev,
                   formula: { ...prev.formula, name: e.target.value }
                 }))}
-                placeholder="Ex: Formule Classique"
+                placeholder="Ex: Formule Energetique"
               />
             </div>
             
@@ -575,7 +710,7 @@ export function BreakfastMenuAdmin() {
                   ...prev,
                   formula: { ...prev.formula, description: e.target.value }
                 }))}
-                placeholder="Ex: Cafe au choix + Croissant nature"
+                placeholder="Ex: Cafe au choix + Pain complet + Oeuf"
                 rows={2}
               />
             </div>
@@ -601,7 +736,7 @@ export function BreakfastMenuAdmin() {
                 </Label>
                 <Input
                   type="number"
-                  value={formulaDialog.formula?.points ?? 0}
+                  value={formulaDialog.formula?.points || 0}
                   onChange={(e) => setFormulaDialog(prev => ({
                     ...prev,
                     formula: { ...prev.formula, points: parseInt(e.target.value) || 0 }
@@ -609,17 +744,157 @@ export function BreakfastMenuAdmin() {
                 />
               </div>
             </div>
+
+           <div className="space-y-2">
+              <Label>Type de formule</Label>
+              <div className="grid grid-cols-5 gap-2">
+                <button
+                  onClick={() => setFormulaDialog(prev => ({
+                    ...prev,
+                    formula: { ...prev.formula, type: "normal" }
+                  }))}
+                  className={`flex flex-col items-center gap-1.5 p-2 rounded-lg border-2 transition-all ${
+                    formulaDialog.formula?.type === "normal"
+                      ? "border-amber-500 bg-amber-50"
+                      : "border-stone-200 hover:border-stone-300"
+                  }`}
+                  title="Formule Classique"
+                >
+                  <CoffeeIcon className="h-4 w-4 text-amber-600" />
+                  <span className="text-xs font-medium text-center">Normal</span>
+                </button>
+                <button
+                  onClick={() => setFormulaDialog(prev => ({
+                    ...prev,
+                    formula: { ...prev.formula, type: "healthy" }
+                  }))}
+                  className={`flex flex-col items-center gap-1.5 p-2 rounded-lg border-2 transition-all ${
+                    formulaDialog.formula?.type === "healthy"
+                      ? "border-green-500 bg-green-50"
+                      : "border-stone-200 hover:border-stone-300"
+                  }`}
+                  title="Formule Sante"
+                >
+                  <LeafIcon className="h-4 w-4 text-green-600" />
+                  <span className="text-xs font-medium text-center">Healthy</span>
+                </button>
+                <button
+                  onClick={() => setFormulaDialog(prev => ({
+                    ...prev,
+                    formula: { ...prev.formula, type: "vegan" }
+                  }))}
+                  className={`flex flex-col items-center gap-1.5 p-2 rounded-lg border-2 transition-all ${
+                    formulaDialog.formula?.type === "vegan"
+                      ? "border-red-500 bg-red-50"
+                      : "border-stone-200 hover:border-stone-300"
+                  }`}
+                  title="Formule Vegan"
+                >
+                  <HeartIcon className="h-4 w-4 text-red-600" />
+                  <span className="text-xs font-medium text-center">Vegan</span>
+                </button>
+                <button
+                  onClick={() => setFormulaDialog(prev => ({
+                    ...prev,
+                    formula: { ...prev.formula, type: "premium" }
+                  }))}
+                  className={`flex flex-col items-center gap-1.5 p-2 rounded-lg border-2 transition-all ${
+                    formulaDialog.formula?.type === "premium"
+                      ? "border-purple-500 bg-purple-50"
+                      : "border-stone-200 hover:border-stone-300"
+                  }`}
+                  title="Formule Premium"
+                >
+                  <CrownIcon className="h-4 w-4 text-purple-600" />
+                  <span className="text-xs font-medium text-center">Premium</span>
+                </button>
+                <button
+                  onClick={() => setFormulaDialog(prev => ({
+                    ...prev,
+                    formula: { ...prev.formula, type: "enfants" }
+                  }))}
+                  className={`flex flex-col items-center gap-1.5 p-2 rounded-lg border-2 transition-all ${
+                    formulaDialog.formula?.type === "enfants"
+                      ? "border-pink-500 bg-pink-50"
+                      : "border-stone-200 hover:border-stone-300"
+                  }`}
+                  title="Formule Enfants"
+                >
+                  <SmileIcon className="h-4 w-4 text-pink-600" />
+                  <span className="text-xs font-medium text-center">Enfants</span>
+                </button>
+              </div>
+            </div>
             
             <div className="space-y-2">
-              <Label>URL de l&apos;image</Label>
-              <Input
-                value={formulaDialog.formula?.image || ""}
-                onChange={(e) => setFormulaDialog(prev => ({
-                  ...prev,
-                  formula: { ...prev.formula, image: e.target.value }
-                }))}
-                placeholder="https://..."
-              />
+              <Label>Photo de la formule</Label>
+              <div className="relative">
+                {getFormulaImageSrc(formulaDialog.formula) ? (
+                  <div className="relative group">
+                    <div className="relative h-40 w-full rounded-xl overflow-hidden border-2 border-amber-200 bg-amber-50">
+                      <img
+                        src={getFormulaImageSrc(formulaDialog.formula)}
+                        alt="Preview formule"
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center gap-3">
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFormulaImageUpload}
+                          className="hidden"
+                        />
+                        <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center hover:bg-amber-100 transition-colors">
+                          <UploadIcon className="h-5 w-5 text-stone-700" />
+                        </div>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleRemoveFormulaImage}
+                        className="h-10 w-10 rounded-full bg-white flex items-center justify-center hover:bg-red-100 transition-colors"
+                      >
+                        <Trash2Icon className="h-5 w-5 text-red-500" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="cursor-pointer block">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFormulaImageUpload}
+                      className="hidden"
+                      disabled={uploadingImage}
+                    />
+                    <div className={`h-40 w-full rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-3 transition-all ${
+                      uploadingImage
+                        ? "border-amber-300 bg-amber-50"
+                        : "border-stone-300 hover:border-amber-400 hover:bg-amber-50"
+                    }`}>
+                      {uploadingImage ? (
+                        <>
+                          <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center animate-pulse">
+                            <UploadIcon className="h-5 w-5 text-amber-600" />
+                          </div>
+                          <span className="text-sm text-amber-600">Chargement...</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="h-12 w-12 rounded-full bg-stone-100 flex items-center justify-center">
+                            <ImageIcon className="h-6 w-6 text-stone-400" />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-medium text-stone-700">Cliquez pour ajouter une photo</p>
+                            <p className="text-xs text-stone-400 mt-1">JPG, PNG ou WEBP (max 2MB)</p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </label>
+                )}
+              </div>
             </div>
           </div>
           
@@ -628,7 +903,7 @@ export function BreakfastMenuAdmin() {
               Annuler
             </Button>
             <Button onClick={handleSaveFormula} className="bg-amber-500 hover:bg-amber-600">
-              Enregistrer
+              {formulaDialog.formula?.id ? "Enregistrer" : "Creer"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -925,7 +1200,7 @@ export function BreakfastMenuAdmin() {
           </DialogHeader>
           
           <p className="text-stone-600">
-            Etes-vous sur de vouloir supprimer {deleteDialog?.type === "category" ? "la categorie" : "l'article"}{" "}
+            Etes-vous sur de vouloir supprimer {deleteDialog?.type === "category" ? "la categorie" : deleteDialog?.type === "formula" ? "la formule" : "l'article"}{" "}
             <strong>{deleteDialog?.name}</strong> ?
             {deleteDialog?.type === "category" && (
               <span className="block mt-2 text-sm text-red-500">
