@@ -23,7 +23,6 @@ export interface Notification {
   duration?: number
   timestamp: Date
   read: boolean
-  // Optional metadata for linking to specific resources
   actionUrl?: string
   actionLabel?: string
   metadata?: {
@@ -35,18 +34,37 @@ export interface Notification {
   }
 }
 
-// Helper type for creating notifications
-export type CreateNotificationInput = Omit<Notification, "id" | "timestamp" | "read"> & {
+// Helper type for creating notifications - all fields except type and title are optional
+export type CreateNotificationInput = {
+  type: "success" | "error" | "warning" | "info"
   category?: NotificationCategory
   priority?: NotificationPriority
+  title: string
+  message?: string
+  duration?: number
+  actionUrl?: string
+  actionLabel?: string
+  metadata?: {
+    orderId?: string
+    productId?: string
+    clientId?: string
+    amount?: number
+    [key: string]: any
+  }
 }
 
+// Overload signatures for addNotification
 interface NotificationContextType {
   notifications: Notification[]
   notificationHistory: Notification[]
   unreadCount: number
   unreadByCategory: Record<NotificationCategory, number>
-  addNotification: (notification: CreateNotificationInput) => void
+  addNotification: {
+    // Signature 1: Object format
+    (notification: CreateNotificationInput): void
+    // Signature 2: Simple format (type, title, message?)
+    (type: "success" | "error" | "warning" | "info", title: string, message?: string): void
+  }
   removeNotification: (id: string) => void
   markAsRead: (id: string) => void
   markAllAsRead: () => void
@@ -56,7 +74,6 @@ interface NotificationContextType {
   getNotificationsByCategory: (category: NotificationCategory) => Notification[]
   getNotificationsByPriority: (priority: NotificationPriority) => Notification[]
   getRecentNotifications: (limit?: number) => Notification[]
-  // Alert generators for common scenarios
   notifyNewOrder: (orderId: string, clientName: string, total: number) => void
   notifyOrderConfirmed: (orderId: string, clientName: string) => void
   notifyLowStock: (productName: string, currentStock: number, minStock: number) => void
@@ -123,32 +140,53 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     return acc
   }, {} as Record<NotificationCategory, number>)
 
-  // Add notification
-  const addNotification = useCallback((input: CreateNotificationInput) => {
+  // Core add notification function (internal)
+  const addNotificationCore = useCallback((input: CreateNotificationInput) => {
     const id = Date.now().toString() + Math.random().toString(36).substring(2, 9)
     const newNotification: Notification = {
-      ...input,
       id,
-      timestamp: new Date(),
-      read: false,
+      type: input.type,
       category: input.category || "system",
       priority: input.priority || "medium",
+      title: input.title,
+      message: input.message,
       duration: input.duration ?? 5000,
+      timestamp: new Date(),
+      read: false,
+      actionUrl: input.actionUrl,
+      actionLabel: input.actionLabel,
+      metadata: input.metadata,
     }
 
-    // Add to active notifications (toasts)
     setNotifications((prev) => [...prev, newNotification])
-
-    // Add to history (newest first)
     setNotificationHistory((prev) => [newNotification, ...prev].slice(0, MAX_HISTORY))
 
-    // Auto remove from toast after duration
     if (newNotification.duration && newNotification.duration > 0) {
       setTimeout(() => {
         removeNotification(id)
       }, newNotification.duration)
     }
   }, [])
+
+  // Overloaded addNotification function
+  const addNotification = useCallback((
+    arg1: CreateNotificationInput | "success" | "error" | "warning" | "info",
+    arg2?: string,
+    arg3?: string
+  ) => {
+    // Check if first argument is an object (object format)
+    if (typeof arg1 === 'object' && arg1 !== null && 'type' in arg1 && 'title' in arg1) {
+      // Object format
+      addNotificationCore(arg1 as CreateNotificationInput)
+    } else {
+      // Simple format: (type, title, message?)
+      addNotificationCore({
+        type: arg1 as "success" | "error" | "warning" | "info",
+        title: arg2 || "",
+        message: arg3,
+      })
+    }
+  }, [addNotificationCore])
 
   // Remove notification (from active toasts only)
   const removeNotification = useCallback((id: string) => {
@@ -198,10 +236,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     return notificationHistory.slice(0, limit)
   }, [notificationHistory])
 
-  // ============================================
-  // CONVENIENCE NOTIFICATION GENERATORS
-  // ============================================
-
+  // Convenience notification generators
   const notifyNewOrder = useCallback((orderId: string, clientName: string, total: number) => {
     addNotification({
       type: "info",

@@ -1103,7 +1103,7 @@ const handleSaveProduct = async () => {
             </div>
 
             {/* Supplements Section */}
-            <div className="space-y-3 rounded-lg border p-4 bg-muted/30">
+           {/*  <div className="space-y-3 rounded-lg border p-4 bg-muted/30">
               <div className="flex items-center gap-2">
                 <TagIcon className="h-4 w-4 text-blue-600" />
                 <Label className="font-medium">Supplements / Options</Label>
@@ -1150,7 +1150,7 @@ const handleSaveProduct = async () => {
                 </Button>
               </div>
             </div>
-
+ */}
             {/* Promotion Section */}
             <div className="space-y-3 rounded-lg border p-4 bg-muted/30">
               <div className="flex items-center justify-between">

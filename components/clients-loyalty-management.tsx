@@ -28,7 +28,7 @@ export function ClientsLoyaltyManagement() {
     } else {
       addPoints(clientId, pointsChange, "redeem", "Ajustement manuel admin")
     }
-    addNotification(`Points ${pointsChange > 0 ? "ajoutes" : "retires"} avec succes`, "success")
+    addNotification("success", `Points ${pointsChange > 0 ? "ajoutes" : "retires"} avec succes`)
   }
 
   const filteredClients = clients.filter((client) => {
@@ -205,7 +205,7 @@ export function ClientsLoyaltyManagement() {
                         className="h-6 w-6 p-0"
                         onClick={() => {
                           navigator.clipboard.writeText(client.referralCode || "")
-                          addNotification("Code copie!", "success")
+                          addNotification("success","Code copie!" )
                         }}
                       >
                         <CopyIcon className="h-3 w-3 text-purple-600" />
