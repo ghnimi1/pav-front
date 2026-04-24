@@ -10,6 +10,7 @@ import { LoyaltyProvider } from "@/contexts/loyalty-context"
 import { ProductionProvider } from "@/contexts/production-context"
 import { BreakfastProvider } from "@/contexts/breakfast-context"
 import { UnifiedSalesProvider } from "@/contexts/unified-sales-context"
+import { OrdersProvider } from "@/contexts/orders-context"
 import { NotificationContainer } from "@/components/notification-container"
 import { ExpirationMonitor } from "@/components/expiration-monitor"
 
@@ -46,9 +47,11 @@ function ProtectedDashboard() {
         <ProductionProvider>
           <BreakfastProvider>
             <UnifiedSalesProvider>
-              <Dashboard />
-              <NotificationContainer />
-              <ExpirationMonitor />
+              <OrdersProvider>
+                <Dashboard />
+                <NotificationContainer />
+                <ExpirationMonitor />
+              </OrdersProvider>
             </UnifiedSalesProvider>
           </BreakfastProvider>
         </ProductionProvider>

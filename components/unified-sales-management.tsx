@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { useUnifiedSales, type UnifiedSale, type UnifiedSaleItem } from "@/contexts/unified-sales-context"
+import { useOrders } from "@/contexts/orders-context"
 import { useProduction } from "@/contexts/production-context"
 import { useBreakfast } from "@/contexts/breakfast-context"
 import { useLoyalty } from "@/contexts/loyalty-context"
@@ -67,6 +68,24 @@ interface CartItem {
   recipeId?: string
 }
 
+type ManagedOrder = {
+  id: string
+  orderNumber: string
+  sourceType: "unified" | "remote"
+  type: "counter" | "breakfast" | "delivery" | "pickup" | "table"
+  status: "pending" | "confirmed" | "preparing" | "ready" | "delivering" | "completed" | "cancelled"
+  paymentMethod: string
+  total: number
+  subtotal: number
+  discount: number
+  deliveryFee: number
+  createdAt: string
+  clientName?: string
+  tableNumber?: string
+  customerNote?: string
+  items: { quantity: number; name: string; total: number }[]
+}
+
 const ITEMS_PER_PAGE = 15
 
 export function UnifiedSalesManagement() {
@@ -87,6 +106,11 @@ export function UnifiedSalesManagement() {
     todaySalesCount,
     todayRevenue,
   } = useUnifiedSales()
+  const {
+    orders: remoteOrders,
+    updateOrderStatus,
+    cancelOrder: cancelRemoteOrder,
+  } = useOrders()
 
   const { recipes, recipeCategories, showcases, getAvailableItems, decrementShowcaseStock } = useProduction()
   const { items: breakfastItems, categories: breakfastCategories } = useBreakfast()
@@ -116,7 +140,7 @@ export function UnifiedSalesManagement() {
   const [orderStatusFilter, setOrderStatusFilter] = useState<"all" | "active" | "completed" | "cancelled">("active")
   const [dateFilter, setDateFilter] = useState<"today" | "week" | "month" | "all">("today")
   const [currentPage, setCurrentPage] = useState(1)
-  const [selectedOrder, setSelectedOrder] = useState<UnifiedSale | null>(null)
+  const [selectedOrder, setSelectedOrder] = useState<ManagedOrder | null>(null)
   const [orderDetailOpen, setOrderDetailOpen] = useState(false)
 
   // Available products from all sources
@@ -220,12 +244,62 @@ export function UnifiedSalesManagement() {
   const todayStats = getTodayStats()
 
   // Filtered orders
+  const combinedOrders = useMemo<ManagedOrder[]>(() => {
+    const unifiedOrders: ManagedOrder[] = sales.map((sale) => ({
+      id: sale.id,
+      orderNumber: sale.saleNumber,
+      sourceType: "unified",
+      type: sale.type,
+      status: sale.status,
+      paymentMethod: sale.paymentMethod,
+      total: sale.total,
+      subtotal: sale.subtotal,
+      discount: sale.discount,
+      deliveryFee: sale.deliveryFee,
+      createdAt: sale.createdAt,
+      clientName: sale.clientName,
+      tableNumber: sale.tableNumber,
+      customerNote: sale.customerNote,
+      items: sale.items.map((item) => ({
+        quantity: item.quantity,
+        name: item.name,
+        total: item.total,
+      })),
+    }))
+
+    const normalizedRemoteOrders: ManagedOrder[] = remoteOrders.map((order) => ({
+      id: order.id,
+      orderNumber: order.orderNumber,
+      sourceType: "remote",
+      type: order.deliveryMode === "delivery" ? "delivery" : "pickup",
+      status: order.status === "new" ? "pending" : order.status,
+      paymentMethod: order.paymentMethod,
+      total: order.total,
+      subtotal: order.subtotal,
+      discount: 0,
+      deliveryFee: order.deliveryFee,
+      createdAt: order.createdAt,
+      clientName: order.clientName,
+      tableNumber: undefined,
+      customerNote: order.customerNote,
+      items: order.items.map((item) => ({
+        quantity: item.quantity,
+        name: item.supplements?.length
+          ? `${item.name} (+${item.supplements.map((supplement) => supplement.name).join(", ")})`
+          : item.name,
+        total: (item.price + (item.supplements?.reduce((sum, supplement) => sum + supplement.price, 0) || 0)) * item.quantity,
+      })),
+    }))
+
+    return [...unifiedOrders, ...normalizedRemoteOrders]
+  }, [sales, remoteOrders])
+
   const filteredOrders = useMemo(() => {
-    let filtered = [...sales]
+    let filtered = [...combinedOrders]
 
     // Status filter
     if (orderStatusFilter === "active") {
-      filtered = filtered.filter(s => ["pending", "confirmed", "preparing", "ready"].includes(s.status))
+      filtered = filtered.filter(s => ["pending", "confirmed", "preparing", "ready", "delivering"].includes(s.status))
     } else if (orderStatusFilter === "completed") {
       filtered = filtered.filter(s => s.status === "completed")
     } else if (orderStatusFilter === "cancelled") {
@@ -251,14 +325,14 @@ export function UnifiedSalesManagement() {
     if (orderSearchQuery) {
       const query = orderSearchQuery.toLowerCase()
       filtered = filtered.filter(s => 
-        s.saleNumber.toLowerCase().includes(query) ||
+        s.orderNumber.toLowerCase().includes(query) ||
         s.clientName?.toLowerCase().includes(query) ||
         s.items.some(i => i.name.toLowerCase().includes(query))
       )
     }
 
     return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  }, [sales, orderStatusFilter, dateFilter, orderSearchQuery])
+  }, [combinedOrders, orderStatusFilter, dateFilter, orderSearchQuery])
 
   // Pagination
   const totalPages = Math.ceil(filteredOrders.length / ITEMS_PER_PAGE)
@@ -355,10 +429,30 @@ export function UnifiedSalesManagement() {
   // ORDER FUNCTIONS
   // ============================================
 
-  const handleOrderAction = (sale: UnifiedSale, action: string) => {
+  const handleOrderAction = async (sale: ManagedOrder, action: string) => {
+    if (sale.sourceType === "remote") {
+      switch (action) {
+        case "confirm":
+          await updateOrderStatus(sale.id, "confirmed")
+          break
+        case "prepare":
+          await updateOrderStatus(sale.id, "preparing")
+          break
+        case "ready":
+          await updateOrderStatus(sale.id, "ready")
+          break
+        case "complete":
+          await updateOrderStatus(sale.id, "completed")
+          break
+        case "cancel":
+          await cancelRemoteOrder(sale.id)
+          break
+      }
+      return
+    }
+
     switch (action) {
-case "confirm":
-        // Decrement showcase stock when confirming the order
+      case "confirm":
         confirmSale(sale.id, decrementShowcaseStock)
         break
       case "prepare":
@@ -376,12 +470,13 @@ case "confirm":
     }
   }
 
-  const getStatusBadge = (status: UnifiedSale["status"]) => {
+  const getStatusBadge = (status: ManagedOrder["status"]) => {
     const config: Record<string, { label: string; className: string }> = {
       pending: { label: "En attente", className: "bg-amber-100 text-amber-700 border-amber-200" },
       confirmed: { label: "Confirmee", className: "bg-blue-100 text-blue-700 border-blue-200" },
       preparing: { label: "En preparation", className: "bg-purple-100 text-purple-700 border-purple-200" },
       ready: { label: "Prete", className: "bg-emerald-100 text-emerald-700 border-emerald-200" },
+      delivering: { label: "En livraison", className: "bg-cyan-100 text-cyan-700 border-cyan-200" },
       completed: { label: "Terminee", className: "bg-stone-100 text-stone-600 border-stone-200" },
       cancelled: { label: "Annulee", className: "bg-red-100 text-red-700 border-red-200" },
     }
@@ -389,7 +484,7 @@ case "confirm":
     return <Badge className={`${c.className} border`}>{c.label}</Badge>
   }
 
-  const getTypeBadge = (type: UnifiedSale["type"]) => {
+  const getTypeBadge = (type: ManagedOrder["type"]) => {
     const config: Record<string, { label: string; icon: React.ReactNode; className: string }> = {
       counter: { label: "Comptoir", icon: <ShoppingCartIcon className="h-3 w-3" />, className: "bg-stone-100 text-stone-600" },
       breakfast: { label: "P.Dej", icon: <CoffeeIcon className="h-3 w-3" />, className: "bg-amber-100 text-amber-700" },
@@ -408,7 +503,13 @@ case "confirm":
 
   const handleExport = () => {
     const dateStr = new Date().toISOString().split("T")[0]
-    exportToExcel(filteredOrders, `ventes-${dateStr}`)
+    exportToExcel(
+      filteredOrders
+        .filter((order) => order.sourceType === "unified")
+        .map((order) => sales.find((sale) => sale.id === order.id)!)
+        .filter(Boolean),
+      `ventes-${dateStr}`
+    )
   }
 
   // ============================================
@@ -489,7 +590,7 @@ case "confirm":
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-amber-700 text-sm">En attente</p>
-                <p className="text-3xl font-bold text-amber-700">{getPendingSales().length}</p>
+                <p className="text-3xl font-bold text-amber-700">{combinedOrders.filter(o => o.status === "pending").length}</p>
                 <p className="text-amber-600 text-sm">commandes</p>
               </div>
               <ClockIcon className="h-10 w-10 text-amber-300" />
@@ -508,8 +609,8 @@ case "confirm":
           <TabsTrigger value="orders" className="gap-2">
             <ListIcon className="h-4 w-4" />
             Commandes
-            {getPendingSales().length > 0 && (
-              <Badge className="ml-1 bg-amber-500 text-white">{getPendingSales().length}</Badge>
+            {combinedOrders.filter(o => o.status === "pending").length > 0 && (
+              <Badge className="ml-1 bg-amber-500 text-white">{combinedOrders.filter(o => o.status === "pending").length}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="dashboard" className="gap-2">
@@ -878,9 +979,12 @@ case "confirm":
                           </div>
                           <div>
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="font-semibold">{sale.saleNumber}</span>
+                              <span className="font-semibold">{sale.orderNumber}</span>
                               {getTypeBadge(sale.type)}
                               {getStatusBadge(sale.status)}
+                              {sale.sourceType === "remote" && (
+                                <Badge variant="outline" className="border-blue-200 text-blue-700 bg-blue-50">Client</Badge>
+                              )}
                             </div>
                             <p className="text-sm text-muted-foreground">
                               {new Date(sale.createdAt).toLocaleDateString("fr-TN", {
@@ -907,28 +1011,28 @@ case "confirm":
                           <div className="flex gap-1">
                             {sale.status === "pending" && (
                               <>
-                                <Button size="sm" variant="outline" className="h-8 px-2 text-emerald-600 border-emerald-200 hover:bg-emerald-50" onClick={() => handleOrderAction(sale, "confirm")}>
+                                <Button size="sm" variant="outline" className="h-8 px-2 text-emerald-600 border-emerald-200 hover:bg-emerald-50" onClick={() => void handleOrderAction(sale, "confirm")}>
                                   <CheckIcon className="h-4 w-4" />
                                 </Button>
-                                <Button size="sm" variant="outline" className="h-8 px-2 text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleOrderAction(sale, "cancel")}>
+                                <Button size="sm" variant="outline" className="h-8 px-2 text-red-600 border-red-200 hover:bg-red-50" onClick={() => void handleOrderAction(sale, "cancel")}>
                                   <XIcon className="h-4 w-4" />
                                 </Button>
                               </>
                             )}
                             {sale.status === "confirmed" && (
-                              <Button size="sm" variant="outline" className="h-8 px-2 text-purple-600 border-purple-200 hover:bg-purple-50" onClick={() => handleOrderAction(sale, "prepare")}>
+                              <Button size="sm" variant="outline" className="h-8 px-2 text-purple-600 border-purple-200 hover:bg-purple-50" onClick={() => void handleOrderAction(sale, "prepare")}>
                                 <PlayIcon className="h-4 w-4 mr-1" />
                                 Preparer
                               </Button>
                             )}
                             {sale.status === "preparing" && (
-                              <Button size="sm" variant="outline" className="h-8 px-2 text-emerald-600 border-emerald-200 hover:bg-emerald-50" onClick={() => handleOrderAction(sale, "ready")}>
+                              <Button size="sm" variant="outline" className="h-8 px-2 text-emerald-600 border-emerald-200 hover:bg-emerald-50" onClick={() => void handleOrderAction(sale, "ready")}>
                                 <CheckCircleIcon className="h-4 w-4 mr-1" />
                                 Prete
                               </Button>
                             )}
                             {sale.status === "ready" && (
-                              <Button size="sm" className="h-8 px-2 bg-emerald-500 hover:bg-emerald-600" onClick={() => handleOrderAction(sale, "complete")}>
+                              <Button size="sm" className="h-8 px-2 bg-emerald-500 hover:bg-emerald-600" onClick={() => void handleOrderAction(sale, "complete")}>
                                 <CheckCircleIcon className="h-4 w-4 mr-1" />
                                 Terminer
                               </Button>
@@ -1080,7 +1184,7 @@ case "confirm":
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-semibold text-lg">{selectedOrder.saleNumber}</p>
+                  <p className="font-semibold text-lg">{selectedOrder.orderNumber}</p>
                   <p className="text-sm text-muted-foreground">
                     {new Date(selectedOrder.createdAt).toLocaleDateString("fr-TN", {
                       day: "numeric",
