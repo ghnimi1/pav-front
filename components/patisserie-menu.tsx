@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useStock, type MenuItem, type Offer, type MenuCategory } from "@/contexts/stock-context"
-import { SupplementsModal } from "@/components/supplements-modal"
+import { SupplementsModal } from "@/components/supplements-modal-menu"
 import { useUnifiedSales } from "@/contexts/unified-sales-context"
 import { useLoyalty } from "@/contexts/loyalty-context"
 import { useAuth } from "@/contexts/auth-context"
@@ -606,7 +606,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                     {/* Image */}
                     <div className="h-28 bg-stone-100 relative">
                       {item.image ? (
-                        <Image src={item.image} alt={item.name} fill className="object-cover" />
+                        <Image src={`${process.env.NEXT_PUBLIC_API_IMAGE_URL}/menu/${item.image}`} alt={item.name} fill className="object-cover" />
                       ) : (
                         <div className="h-full flex items-center justify-center">
                           <CakeIcon className="h-10 w-10 text-stone-300" />
@@ -908,7 +908,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
             setSelectedItemForSupplements(null)
           }}
           item={selectedItemForSupplements}
-          onConfirm={(supplements) => {
+          onConfirm={(_,supplements) => {
             handleAddItemWithSupplements(selectedItemForSupplements, supplements)
             setSupplementsModalOpen(false)
             setSelectedItemForSupplements(null)

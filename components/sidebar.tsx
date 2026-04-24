@@ -149,15 +149,6 @@ export function Sidebar({ currentView, onViewChange, isOpen, onClose, isAdmin }:
       section: "production",
     },
     {
-      id: "menu-admin",
-      label: "Gestion Menu",
-      icon: UtensilsCrossedIcon,
-      adminOnly: true,
-      permission: "articles",
-      section: "production",
-      href: "/admin/menu",
-    },
-    {
       id: "menu-client",
       label: "Menu Client",
       icon: MenuIcon,
@@ -165,6 +156,15 @@ export function Sidebar({ currentView, onViewChange, isOpen, onClose, isAdmin }:
       permission: "articles",
       section: "production",
       href: "/admin/menu-client",
+    },
+    {
+      id: "menu-admin",
+      label: "Gestion Menu",
+      icon: UtensilsCrossedIcon,
+      adminOnly: true,
+      permission: "articles",
+      section: "production",
+      href: "/admin/menu",
     },
     // Stock Section
     {
@@ -207,14 +207,14 @@ export function Sidebar({ currentView, onViewChange, isOpen, onClose, isAdmin }:
       permission: "articles",
       section: "stock",
     },
-    {
+    /* {
       id: "categories",
       label: "Categories Menu",
       icon: TagIcon,
       adminOnly: true,
       permission: "categories",
       section: "stock",
-    },
+    }, */
     {
       id: "suppliers",
       label: "Fournisseurs",
@@ -223,14 +223,14 @@ export function Sidebar({ currentView, onViewChange, isOpen, onClose, isAdmin }:
       permission: "suppliers",
       section: "stock",
     },
-    {
+   /*  {
       id: "menu",
       label: "Menu Client",
       icon: MenuIcon,
       adminOnly: true,
       permission: "menu",
       section: "menu",
-    },
+    }, */
     {
       id: "clients-management",
       label: "Gestion Clients",
