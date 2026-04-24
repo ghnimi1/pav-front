@@ -409,52 +409,56 @@ function MenuClientAdminContent() {
     setEditingProduct(product)
     setShowProductDialog(true)
   }
+const handleSaveProduct = async () => {
+  if (!productFormData.name || !productFormData.description || !productFormData.price || !productFormData.category) {
+    addNotification({ type: "error", title: "Erreur", message: "Veuillez remplir tous les champs obligatoires" })
+    return
+  }
+
+  const allergensArray = productFormData.allergens
+    .split(",")
+    .map((a) => a.trim())
+    .filter((a) => a)
+
+  let promotion: Promotion | undefined
+  if (productFormData.hasPromotion) {
+    promotion = {
+      type: productFormData.promotionType,
+      value: productFormData.promotionValue ? parseFloat(productFormData.promotionValue) : undefined,
+      label: productFormData.promotionLabel || undefined,
+      endDate: productFormData.promotionEndDate || undefined,
+    }
+  }
   
-  const handleSaveProduct = () => {
-    if (!productFormData.name || !productFormData.description || !productFormData.price || !productFormData.category) {
-      addNotification({ type: "error", title: "Erreur", message: "Veuillez remplir tous les champs obligatoires" })
-      return
-    }
-
-    const allergensArray = productFormData.allergens
-      .split(",")
-      .map((a) => a.trim())
-      .filter((a) => a)
-
-    let promotion: Promotion | undefined
-    if (productFormData.hasPromotion) {
-      promotion = {
-        type: productFormData.promotionType,
-        value: productFormData.promotionValue ? parseFloat(productFormData.promotionValue) : undefined,
-        label: productFormData.promotionLabel || undefined,
-        endDate: productFormData.promotionEndDate || undefined,
-      }
-    }
-    
-    const productData = {
-      name: productFormData.name,
-      description: productFormData.description,
-      price: parseFloat(productFormData.price),
-      points: productFormData.points ? parseInt(productFormData.points) : undefined,
-      category: productFormData.category,
-      image: productImageFile || productFormData.image || undefined,
-      allergens: allergensArray,
-      isAvailable: productFormData.isAvailable,
-      supplements: supplements.length > 0 ? supplements : undefined,
-      promotion,
-    }
-    
+  const productData = {
+    name: productFormData.name,
+    description: productFormData.description,
+    price: parseFloat(productFormData.price),
+    points: productFormData.points ? parseInt(productFormData.points) : undefined,
+    category: productFormData.category,
+    image: productImageFile || undefined, // Pass File object for upload
+    allergens: allergensArray,
+    isAvailable: productFormData.isAvailable,
+    supplements: supplements.length > 0 ? supplements : undefined,
+    promotion,
+  }
+  
+  try {
     if (editingProduct) {
-      updateMenuItem(editingProduct.id, productData)
-      addNotification({ type: "success", title: "Produit modifie", message: `Le produit "${productData.name}" a ete mis a jour` })
+      await updateMenuItem(editingProduct.id, productData)
+      addNotification({ type: "success", title: "Produit modifié", message: `Le produit "${productData.name}" a été mis à jour` })
     } else {
-      addMenuItem(productData)
-      addNotification({ type: "success", title: "Produit cree", message: `Le produit "${productData.name}" a ete ajoute` })
+      await addMenuItem(productData)
+      addNotification({ type: "success", title: "Produit créé", message: `Le produit "${productData.name}" a été ajouté` })
     }
     
     setShowProductDialog(false)
     resetProductForm()
+  } catch (error) {
+    console.error('Error saving product:', error)
+    addNotification({ type: "error", title: "Erreur", message: "Erreur lors de l'enregistrement" })
   }
+}
   
   const handleDeleteProduct = () => {
     if (!deleteProductConfirm) return

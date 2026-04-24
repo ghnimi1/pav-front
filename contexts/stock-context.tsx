@@ -274,32 +274,33 @@ interface StockContextType {
   getArchivedBatches: (productId: string) => Batch[]
   menuCategories: MenuCategory[]
   menuItems: MenuItem[]
-  addMenuCategory: (category: Omit<MenuCategory, "id">) => void
-  updateMenuCategory: (id: string, category: Partial<MenuCategory>) => void
-  deleteMenuCategory: (id: string) => void
-  addMenuItem: (item: Omit<MenuItem, "id" | "createdAt" | "updatedAt">) => void
-  updateMenuItem: (id: string, item: Partial<MenuItem>) => void
-  deleteMenuItem: (id: string) => void
+  addMenuCategory: (category: Omit<MenuCategory, "id">) => Promise<void>
+  updateMenuCategory: (id: string, category: Partial<MenuCategory>) => Promise<void>
+  deleteMenuCategory: (id: string) => Promise<void>
+  addMenuItem: (item: Omit<MenuItem, "id" | "createdAt" | "updatedAt">) => Promise<void>
+  updateMenuItem: (id: string, item: Partial<MenuItem>) => Promise<void>
+  deleteMenuItem: (id: string) => Promise<void>
+  toggleMenuItemAvailability: (id: string) => Promise<void>
   rewards: Reward[]
   addReward: (reward: Omit<Reward, "id" | "createdAt" | "updatedAt">) => void
   updateReward: (id: string, reward: Partial<Reward>) => void
   deleteReward: (id: string) => void
   getActiveRewards: () => Reward[]
   supplements: Supplement[]
-  addSupplement: (supplement: Omit<Supplement, "id" | "createdAt" | "updatedAt">) => void
-  updateSupplement: (id: string, supplement: Partial<Supplement>) => void
-  deleteSupplement: (id: string) => void
+  addSupplement: (supplement: Omit<Supplement, "id" | "createdAt" | "updatedAt">) => Promise<void>
+  updateSupplement: (id: string, supplement: Partial<Supplement>) => Promise<void>
+  deleteSupplement: (id: string) => Promise<void>
   getActiveSupplements: () => Supplement[]
   getSupplementsForProduct: (productSupplements: ProductSupplementConfig[]) => Supplement[]
   supplementCategories: SupplementCategory[]
-  addSupplementCategory: (category: Omit<SupplementCategory, "id" | "createdAt" | "updatedAt">) => void
-  updateSupplementCategory: (id: string, category: Partial<SupplementCategory>) => void
-  deleteSupplementCategory: (id: string) => void
+  addSupplementCategory: (category: Omit<SupplementCategory, "id" | "createdAt" | "updatedAt">) => Promise<void>
+  updateSupplementCategory: (id: string, category: Partial<SupplementCategory>) => Promise<void>
+  deleteSupplementCategory: (id: string) => Promise<void>
   getActiveSupplementCategories: () => SupplementCategory[]
   offers: Offer[]
-  addOffer: (offer: Omit<Offer, "id" | "createdAt" | "updatedAt">) => void
-  updateOffer: (id: string, offer: Partial<Offer>) => void
-  deleteOffer: (id: string) => void
+  addOffer: (offer: Omit<Offer, "id" | "createdAt" | "updatedAt">) => Promise<void>
+  updateOffer: (id: string, offer: Partial<Offer>) => Promise<void>
+  deleteOffer: (id: string) => Promise<void>
   getActiveOffers: () => Offer[]
   getCurrentOffers: () => Offer[]
 }
@@ -336,7 +337,162 @@ function getAuthHeaders() {
   }
 }
 
-// API functions for supplements
+// ============================================
+// API FUNCTIONS FOR MENU CATEGORIES
+// ============================================
+
+async function fetchMenuCategories(): Promise<MenuCategory[]> {
+  try {
+    const data = await fetchJson<MenuCategory[]>('/menu/categories/all', {
+      headers: getAuthHeaders(),
+    })
+    return data.map(c => ({
+      ...c,
+      id: (c as any)._id || c.id,
+    }))
+  } catch (error) {
+    console.error('Failed to fetch menu categories:', error)
+    return []
+  }
+}
+
+async function createMenuCategoryAPI(data: Omit<MenuCategory, 'id'>): Promise<MenuCategory> {
+  const result = await fetchJson<MenuCategory>('/menu/categories', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  })
+  return {
+    ...result,
+    id: (result as any)._id || result.id,
+  }
+}
+
+async function updateMenuCategoryAPI(id: string, data: Partial<MenuCategory>): Promise<void> {
+  await fetchJson(`/menu/categories/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  })
+}
+
+async function deleteMenuCategoryAPI(id: string): Promise<void> {
+  await fetchJson(`/menu/categories/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  })
+}
+
+// ============================================
+// API FUNCTIONS FOR MENU ITEMS
+// ============================================
+
+async function fetchMenuItems(): Promise<MenuItem[]> {
+  try {
+    const data = await fetchJson<MenuItem[]>('/menu/items', {
+      headers: getAuthHeaders(),
+    })
+    return data.map(item => ({
+      ...item,
+      id: (item as any)._id || item.id,
+    }))
+  } catch (error) {
+    console.error('Failed to fetch menu items:', error)
+    return []
+  }
+}
+
+async function createMenuItemAPI(formData: FormData): Promise<MenuItem> {
+  const token = localStorage.getItem(AUTH_TOKEN_KEY)
+  const response = await fetch(`${API_BASE_URL}/menu/items`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  })
+  const payload = await response.json()
+  if (!response.ok) {
+    throw new Error(payload.error || 'Failed to create menu item')
+  }
+  return payload.data
+}
+
+async function updateMenuItemAPI(id: string, formData: FormData): Promise<void> {
+  const token = localStorage.getItem(AUTH_TOKEN_KEY)
+  const response = await fetch(`${API_BASE_URL}/menu/items/${id}`, {
+    method: 'PUT',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  })
+  const payload = await response.json()
+  if (!response.ok) {
+    throw new Error(payload.error || 'Failed to update menu item')
+  }
+}
+
+async function deleteMenuItemAPI(id: string): Promise<void> {
+  await fetchJson(`/menu/items/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  })
+}
+
+async function toggleMenuItemAvailabilityAPI(id: string): Promise<void> {
+  await fetchJson(`/menu/items/${id}/toggle`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+  })
+}
+
+// ============================================
+// API FUNCTIONS FOR OFFERS
+// ============================================
+
+async function fetchOffers(): Promise<Offer[]> {
+  try {
+    const data = await fetchJson<Offer[]>('/menu/offers/all', {
+      headers: getAuthHeaders(),
+    })
+    return data.map(offer => ({
+      ...offer,
+      id: (offer as any)._id || offer.id,
+    }))
+  } catch (error) {
+    console.error('Failed to fetch offers:', error)
+    return []
+  }
+}
+
+async function createOfferAPI(data: Omit<Offer, 'id' | 'createdAt' | 'updatedAt'>): Promise<Offer> {
+  const result = await fetchJson<Offer>('/menu/offers', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  })
+  return {
+    ...result,
+    id: (result as any)._id || result.id,
+  }
+}
+
+async function updateOfferAPI(id: string, data: Partial<Offer>): Promise<void> {
+  await fetchJson(`/menu/offers/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  })
+}
+
+async function deleteOfferAPI(id: string): Promise<void> {
+  await fetchJson(`/menu/offers/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  })
+}
+
+// ============================================
+// API FUNCTIONS FOR SUPPLEMENTS
+// ============================================
+
 async function fetchSupplements(): Promise<Supplement[]> {
   try {
     const data = await fetchJson<Supplement[]>('/menu/supplements/all', {
@@ -429,7 +585,10 @@ async function deleteSupplementCategoryAPI(id: string): Promise<void> {
   })
 }
 
-// Initial data
+// ============================================
+// INITIAL DATA
+// ============================================
+
 const initialStockCategories: StockCategory[] = [
   {
     id: "cat-1",
@@ -545,9 +704,9 @@ const initialMenuCategories: MenuCategory[] = [
 ]
 
 const initialMenuItems: MenuItem[] = [
-  { id: "0", name: "Petit Dejeuner Gourmand pour 2", description: "Assortiment complet pour deux personnes", price: 32.0, points: 32, category: "petit-dejeuner", image: "/placeholder.svg", allergens: ["Gluten", "Lait", "Oeufs"], isAvailable: true, tags: ["Pour 2 personnes", "Complet"], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "1", name: "Croissant Artisanal", description: "Croissant pur beurre croustillant et fondant", price: 4.5, points: 5, category: "viennoiseries", image: "/placeholder.svg", allergens: ["Gluten", "Lait"], isAvailable: true, availableSupplements: [{ supplementId: "sup-16", isEnabled: true }, { supplementId: "sup-17", isEnabled: true }, { supplementId: "sup-18", isEnabled: true }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "2", name: "Pain au Chocolat", description: "Viennoiserie pur beurre garnie de chocolat noir", price: 5.5, points: 6, category: "viennoiseries", image: "/placeholder.svg", allergens: ["Gluten", "Lait"], isAvailable: true, availableSupplements: [{ supplementId: "sup-16", isEnabled: true }, { supplementId: "sup-9", isEnabled: true }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "0", name: "Petit Dejeuner Gourmand pour 2", description: "Assortiment complet pour deux personnes", price: 32.0, points: 32, category: "0", image: "/placeholder.svg", allergens: ["Gluten", "Lait", "Oeufs"], isAvailable: true, tags: ["Pour 2 personnes", "Complet"], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "1", name: "Croissant Artisanal", description: "Croissant pur beurre croustillant et fondant", price: 4.5, points: 5, category: "1", image: "/placeholder.svg", allergens: ["Gluten", "Lait"], isAvailable: true, availableSupplements: [{ supplementId: "sup-16", isEnabled: true }, { supplementId: "sup-17", isEnabled: true }, { supplementId: "sup-18", isEnabled: true }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "2", name: "Pain au Chocolat", description: "Viennoiserie pur beurre garnie de chocolat noir", price: 5.5, points: 6, category: "1", image: "/placeholder.svg", allergens: ["Gluten", "Lait"], isAvailable: true, availableSupplements: [{ supplementId: "sup-16", isEnabled: true }, { supplementId: "sup-9", isEnabled: true }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
 ]
 
 const initialSupplementCategories: SupplementCategory[] = []
@@ -583,6 +742,30 @@ export function StockProvider({ children }: { children: ReactNode }) {
         const hasToken = !!localStorage.getItem(AUTH_TOKEN_KEY)
         
         if (hasToken) {
+          // Load menu categories from API
+          const apiMenuCategories = await fetchMenuCategories()
+          if (!cancelled && apiMenuCategories.length > 0) {
+            setMenuCategories(apiMenuCategories)
+          } else if (!cancelled && apiMenuCategories.length === 0) {
+            setMenuCategories(initialMenuCategories)
+          }
+
+          // Load menu items from API
+          const apiMenuItems = await fetchMenuItems()
+          if (!cancelled && apiMenuItems.length > 0) {
+            setMenuItems(apiMenuItems)
+          } else if (!cancelled && apiMenuItems.length === 0) {
+            setMenuItems(initialMenuItems)
+          }
+
+          // Load offers from API
+          const apiOffers = await fetchOffers()
+          if (!cancelled && apiOffers.length > 0) {
+            setOffers(apiOffers)
+          } else if (!cancelled && apiOffers.length === 0) {
+            setOffers(initialOffers)
+          }
+
           // Load supplement categories from API
           const apiSupplementCategories = await fetchSupplementCategories()
           if (!cancelled && apiSupplementCategories.length > 0) {
@@ -598,12 +781,9 @@ export function StockProvider({ children }: { children: ReactNode }) {
           } else if (!cancelled && apiSupplements.length === 0) {
             setSupplements(initialSupplements)
           }
-        } else {
-          setSupplementCategories(initialSupplementCategories)
-          setSupplements(initialSupplements)
         }
 
-        // Load other data from localStorage
+        // Load other data from localStorage (stock management data)
         const storedVersion = localStorage.getItem("pastry-data-version")
         if (storedVersion !== DATA_VERSION) {
           localStorage.removeItem("pastry-menu-items")
@@ -622,9 +802,6 @@ export function StockProvider({ children }: { children: ReactNode }) {
           categories: localStorage.getItem("pastry-categories"),
           suppliers: localStorage.getItem("pastry-suppliers"),
           rewards: localStorage.getItem("pastry-rewards"),
-          menuItems: localStorage.getItem("pastry-menu-items"),
-          menuCategories: localStorage.getItem("pastry-menu-categories"),
-          offers: localStorage.getItem("pastry-offers"),
         }
 
         if (!cancelled) {
@@ -637,13 +814,13 @@ export function StockProvider({ children }: { children: ReactNode }) {
           setCategories(stored.categories ? JSON.parse(stored.categories) : initialLegacyCategories)
           setSuppliers(stored.suppliers ? JSON.parse(stored.suppliers) : initialSuppliers)
           setRewards(stored.rewards ? JSON.parse(stored.rewards) : initialRewards)
-          setMenuItems(stored.menuItems ? JSON.parse(stored.menuItems) : initialMenuItems)
-          setMenuCategories(stored.menuCategories ? JSON.parse(stored.menuCategories) : initialMenuCategories)
-          setOffers(stored.offers ? JSON.parse(stored.offers) : initialOffers)
         }
       } catch (error) {
         console.error("Failed to load data:", error)
         if (!cancelled) {
+          setMenuCategories(initialMenuCategories)
+          setMenuItems(initialMenuItems)
+          setOffers(initialOffers)
           setSupplementCategories(initialSupplementCategories)
           setSupplements(initialSupplements)
         }
@@ -657,7 +834,7 @@ export function StockProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Save to localStorage
+  // Save stock data to localStorage (only for non-menu data)
   useEffect(() => { if (stockCategories.length) localStorage.setItem("stock-categories", JSON.stringify(stockCategories)) }, [stockCategories])
   useEffect(() => { if (subCategories.length) localStorage.setItem("sub-categories", JSON.stringify(subCategories)) }, [subCategories])
   useEffect(() => { if (products.length) localStorage.setItem("stock-products", JSON.stringify(products)) }, [products])
@@ -667,9 +844,6 @@ export function StockProvider({ children }: { children: ReactNode }) {
   useEffect(() => { localStorage.setItem("pastry-categories", JSON.stringify(categories)) }, [categories])
   useEffect(() => { localStorage.setItem("pastry-suppliers", JSON.stringify(suppliers)) }, [suppliers])
   useEffect(() => { localStorage.setItem("pastry-rewards", JSON.stringify(rewards)) }, [rewards])
-  useEffect(() => { localStorage.setItem("pastry-menu-items", JSON.stringify(menuItems)) }, [menuItems])
-  useEffect(() => { localStorage.setItem("pastry-menu-categories", JSON.stringify(menuCategories)) }, [menuCategories])
-  useEffect(() => { if (offers.length) localStorage.setItem("pastry-offers", JSON.stringify(offers)) }, [offers])
 
   // Stock Category CRUD
   const addStockCategory = (cat: Omit<StockCategory, "id" | "createdAt" | "updatedAt">) => {
@@ -915,31 +1089,123 @@ export function StockProvider({ children }: { children: ReactNode }) {
 
   const getLowStockItems = () => items.filter(item => item.quantity <= item.minQuantity)
 
-  // Menu CRUD
-  const addMenuCategory = (category: Omit<MenuCategory, "id">) => {
-    const newCat: MenuCategory = { ...category, id: Date.now().toString() }
-    setMenuCategories(prev => [...prev, newCat])
+  // Menu CRUD with API
+  const addMenuCategory = async (category: Omit<MenuCategory, "id">) => {
+    try {
+      const newCategory = await createMenuCategoryAPI(category)
+      setMenuCategories(prev => [...prev, newCategory])
+    } catch (error) {
+      console.error("Failed to create menu category:", error)
+      const newCat: MenuCategory = { ...category, id: Date.now().toString() }
+      setMenuCategories(prev => [...prev, newCat])
+    }
   }
 
-  const updateMenuCategory = (id: string, updates: Partial<MenuCategory>) => {
-    setMenuCategories(prev => prev.map(cat => cat.id === id ? { ...cat, ...updates } : cat))
+  const updateMenuCategory = async (id: string, updates: Partial<MenuCategory>) => {
+    try {
+      await updateMenuCategoryAPI(id, updates)
+      setMenuCategories(prev => prev.map(cat => cat.id === id ? { ...cat, ...updates } : cat))
+    } catch (error) {
+      console.error("Failed to update menu category:", error)
+      setMenuCategories(prev => prev.map(cat => cat.id === id ? { ...cat, ...updates } : cat))
+    }
   }
 
-  const deleteMenuCategory = (id: string) => {
-    setMenuCategories(prev => prev.filter(cat => cat.id !== id))
+  const deleteMenuCategory = async (id: string) => {
+    try {
+      await deleteMenuCategoryAPI(id)
+      setMenuCategories(prev => prev.filter(cat => cat.id !== id))
+    } catch (error) {
+      console.error("Failed to delete menu category:", error)
+      setMenuCategories(prev => prev.filter(cat => cat.id !== id))
+    }
   }
 
-  const addMenuItem = (item: Omit<MenuItem, "id" | "createdAt" | "updatedAt">) => {
-    const newItem: MenuItem = { ...item, id: Date.now().toString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
-    setMenuItems(prev => [...prev, newItem])
+  const addMenuItem = async (item: Omit<MenuItem, "id" | "createdAt" | "updatedAt">) => {
+    try {
+      const formData = new FormData()
+      formData.append('name', item.name)
+      formData.append('description', item.description)
+      formData.append('price', item.price.toString())
+      if (item.points) formData.append('points', item.points.toString())
+      formData.append('categoryId', item.category)
+      formData.append('allergens', JSON.stringify(item.allergens || []))
+      formData.append('isAvailable', String(item.isAvailable))
+      if (item.image instanceof File) {
+        formData.append('imageFile', item.image)
+      } else if (item.image && typeof item.image === 'string') {
+        formData.append('image', item.image)
+      }
+      if (item.supplements) {
+        formData.append('supplements', JSON.stringify(item.supplements))
+      }
+      if (item.promotion) {
+        formData.append('promotion', JSON.stringify(item.promotion))
+      }
+
+      const newItem = await createMenuItemAPI(formData)
+      setMenuItems(prev => [...prev, { ...newItem, createdAt: newItem.createdAt || new Date().toISOString(), updatedAt: newItem.updatedAt || new Date().toISOString() }])
+    } catch (error) {
+      console.error("Failed to create menu item:", error)
+      const newItem: MenuItem = {
+        ...item,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+      setMenuItems(prev => [...prev, newItem])
+    }
   }
 
-  const updateMenuItem = (id: string, updates: Partial<MenuItem>) => {
-    setMenuItems(prev => prev.map(item => item.id === id ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item))
+  const updateMenuItem = async (id: string, updates: Partial<MenuItem>) => {
+    try {
+      const formData = new FormData()
+      if (updates.name) formData.append('name', updates.name)
+      if (updates.description) formData.append('description', updates.description)
+      if (updates.price) formData.append('price', updates.price.toString())
+      if (updates.points) formData.append('points', updates.points.toString())
+      if (updates.category) formData.append('categoryId', updates.category)
+      if (updates.allergens) formData.append('allergens', JSON.stringify(updates.allergens))
+      if (updates.isAvailable !== undefined) formData.append('isAvailable', String(updates.isAvailable))
+      if (updates.image instanceof File) {
+        formData.append('imageFile', updates.image)
+      } else if (updates.image === undefined || updates.image === null) {
+        formData.append('removeImage', 'true')
+      }
+      if (updates.supplements) {
+        formData.append('supplements', JSON.stringify(updates.supplements))
+      }
+      if (updates.promotion) {
+        formData.append('promotion', JSON.stringify(updates.promotion))
+      }
+
+      await updateMenuItemAPI(id, formData)
+      setMenuItems(prev => prev.map(item => item.id === id ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item))
+    } catch (error) {
+      console.error("Failed to update menu item:", error)
+      setMenuItems(prev => prev.map(item => item.id === id ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item))
+    }
   }
 
-  const deleteMenuItem = (id: string) => {
-    setMenuItems(prev => prev.filter(item => item.id !== id))
+  const deleteMenuItem = async (id: string) => {
+    try {
+      await deleteMenuItemAPI(id)
+      setMenuItems(prev => prev.filter(item => item.id !== id))
+    } catch (error) {
+      console.error("Failed to delete menu item:", error)
+      setMenuItems(prev => prev.filter(item => item.id !== id))
+    }
+  }
+
+  const toggleMenuItemAvailability = async (id: string) => {
+    try {
+      await toggleMenuItemAvailabilityAPI(id)
+      setMenuItems(prev => prev.map(item => 
+        item.id === id ? { ...item, isAvailable: !item.isAvailable, updatedAt: new Date().toISOString() } : item
+      ))
+    } catch (error) {
+      console.error("Failed to toggle availability:", error)
+    }
   }
 
   // Rewards CRUD
@@ -1053,23 +1319,41 @@ export function StockProvider({ children }: { children: ReactNode }) {
 
   const getActiveSupplementCategories = () => supplementCategories.filter(c => c.isActive)
 
-  // Offers CRUD
-  const addOffer = (offer: Omit<Offer, "id" | "createdAt" | "updatedAt">) => {
-    const newOffer: Offer = {
-      ...offer,
-      id: `offer-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+  // Offers CRUD with API
+  const addOffer = async (offer: Omit<Offer, "id" | "createdAt" | "updatedAt">) => {
+    try {
+      const newOffer = await createOfferAPI(offer)
+      setOffers(prev => [...prev, { ...newOffer, createdAt: newOffer.createdAt || new Date().toISOString(), updatedAt: newOffer.updatedAt || new Date().toISOString() }])
+    } catch (error) {
+      console.error("Failed to create offer:", error)
+      const newOffer: Offer = {
+        ...offer,
+        id: `offer-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+      setOffers(prev => [...prev, newOffer])
     }
-    setOffers(prev => [...prev, newOffer])
   }
 
-  const updateOffer = (id: string, updates: Partial<Offer>) => {
-    setOffers(prev => prev.map(o => o.id === id ? { ...o, ...updates, updatedAt: new Date().toISOString() } : o))
+  const updateOffer = async (id: string, updates: Partial<Offer>) => {
+    try {
+      await updateOfferAPI(id, updates)
+      setOffers(prev => prev.map(o => o.id === id ? { ...o, ...updates, updatedAt: new Date().toISOString() } : o))
+    } catch (error) {
+      console.error("Failed to update offer:", error)
+      setOffers(prev => prev.map(o => o.id === id ? { ...o, ...updates, updatedAt: new Date().toISOString() } : o))
+    }
   }
 
-  const deleteOffer = (id: string) => {
-    setOffers(prev => prev.filter(o => o.id !== id))
+  const deleteOffer = async (id: string) => {
+    try {
+      await deleteOfferAPI(id)
+      setOffers(prev => prev.filter(o => o.id !== id))
+    } catch (error) {
+      console.error("Failed to delete offer:", error)
+      setOffers(prev => prev.filter(o => o.id !== id))
+    }
   }
 
   const getActiveOffers = () => offers.filter(o => o.isActive)
@@ -1145,6 +1429,7 @@ export function StockProvider({ children }: { children: ReactNode }) {
         addMenuItem,
         updateMenuItem,
         deleteMenuItem,
+        toggleMenuItemAvailability,
         rewards,
         addReward,
         updateReward,
