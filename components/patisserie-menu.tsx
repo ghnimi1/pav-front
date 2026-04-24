@@ -8,6 +8,7 @@ import { useUnifiedSales } from "@/contexts/unified-sales-context"
 import { useLoyalty } from "@/contexts/loyalty-context"
 import { useAuth } from "@/contexts/auth-context"
 import { useDiscount } from "@/contexts/discount-context"
+import { useOrders, type OrderItem } from "@/contexts/orders-context"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -70,6 +71,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
   const { user } = useAuth()
   const { getClientByEmail } = useLoyalty()
   const { addSale } = useUnifiedSales()
+  const { createOrderFromItems } = useOrders()
   const {
     menuItems,
     menuCategories,
@@ -89,6 +91,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
   const [searchQuery, setSearchQuery] = useState("")
   const [showCartSummary, setShowCartSummary] = useState(false)
   const [showOrderSuccess, setShowOrderSuccess] = useState(false)
+  const [lastClientOrder, setLastClientOrder] = useState<{ orderNumber: string; estimatedTime: number } | null>(null)
   const [showRecap, setShowRecap] = useState(false)
   const [customerNote, setCustomerNote] = useState("")
   const [tableNumber, setTableNumber] = useState("")
@@ -109,7 +112,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
   const activeCategories = useMemo(() => {
     return menuCategories.filter(cat => cat.isActive).sort((a, b) => a.order - b.order)
   }, [menuCategories])
-  console.log(activeCategories,"activeCategories")
+
   // Navigation steps: Offers (if any) + All categories
   const navigationSteps = useMemo(() => {
     const steps: { id: string; name: string; type: "offers" | "category" }[] = []
@@ -294,8 +297,62 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
   }
   
   // Handle order submission
-  const handleSubmitOrder = () => {
+  const handleSubmitOrder = async () => {
     if (cartItemsCount === 0) return
+
+    const remoteOrderItems: OrderItem[] = [
+      ...offerCart.map((offerItem) => ({
+        id: `offer-${offerItem.offer.id}`,
+        name: offerItem.offer.name,
+        price: offerItem.offer.discountedPrice,
+        quantity: offerItem.quantity,
+        image: offerItem.offer.image,
+        points: offerItem.offer.points,
+      })),
+      ...cart.map((cartItem) => ({
+        id: `${cartItem.item.id}-${cartItem.supplements.map((s) => `${s.supplementId}:${s.quantity}`).join(",")}`,
+        name: cartItem.item.name,
+        price: cartItem.item.price,
+        quantity: cartItem.quantity,
+        image: cartItem.item.image,
+        points: cartItem.item.points || Math.floor(cartItem.item.price),
+        supplements: cartItem.supplements.flatMap((supplement) =>
+          Array.from({ length: supplement.quantity }, () => ({
+            name: supplement.name,
+            price: supplement.price,
+          }))
+        ),
+      })),
+    ]
+
+    if (user?.role === "client") {
+      const clientOrder = await createOrderFromItems(
+        remoteOrderItems,
+        "pickup",
+        "cash_on_pickup",
+        {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        },
+        undefined,
+        undefined,
+        [customerNote, tableNumber ? `Table: ${tableNumber}` : ""].filter(Boolean).join(" | ")
+      )
+
+      if (clientOrder) {
+        setLastClientOrder({
+          orderNumber: clientOrder.orderNumber,
+          estimatedTime: clientOrder.estimatedTime,
+        })
+        setShowCartSummary(false)
+        setShowOrderSuccess(true)
+        clearCart()
+        setCustomerNote("")
+        setTableNumber("")
+        return
+      }
+    }
     
     // Build items array
     const orderItems = [
@@ -349,7 +406,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
       } : undefined,
     })
     
-    // Show success
+    setLastClientOrder(null)
     setShowCartSummary(false)
     setShowOrderSuccess(true)
     
@@ -865,10 +922,10 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                 <Button variant="ghost" onClick={clearCart} className="text-red-500">
                   Vider
                 </Button>
-                <Button onClick={handleSubmitOrder} className="bg-amber-500 hover:bg-amber-600 text-white">
-                  <SendIcon className="h-4 w-4 mr-2" />
-                  Commander
-                </Button>
+                  <Button onClick={() => void handleSubmitOrder()} className="bg-amber-500 hover:bg-amber-600 text-white">
+                    <SendIcon className="h-4 w-4 mr-2" />
+                    Commander
+                  </Button>
               </>
             )}
           </DialogFooter>
@@ -878,15 +935,22 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
       {/* Order Success Dialog */}
       <Dialog open={showOrderSuccess} onOpenChange={setShowOrderSuccess}>
         <DialogContent className="max-w-sm text-center">
-          <div className="py-6">
-            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-              <CheckCircle2Icon className="h-8 w-8 text-green-600" />
-            </div>
-            <h2 className="text-xl font-bold text-stone-900 mb-2">Commande envoyee!</h2>
-            <p className="text-stone-600">Votre commande a ete transmise avec succes.</p>
-            {cartTotalPoints > 0 && (
-              <div className="mt-4 p-3 bg-emerald-50 rounded-lg">
-                <div className="flex items-center justify-center gap-2 text-emerald-600">
+            <div className="py-6">
+              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2Icon className="h-8 w-8 text-green-600" />
+              </div>
+              <h2 className="text-xl font-bold text-stone-900 mb-2">Commande envoyee!</h2>
+              <p className="text-stone-600">
+                {lastClientOrder
+                  ? `Votre commande ${lastClientOrder.orderNumber} a ete enregistree.`
+                  : "Votre commande a ete transmise avec succes."}
+              </p>
+              {lastClientOrder && (
+                <p className="text-sm text-amber-600 mt-2">Retrait estime: ~{lastClientOrder.estimatedTime} min</p>
+              )}
+              {cartTotalPoints > 0 && (
+                <div className="mt-4 p-3 bg-emerald-50 rounded-lg">
+                  <div className="flex items-center justify-center gap-2 text-emerald-600">
                   <CoinsIcon className="h-5 w-5" />
                   <span className="font-medium">+{cartTotalPoints} points fidelite gagnes!</span>
                 </div>
@@ -1179,11 +1243,11 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                 )}
                 
                 {/* Submit button */}
-                <Button
-                  onClick={() => {
-                    handleSubmitOrder()
-                    setShowRecap(false)
-                  }}
+                  <Button
+                    onClick={() => {
+                    void handleSubmitOrder()
+                      setShowRecap(false)
+                    }}
                   className="w-full mt-4 h-14 rounded-2xl bg-white text-amber-600 hover:bg-white/90 font-bold text-lg shadow-lg"
                 >
                   <SendIcon className="h-5 w-5 mr-2" />

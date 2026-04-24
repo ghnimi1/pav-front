@@ -11,6 +11,7 @@ import { LoyaltyCardsProvider } from "@/contexts/loyalty-cards-context"
 import { UnifiedSalesProvider } from "@/contexts/unified-sales-context"
 import { ProductionProvider, useProduction } from "@/contexts/production-context"
 import { DiscountProvider, useDiscount } from "@/contexts/discount-context"
+import { OrdersProvider } from "@/contexts/orders-context"
 import { NotificationContainer } from "@/components/notification-container"
 import { Button } from "@/components/ui/button"
 import { 
@@ -567,9 +568,11 @@ export default function MenuPage() {
               <BreakfastProvider>
                 <UnifiedSalesProvider>
                   <DiscountProvider>
-                    <LoyaltyCardsProvider>
-                      <MenuContent />
-                    </LoyaltyCardsProvider>
+                    <OrdersProvider>
+                      <LoyaltyCardsProvider>
+                        <MenuContent />
+                      </LoyaltyCardsProvider>
+                    </OrdersProvider>
                   </DiscountProvider>
                 </UnifiedSalesProvider>
               </BreakfastProvider>

@@ -162,7 +162,7 @@ function OrderPageContent() {
   }
 
   // Submit order
-  const handleSubmitOrder = () => {
+  const handleSubmitOrder = async () => {
     if (!validateDeliveryForm()) {
       addNotification({
         type: "error",
@@ -179,7 +179,7 @@ function OrderPageContent() {
       phone: deliveryAddress.phone,
     }
 
-    const order = createOrder(
+    const order = await createOrder(
       deliveryMode,
       deliveryMode === "delivery" ? "cash_on_delivery" : "cash_on_pickup",
       clientInfo,
@@ -734,7 +734,7 @@ function OrderPageContent() {
                           </Button>
                           <Button
                             className="flex-1 bg-emerald-600 hover:bg-emerald-700 h-12"
-                            onClick={handleSubmitOrder}
+                            onClick={() => void handleSubmitOrder()}
                           >
                             <CheckCircleIcon className="h-5 w-5 mr-2" />
                             Confirmer ({orderTotal.toFixed(2)} TND)

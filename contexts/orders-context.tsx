@@ -1,8 +1,7 @@
 "use client"
 
-import React, { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import React, { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 
-// Types
 export type OrderStatus = "new" | "confirmed" | "preparing" | "ready" | "delivering" | "completed" | "cancelled"
 export type DeliveryMode = "delivery" | "pickup"
 export type PaymentMethod = "cash_on_delivery" | "cash_on_pickup"
@@ -40,22 +39,19 @@ export interface RemoteOrder {
   paymentMethod: PaymentMethod
   deliveryAddress?: DeliveryAddress
   pickupTime?: string
-  estimatedTime: number // in minutes
+  estimatedTime: number
   createdAt: string
   confirmedAt?: string
   readyAt?: string
   completedAt?: string
   cancelledAt?: string
   cancelReason?: string
-  // Client info
   clientId?: string
   clientEmail?: string
   clientName?: string
   clientPhone?: string
-  // Staff info
   confirmedBy?: string
   completedBy?: string
-  // Notes
   customerNote?: string
   staffNote?: string
 }
@@ -65,21 +61,18 @@ export interface DeliveryConfig {
   pickupEnabled: boolean
   deliveryFee: number
   freeDeliveryThreshold: number
-  estimatedDeliveryTime: number // minutes
-  estimatedPickupTime: number // minutes
+  estimatedDeliveryTime: number
+  estimatedPickupTime: number
   deliveryZones: string[]
   minOrderAmount: number
   maxDeliveryDistance?: number
 }
 
 interface OrdersContextType {
-  // Orders
   orders: RemoteOrder[]
   getOrderById: (id: string) => RemoteOrder | undefined
   getOrdersByStatus: (status: OrderStatus) => RemoteOrder[]
   getOrdersByClient: (clientEmail: string) => RemoteOrder[]
-  
-  // Cart
   cart: OrderItem[]
   addToCart: (item: OrderItem) => void
   removeFromCart: (itemId: string) => void
@@ -88,8 +81,6 @@ interface OrdersContextType {
   cartTotal: number
   cartItemsCount: number
   cartTotalPoints: number
-  
-  // Order creation
   createOrder: (
     deliveryMode: DeliveryMode,
     paymentMethod: PaymentMethod,
@@ -97,32 +88,87 @@ interface OrdersContextType {
     deliveryAddress?: DeliveryAddress,
     pickupTime?: string,
     customerNote?: string
-  ) => RemoteOrder | null
-  
-  // Order management (admin)
-  updateOrderStatus: (orderId: string, status: OrderStatus, staffId?: string) => void
-  cancelOrder: (orderId: string, reason?: string) => void
-  addStaffNote: (orderId: string, note: string) => void
-  
-  // Config
+  ) => Promise<RemoteOrder | null>
+  createOrderFromItems: (
+    items: OrderItem[],
+    deliveryMode: DeliveryMode,
+    paymentMethod: PaymentMethod,
+    clientInfo: { id?: string; email?: string; name?: string; phone?: string },
+    deliveryAddress?: DeliveryAddress,
+    pickupTime?: string,
+    customerNote?: string
+  ) => Promise<RemoteOrder | null>
+  updateOrderStatus: (orderId: string, status: OrderStatus, staffId?: string) => Promise<void>
+  cancelOrder: (orderId: string, reason?: string) => Promise<void>
+  addStaffNote: (orderId: string, note: string) => Promise<void>
   deliveryConfig: DeliveryConfig
-  updateDeliveryConfig: (config: Partial<DeliveryConfig>) => void
+  updateDeliveryConfig: (config: Partial<DeliveryConfig>) => Promise<void>
   getDeliveryFee: (subtotal: number) => number
   getEstimatedTime: (mode: DeliveryMode) => number
 }
 
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api").replace(/\/$/, "")
+const AUTH_TOKEN_KEY = "authToken"
+
 const defaultDeliveryConfig: DeliveryConfig = {
   deliveryEnabled: true,
   pickupEnabled: true,
-  deliveryFee: 5.00,
-  freeDeliveryThreshold: 50.00,
+  deliveryFee: 5.0,
+  freeDeliveryThreshold: 50.0,
   estimatedDeliveryTime: 45,
   estimatedPickupTime: 20,
   deliveryZones: ["Tunis", "Ariana", "Ben Arous", "Manouba"],
-  minOrderAmount: 15.00,
+  minOrderAmount: 15.0,
 }
 
 const OrdersContext = createContext<OrdersContextType | undefined>(undefined)
+
+function getAuthToken() {
+  if (typeof window === "undefined") return null
+  return localStorage.getItem(AUTH_TOKEN_KEY)
+}
+
+function getCurrentUser() {
+  if (typeof window === "undefined") return null
+  const raw = localStorage.getItem("currentUser")
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as { role?: string; email?: string }
+  } catch {
+    return null
+  }
+}
+
+function getAuthHeaders() {
+  const token = getAuthToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+async function readApi<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, init)
+  const payload = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    const message =
+      payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
+        ? payload.error
+        : "Une erreur est survenue"
+    throw new Error(message)
+  }
+
+  if (payload && typeof payload === "object" && "data" in payload) {
+    return payload.data as T
+  }
+
+  return payload as T
+}
+
+function normalizeOrder(order: any): RemoteOrder {
+  return {
+    ...order,
+    id: order.id || order._id,
+  }
+}
 
 export function OrdersProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<RemoteOrder[]>([])
@@ -130,27 +176,68 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
   const [deliveryConfig, setDeliveryConfig] = useState<DeliveryConfig>(defaultDeliveryConfig)
   const [orderCounter, setOrderCounter] = useState(1000)
 
-  // Load from localStorage
   useEffect(() => {
-    const savedOrders = localStorage.getItem("remote-orders")
     const savedCart = localStorage.getItem("remote-cart")
     const savedConfig = localStorage.getItem("delivery-config")
+    const savedOrders = localStorage.getItem("remote-orders")
     const savedCounter = localStorage.getItem("order-counter")
-    
-    if (savedOrders) setOrders(JSON.parse(savedOrders))
+
     if (savedCart) setCart(JSON.parse(savedCart))
     if (savedConfig) setDeliveryConfig({ ...defaultDeliveryConfig, ...JSON.parse(savedConfig) })
-    if (savedCounter) setOrderCounter(parseInt(savedCounter))
-  }, [])
+    if (savedOrders) setOrders(JSON.parse(savedOrders))
+    if (savedCounter) setOrderCounter(parseInt(savedCounter, 10))
 
-  // Save to localStorage
-  useEffect(() => {
-    localStorage.setItem("remote-orders", JSON.stringify(orders))
-  }, [orders])
+    const loadData = async () => {
+      try {
+        const config = await readApi<DeliveryConfig>("/orders/config")
+        setDeliveryConfig(config)
+        localStorage.setItem("delivery-config", JSON.stringify(config))
+      } catch (error) {
+        console.error("Failed to load delivery config:", error)
+      }
+
+      try {
+        const currentUser = getCurrentUser()
+        const token = getAuthToken()
+        if (!token || !currentUser?.role) return
+
+        if (currentUser.role === "admin") {
+          const apiOrders = await readApi<RemoteOrder[]>("/orders/all", {
+            headers: {
+              ...getAuthHeaders(),
+            },
+          })
+          const normalizedOrders = apiOrders.map(normalizeOrder)
+          setOrders(normalizedOrders)
+          localStorage.setItem("remote-orders", JSON.stringify(normalizedOrders))
+          return
+        }
+
+        if (currentUser.role === "client") {
+          const apiOrders = await readApi<RemoteOrder[]>("/orders/my", {
+            headers: {
+              ...getAuthHeaders(),
+            },
+          })
+          const normalizedOrders = apiOrders.map(normalizeOrder)
+          setOrders(normalizedOrders)
+          localStorage.setItem("remote-orders", JSON.stringify(normalizedOrders))
+        }
+      } catch (error) {
+        console.error("Failed to load orders:", error)
+      }
+    }
+
+    void loadData()
+  }, [])
 
   useEffect(() => {
     localStorage.setItem("remote-cart", JSON.stringify(cart))
   }, [cart])
+
+  useEffect(() => {
+    localStorage.setItem("remote-orders", JSON.stringify(orders))
+  }, [orders])
 
   useEffect(() => {
     localStorage.setItem("delivery-config", JSON.stringify(deliveryConfig))
@@ -160,35 +247,34 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("order-counter", orderCounter.toString())
   }, [orderCounter])
 
-  // Cart calculations
-  const cartTotal = cart.reduce((sum, item) => {
-    const supplementsTotal = item.supplements?.reduce((s, sup) => s + sup.price, 0) || 0
-    return sum + (item.price + supplementsTotal) * item.quantity
-  }, 0)
+  const cartTotal = useMemo(
+    () =>
+      cart.reduce((sum, item) => {
+        const supplementsTotal = item.supplements?.reduce((acc, sup) => acc + sup.price, 0) || 0
+        return sum + (item.price + supplementsTotal) * item.quantity
+      }, 0),
+    [cart]
+  )
 
-  const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0)
+  const cartItemsCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart])
 
-  const cartTotalPoints = cart.reduce((sum, item) => {
-    return sum + (item.points || Math.floor(item.price)) * item.quantity
-  }, 0)
+  const cartTotalPoints = useMemo(
+    () => cart.reduce((sum, item) => sum + (item.points || Math.floor(item.price)) * item.quantity, 0),
+    [cart]
+  )
 
-  // Cart functions
   const addToCart = (item: OrderItem) => {
-    setCart(prev => {
-      const existing = prev.find(i => i.id === item.id)
+    setCart((prev) => {
+      const existing = prev.find((i) => i.id === item.id)
       if (existing) {
-        return prev.map(i => 
-          i.id === item.id 
-            ? { ...i, quantity: i.quantity + item.quantity }
-            : i
-        )
+        return prev.map((i) => (i.id === item.id ? { ...i, quantity: i.quantity + item.quantity } : i))
       }
       return [...prev, item]
     })
   }
 
   const removeFromCart = (itemId: string) => {
-    setCart(prev => prev.filter(i => i.id !== itemId))
+    setCart((prev) => prev.filter((i) => i.id !== itemId))
   }
 
   const updateCartItemQuantity = (itemId: string, quantity: number) => {
@@ -196,21 +282,14 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
       removeFromCart(itemId)
       return
     }
-    setCart(prev => prev.map(i => 
-      i.id === itemId ? { ...i, quantity } : i
-    ))
+    setCart((prev) => prev.map((i) => (i.id === itemId ? { ...i, quantity } : i)))
   }
 
   const clearCart = () => setCart([])
 
-  // Order functions
-  const getOrderById = (id: string) => orders.find(o => o.id === id)
-
-  const getOrdersByStatus = (status: OrderStatus) => 
-    orders.filter(o => o.status === status)
-
-  const getOrdersByClient = (clientEmail: string) => 
-    orders.filter(o => o.clientEmail === clientEmail)
+  const getOrderById = (id: string) => orders.find((o) => o.id === id)
+  const getOrdersByStatus = (status: OrderStatus) => orders.filter((o) => o.status === status)
+  const getOrdersByClient = (clientEmail: string) => orders.filter((o) => o.clientEmail === clientEmail)
 
   const getDeliveryFee = (subtotal: number) => {
     if (!deliveryConfig.deliveryEnabled) return 0
@@ -219,120 +298,235 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
   }
 
   const getEstimatedTime = (mode: DeliveryMode) => {
-    return mode === "delivery" 
-      ? deliveryConfig.estimatedDeliveryTime 
-      : deliveryConfig.estimatedPickupTime
+    return mode === "delivery" ? deliveryConfig.estimatedDeliveryTime : deliveryConfig.estimatedPickupTime
   }
 
-  const createOrder = (
-    deliveryMode: DeliveryMode,
-    paymentMethod: PaymentMethod,
-    clientInfo: { id?: string; email?: string; name?: string; phone?: string },
-    deliveryAddress?: DeliveryAddress,
-    pickupTime?: string,
-    customerNote?: string
-  ): RemoteOrder | null => {
-    if (cart.length === 0) return null
-    if (cartTotal < deliveryConfig.minOrderAmount) return null
+  const createOrder: OrdersContextType["createOrder"] = async (
+    deliveryMode,
+    paymentMethod,
+    clientInfo,
+    deliveryAddress,
+    pickupTime,
+    customerNote
+  ) => {
+    return createOrderFromItems(cart, deliveryMode, paymentMethod, clientInfo, deliveryAddress, pickupTime, customerNote, true)
+  }
 
-    const newCounter = orderCounter + 1
-    setOrderCounter(newCounter)
+  const createOrderFromItems = async (
+    items: OrderItem[],
+    deliveryMode,
+    paymentMethod,
+    clientInfo,
+    deliveryAddress,
+    pickupTime,
+    customerNote,
+    clearProviderCart = false
+  ): Promise<RemoteOrder | null> => {
+    if (items.length === 0) return null
 
-    const deliveryFee = deliveryMode === "delivery" ? getDeliveryFee(cartTotal) : 0
+    const itemsTotal = items.reduce((sum, item) => {
+      const supplementsTotal = item.supplements?.reduce((acc, sup) => acc + sup.price, 0) || 0
+      return sum + (item.price + supplementsTotal) * item.quantity
+    }, 0)
 
-    const order: RemoteOrder = {
-      id: `RO-${Date.now()}`,
-      orderNumber: `CMD-${newCounter}`,
-      items: [...cart],
-      subtotal: cartTotal,
-      deliveryFee,
-      total: cartTotal + deliveryFee,
-      totalPoints: cartTotalPoints,
-      status: "new",
-      deliveryMode,
-      paymentMethod,
-      deliveryAddress,
-      pickupTime,
-      estimatedTime: getEstimatedTime(deliveryMode),
-      createdAt: new Date().toISOString(),
-      clientId: clientInfo.id,
-      clientEmail: clientInfo.email,
-      clientName: clientInfo.name,
-      clientPhone: clientInfo.phone,
-      customerNote,
+    const itemsTotalPoints = items.reduce(
+      (sum, item) => sum + (item.points || Math.floor(item.price)) * item.quantity,
+      0
+    )
+
+    if (itemsTotal < deliveryConfig.minOrderAmount) return null
+
+    try {
+      const order = normalizeOrder(
+        await readApi<RemoteOrder>("/orders", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            items,
+            subtotal: itemsTotal,
+            total: itemsTotal + (deliveryMode === "delivery" ? getDeliveryFee(itemsTotal) : 0),
+            totalPoints: itemsTotalPoints,
+            deliveryMode,
+            paymentMethod,
+            deliveryAddress,
+            pickupTime,
+            clientId: clientInfo.id,
+            clientEmail: clientInfo.email,
+            clientName: clientInfo.name,
+            clientPhone: clientInfo.phone,
+            customerNote,
+          }),
+        })
+      )
+
+      setOrders((prev) => [order, ...prev])
+      if (clearProviderCart) {
+        clearCart()
+      }
+      return order
+    } catch (error) {
+      console.error("Failed to create remote order, using local fallback:", error)
+
+      const newCounter = orderCounter + 1
+      setOrderCounter(newCounter)
+
+      const deliveryFee = deliveryMode === "delivery" ? getDeliveryFee(itemsTotal) : 0
+      const fallbackOrder: RemoteOrder = {
+        id: `RO-${Date.now()}`,
+        orderNumber: `CMD-${newCounter}`,
+        items: [...items],
+        subtotal: itemsTotal,
+        deliveryFee,
+        total: itemsTotal + deliveryFee,
+        totalPoints: itemsTotalPoints,
+        status: "new",
+        deliveryMode,
+        paymentMethod,
+        deliveryAddress,
+        pickupTime,
+        estimatedTime: getEstimatedTime(deliveryMode),
+        createdAt: new Date().toISOString(),
+        clientId: clientInfo.id,
+        clientEmail: clientInfo.email,
+        clientName: clientInfo.name,
+        clientPhone: clientInfo.phone,
+        customerNote,
+      }
+
+      setOrders((prev) => [fallbackOrder, ...prev])
+      if (clearProviderCart) {
+        clearCart()
+      }
+      return fallbackOrder
+    }
+  }
+
+  const updateOrderStatus: OrdersContextType["updateOrderStatus"] = async (orderId, status, staffId) => {
+    try {
+      await readApi("/orders/" + orderId + "/status", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ status, staffId }),
+      })
+    } catch (error) {
+      console.error("Failed to update order status in API:", error)
     }
 
-    setOrders(prev => [order, ...prev])
-    clearCart()
-    return order
+    setOrders((prev) =>
+      prev.map((order) => {
+        if (order.id !== orderId) return order
+
+        const now = new Date().toISOString()
+        const updates: Partial<RemoteOrder> = { status }
+        if (status === "confirmed") {
+          updates.confirmedAt = now
+          updates.confirmedBy = staffId
+        } else if (status === "ready") {
+          updates.readyAt = now
+        } else if (status === "completed") {
+          updates.completedAt = now
+          updates.completedBy = staffId
+        }
+        return { ...order, ...updates }
+      })
+    )
   }
 
-  const updateOrderStatus = (orderId: string, status: OrderStatus, staffId?: string) => {
-    setOrders(prev => prev.map(order => {
-      if (order.id !== orderId) return order
-      
-      const updates: Partial<RemoteOrder> = { status }
-      
-      if (status === "confirmed") {
-        updates.confirmedAt = new Date().toISOString()
-        updates.confirmedBy = staffId
-      } else if (status === "ready") {
-        updates.readyAt = new Date().toISOString()
-      } else if (status === "completed") {
-        updates.completedAt = new Date().toISOString()
-        updates.completedBy = staffId
-      }
-      
-      return { ...order, ...updates }
-    }))
+  const cancelOrder: OrdersContextType["cancelOrder"] = async (orderId, reason) => {
+    try {
+      await readApi("/orders/" + orderId + "/cancel", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ reason }),
+      })
+    } catch (error) {
+      console.error("Failed to cancel order in API:", error)
+    }
+
+    setOrders((prev) =>
+      prev.map((order) =>
+        order.id === orderId
+          ? {
+              ...order,
+              status: "cancelled",
+              cancelledAt: new Date().toISOString(),
+              cancelReason: reason,
+            }
+          : order
+      )
+    )
   }
 
-  const cancelOrder = (orderId: string, reason?: string) => {
-    setOrders(prev => prev.map(order => 
-      order.id === orderId 
-        ? { 
-            ...order, 
-            status: "cancelled" as OrderStatus, 
-            cancelledAt: new Date().toISOString(),
-            cancelReason: reason 
-          }
-        : order
-    ))
+  const addStaffNote: OrdersContextType["addStaffNote"] = async (orderId, note) => {
+    try {
+      await readApi("/orders/" + orderId + "/staff-note", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ note }),
+      })
+    } catch (error) {
+      console.error("Failed to save staff note in API:", error)
+    }
+
+    setOrders((prev) => prev.map((order) => (order.id === orderId ? { ...order, staffNote: note } : order)))
   }
 
-  const addStaffNote = (orderId: string, note: string) => {
-    setOrders(prev => prev.map(order =>
-      order.id === orderId ? { ...order, staffNote: note } : order
-    ))
-  }
+  const updateDeliveryConfig: OrdersContextType["updateDeliveryConfig"] = async (config) => {
+    try {
+      const nextConfig = await readApi<DeliveryConfig>("/orders/config", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify(config),
+      })
+      setDeliveryConfig(nextConfig)
+      return
+    } catch (error) {
+      console.error("Failed to update delivery config in API:", error)
+    }
 
-  const updateDeliveryConfig = (config: Partial<DeliveryConfig>) => {
-    setDeliveryConfig(prev => ({ ...prev, ...config }))
+    setDeliveryConfig((prev) => ({ ...prev, ...config }))
   }
 
   return (
-    <OrdersContext.Provider value={{
-      orders,
-      getOrderById,
-      getOrdersByStatus,
-      getOrdersByClient,
-      cart,
-      addToCart,
-      removeFromCart,
-      updateCartItemQuantity,
-      clearCart,
-      cartTotal,
-      cartItemsCount,
-      cartTotalPoints,
-      createOrder,
-      updateOrderStatus,
-      cancelOrder,
-      addStaffNote,
-      deliveryConfig,
-      updateDeliveryConfig,
-      getDeliveryFee,
-      getEstimatedTime,
-    }}>
+    <OrdersContext.Provider
+      value={{
+        orders,
+        getOrderById,
+        getOrdersByStatus,
+        getOrdersByClient,
+        cart,
+        addToCart,
+        removeFromCart,
+        updateCartItemQuantity,
+        clearCart,
+        cartTotal,
+        cartItemsCount,
+        cartTotalPoints,
+        createOrder,
+        createOrderFromItems,
+        updateOrderStatus,
+        cancelOrder,
+        addStaffNote,
+        deliveryConfig,
+        updateDeliveryConfig,
+        getDeliveryFee,
+        getEstimatedTime,
+      }}
+    >
       {children}
     </OrdersContext.Provider>
   )

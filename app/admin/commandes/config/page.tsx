@@ -67,8 +67,8 @@ function DeliveryConfigContent() {
   }
 
   // Handle save
-  const handleSave = () => {
-    updateDeliveryConfig(config)
+  const handleSave = async () => {
+    await updateDeliveryConfig(config)
     addNotification({
       type: "success",
       title: "Configuration sauvegardee",
@@ -117,7 +117,7 @@ function DeliveryConfigContent() {
             </div>
             <Button
               className="bg-amber-500 hover:bg-amber-600"
-              onClick={handleSave}
+              onClick={() => void handleSave()}
               disabled={!hasChanges}
             >
               <SaveIcon className="h-4 w-4 mr-2" />
@@ -135,7 +135,7 @@ function DeliveryConfigContent() {
             <p className="text-sm text-amber-700 flex-1">
               Vous avez des modifications non sauvegardees
             </p>
-            <Button size="sm" className="bg-amber-500 hover:bg-amber-600" onClick={handleSave}>
+            <Button size="sm" className="bg-amber-500 hover:bg-amber-600" onClick={() => void handleSave()}>
               Sauvegarder
             </Button>
           </Card>

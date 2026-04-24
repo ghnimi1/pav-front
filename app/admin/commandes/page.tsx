@@ -175,8 +175,8 @@ function AdminOrdersContent() {
   ]
 
   // Handle status change
-  const handleStatusChange = (order: RemoteOrder, newStatus: OrderStatus) => {
-    updateOrderStatus(order.id, newStatus, user?.id)
+  const handleStatusChange = async (order: RemoteOrder, newStatus: OrderStatus) => {
+    await updateOrderStatus(order.id, newStatus, user?.id)
 
     // Credit points when order is completed
     if (newStatus === "completed" && order.clientEmail) {
@@ -205,9 +205,9 @@ function AdminOrdersContent() {
   }
 
   // Handle cancel
-  const handleCancel = () => {
+  const handleCancel = async () => {
     if (selectedOrder) {
-      cancelOrder(selectedOrder.id, cancelReason)
+      await cancelOrder(selectedOrder.id, cancelReason)
       setCancelDialogOpen(false)
       setCancelReason("")
       setSelectedOrder(null)
@@ -338,7 +338,7 @@ function AdminOrdersContent() {
               className="bg-amber-500 hover:bg-amber-600"
               onClick={(e) => {
                 e.stopPropagation()
-                handleStatusChange(order, nextStatusMap[order.status]!)
+                void handleStatusChange(order, nextStatusMap[order.status]!)
               }}
             >
               <PlayIcon className="h-4 w-4 mr-1" />
@@ -355,7 +355,7 @@ function AdminOrdersContent() {
               className="bg-emerald-600 hover:bg-emerald-700"
               onClick={(e) => {
                 e.stopPropagation()
-                handleStatusChange(order, "completed")
+                void handleStatusChange(order, "completed")
               }}
             >
               <CheckCircleIcon className="h-4 w-4 mr-1" />
@@ -743,7 +743,7 @@ function AdminOrdersContent() {
                       <Button
                         className="bg-amber-500 hover:bg-amber-600"
                         onClick={() => {
-                          handleStatusChange(selectedOrder, nextStatusMap[selectedOrder.status]!)
+                          void handleStatusChange(selectedOrder, nextStatusMap[selectedOrder.status]!)
                           setDetailsOpen(false)
                         }}
                       >
@@ -759,7 +759,7 @@ function AdminOrdersContent() {
                       <Button
                         className="bg-emerald-600 hover:bg-emerald-700"
                         onClick={() => {
-                          handleStatusChange(selectedOrder, "completed")
+                          void handleStatusChange(selectedOrder, "completed")
                           setDetailsOpen(false)
                         }}
                       >
@@ -799,7 +799,7 @@ function AdminOrdersContent() {
             <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
               Retour
             </Button>
-            <Button variant="destructive" onClick={handleCancel}>
+            <Button variant="destructive" onClick={() => void handleCancel()}>
               <XCircleIcon className="h-4 w-4 mr-2" />
               Confirmer l&apos;annulation
             </Button>
