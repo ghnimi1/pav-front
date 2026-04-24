@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { NotificationProvider } from "@/contexts/notification-context"
 
 function ClientCardsContent() {
   const { user } = useAuth()
@@ -360,6 +361,7 @@ function ClientCardsContent() {
 
 export default function ClientCartesPage() {
   return (
+    <NotificationProvider>
     <AuthProvider>
       <StockProvider>
         <LoyaltyProvider>
@@ -369,5 +371,6 @@ export default function ClientCartesPage() {
         </LoyaltyProvider>
       </StockProvider>
     </AuthProvider>
+    </NotificationProvider>
   )
 }
