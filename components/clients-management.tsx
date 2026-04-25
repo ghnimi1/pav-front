@@ -1,26 +1,42 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
+import { apiGet } from "@/lib/api-client"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Card } from "./ui/card"
 import { Badge } from "./ui/badge"
 import {
-  SearchIcon,
-  UserPlusIcon,
+  CalendarIcon,
   EditIcon,
-  TrashIcon,
   MailIcon,
   PhoneIcon,
-  CalendarIcon,
+  SearchIcon,
+  TrashIcon,
   TrophyIcon,
+  UserPlusIcon,
 } from "lucide-react"
 import { useNotification } from "@/contexts/notification-context"
 import type { User, LoyaltyTier } from "@/contexts/auth-context"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog"
 import { Label } from "./ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
 import { Pagination } from "./pagination"
+
+type ClientApiUser = {
+  _id?: string
+  id?: string
+  email: string
+  name: string
+  role: "client" | "admin" | "user"
+  createdAt: string
+  phone?: string
+  loyaltyPoints?: number
+  loyaltyTier?: "bronze" | "silver" | "gold" | "diamond" | "platinum"
+  totalSpent?: number
+}
+
+type ClientRow = User & { phone?: string }
 
 const tierOptions: { value: LoyaltyTier; label: string }[] = [
   { value: "bronze", label: "Bronze" },
@@ -30,13 +46,13 @@ const tierOptions: { value: LoyaltyTier; label: string }[] = [
 ]
 
 export function ClientsManagement() {
-  const [clients, setClients] = useState<User[]>([])
+  const [clients, setClients] = useState<ClientRow[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedTier, setSelectedTier] = useState<string>("all")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [selectedClient, setSelectedClient] = useState<User | null>(null)
+  const [selectedClient, setSelectedClient] = useState<ClientRow | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(12)
   const { addNotification } = useNotification()
@@ -51,12 +67,30 @@ export function ClientsManagement() {
   })
 
   useEffect(() => {
-    loadClients()
+    void loadClients()
   }, [])
 
-  const loadClients = () => {
-    const storedClients = JSON.parse(localStorage.getItem("clients") || "[]")
-    setClients(storedClients.filter((c: User) => c.role === "client"))
+  const normalizeClient = (client: ClientApiUser): ClientRow => ({
+    id: client.id || client._id || "",
+    email: client.email,
+    name: client.name,
+    role: "client",
+    createdAt: client.createdAt,
+    loyaltyPoints: client.loyaltyPoints || 0,
+    loyaltyTier: client.loyaltyTier === "diamond" ? "platinum" : (client.loyaltyTier || "bronze"),
+    totalSpent: client.totalSpent || 0,
+    phone: client.phone,
+  })
+
+  const loadClients = async () => {
+    try {
+      const response = await apiGet<{ clients: ClientApiUser[] }>("/auth/clients")
+      setClients(response.clients.map(normalizeClient))
+    } catch (error) {
+      console.error("Failed to load clients from backend:", error)
+      setClients([])
+      addNotification("error", "Chargement impossible", "La liste des clients n'a pas pu etre chargee depuis le serveur")
+    }
   }
 
   const resetForm = () => {
@@ -72,62 +106,33 @@ export function ClientsManagement() {
 
   const handleAdd = () => {
     if (!formData.name || !formData.email) {
-      addNotification("Veuillez remplir tous les champs obligatoires", "error")
+      addNotification("error", "Champs obligatoires", "Veuillez remplir le nom et l'email")
       return
     }
 
-    const existingClient = clients.find((c) => c.email === formData.email)
-    if (existingClient) {
-      addNotification("Un client avec cet email existe déjà", "error")
-      return
-    }
-
-    const newClient: User = {
-      id: `client-${Date.now()}`,
-      ...formData,
-      role: "client",
-      createdAt: new Date().toISOString(),
-    }
-
-    const updatedClients = [...clients, newClient]
-    setClients(updatedClients)
-
-    const allClients = JSON.parse(localStorage.getItem("clients") || "[]")
-    localStorage.setItem("clients", JSON.stringify([...allClients, { ...newClient, password: "password123" }]))
-
-    addNotification("Client ajouté avec succès", "success")
+    addNotification("info", "Backend requis", "L'ajout de client doit maintenant passer par le serveur")
     setIsAddDialogOpen(false)
     resetForm()
   }
 
   const handleEdit = () => {
     if (!selectedClient || !formData.name || !formData.email) {
-      addNotification("Veuillez remplir tous les champs obligatoires", "error")
+      addNotification("error", "Champs obligatoires", "Veuillez remplir le nom et l'email")
       return
     }
 
-    const updatedClients = clients.map((c) =>
-      c.id === selectedClient.id
-        ? {
-            ...c,
-            ...formData,
-          }
-        : c,
+    setClients((prev) =>
+      prev.map((client) =>
+        client.id === selectedClient.id
+          ? {
+              ...client,
+              ...formData,
+            }
+          : client
+      )
     )
-    setClients(updatedClients)
 
-    const allClients = JSON.parse(localStorage.getItem("clients") || "[]")
-    const updatedAllClients = allClients.map((c: any) =>
-      c.id === selectedClient.id
-        ? {
-            ...c,
-            ...formData,
-          }
-        : c,
-    )
-    localStorage.setItem("clients", JSON.stringify(updatedAllClients))
-
-    addNotification("Client modifié avec succès", "success")
+    addNotification("info", "Backend requis", "La modification client doit maintenant etre persistee cote serveur")
     setIsEditDialogOpen(false)
     setSelectedClient(null)
     resetForm()
@@ -136,24 +141,18 @@ export function ClientsManagement() {
   const handleDelete = () => {
     if (!selectedClient) return
 
-    const updatedClients = clients.filter((c) => c.id !== selectedClient.id)
-    setClients(updatedClients)
-
-    const allClients = JSON.parse(localStorage.getItem("clients") || "[]")
-    const updatedAllClients = allClients.filter((c: any) => c.id !== selectedClient.id)
-    localStorage.setItem("clients", JSON.stringify(updatedAllClients))
-
-    addNotification("Client supprimé avec succès", "success")
+    setClients((prev) => prev.filter((client) => client.id !== selectedClient.id))
+    addNotification("info", "Backend requis", "La suppression client doit maintenant etre persistee cote serveur")
     setIsDeleteDialogOpen(false)
     setSelectedClient(null)
   }
 
-  const openEditDialog = (client: User) => {
+  const openEditDialog = (client: ClientRow) => {
     setSelectedClient(client)
     setFormData({
       name: client.name,
       email: client.email,
-      phone: (client as any).phone || "",
+      phone: client.phone || "",
       loyaltyPoints: client.loyaltyPoints || 0,
       loyaltyTier: client.loyaltyTier || "bronze",
       totalSpent: client.totalSpent || 0,
@@ -161,7 +160,7 @@ export function ClientsManagement() {
     setIsEditDialogOpen(true)
   }
 
-  const openDeleteDialog = (client: User) => {
+  const openDeleteDialog = (client: ClientRow) => {
     setSelectedClient(client)
     setIsDeleteDialogOpen(true)
   }
@@ -179,17 +178,16 @@ export function ClientsManagement() {
 
   const stats = {
     totalClients: clients.length,
-    totalPoints: clients.reduce((sum, c) => sum + (c.loyaltyPoints || 0), 0),
-    totalSpent: clients.reduce((sum, c) => sum + (c.totalSpent || 0), 0),
+    totalPoints: clients.reduce((sum, client) => sum + (client.loyaltyPoints || 0), 0),
+    totalSpent: clients.reduce((sum, client) => sum + (client.totalSpent || 0), 0),
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-semibold text-foreground">Gestion des Clients</h1>
-          <p className="text-muted-foreground">Gérez les informations de vos clients</p>
+          <p className="text-muted-foreground">Gerez les informations de vos clients</p>
         </div>
         <Button onClick={() => setIsAddDialogOpen(true)}>
           <UserPlusIcon className="mr-2 h-4 w-4" />
@@ -197,7 +195,6 @@ export function ClientsManagement() {
         </Button>
       </div>
 
-      {/* Statistics */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="p-6">
           <div className="flex items-center justify-between">
@@ -236,7 +233,6 @@ export function ClientsManagement() {
         </Card>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="relative flex-1 max-w-md">
           <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -249,11 +245,7 @@ export function ClientsManagement() {
         </div>
 
         <div className="flex gap-2">
-          <Button
-            variant={selectedTier === "all" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedTier("all")}
-          >
+          <Button variant={selectedTier === "all" ? "default" : "outline"} size="sm" onClick={() => setSelectedTier("all")}>
             Tous
           </Button>
           {tierOptions.map((tier) => (
@@ -269,66 +261,57 @@ export function ClientsManagement() {
         </div>
       </div>
 
-      {/* Clients Table */}
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                <th className="pb-3 text-left text-sm font-medium text-muted-foreground p-4">Client</th>
-                <th className="pb-3 text-left text-sm font-medium text-muted-foreground p-4">Contact</th>
-                <th className="pb-3 text-left text-sm font-medium text-muted-foreground p-4">Niveau</th>
-                <th className="pb-3 text-right text-sm font-medium text-muted-foreground p-4">Points</th>
-                <th className="pb-3 text-right text-sm font-medium text-muted-foreground p-4">Dépenses</th>
-                <th className="pb-3 text-center text-sm font-medium text-muted-foreground p-4">Actions</th>
+                <th className="p-4 pb-3 text-left text-sm font-medium text-muted-foreground">Client</th>
+                <th className="p-4 pb-3 text-left text-sm font-medium text-muted-foreground">Contact</th>
+                <th className="p-4 pb-3 text-left text-sm font-medium text-muted-foreground">Niveau</th>
+                <th className="p-4 pb-3 text-right text-sm font-medium text-muted-foreground">Points</th>
+                <th className="p-4 pb-3 text-right text-sm font-medium text-muted-foreground">Depenses</th>
+                <th className="p-4 pb-3 text-center text-sm font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody>
               {paginatedClients.map((client) => (
                 <tr key={client.id} className="border-b border-border last:border-0">
-                  <td className="py-4 p-4">
+                  <td className="p-4 py-4">
                     <div>
                       <p className="font-medium text-foreground">{client.name}</p>
-                      <p className="text-sm text-muted-foreground flex items-center gap-1">
+                      <p className="flex items-center gap-1 text-sm text-muted-foreground">
                         <CalendarIcon className="h-3 w-3" />
                         {new Date(client.createdAt).toLocaleDateString("fr-FR")}
                       </p>
                     </div>
                   </td>
-                  <td className="py-4 p-4">
+                  <td className="p-4 py-4">
                     <div className="space-y-1">
-                      <p className="text-sm text-foreground flex items-center gap-1">
+                      <p className="flex items-center gap-1 text-sm text-foreground">
                         <MailIcon className="h-3 w-3" />
                         {client.email}
                       </p>
-                      {(client as any).phone && (
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                      {client.phone && (
+                        <p className="flex items-center gap-1 text-sm text-muted-foreground">
                           <PhoneIcon className="h-3 w-3" />
-                          {(client as any).phone}
+                          {client.phone}
                         </p>
                       )}
                     </div>
                   </td>
-                  <td className="py-4 p-4">
-                    <Badge
-                      variant={
-                        client.loyaltyTier === "platinum"
-                          ? "default"
-                          : client.loyaltyTier === "gold"
-                            ? "secondary"
-                            : "outline"
-                      }
-                    >
-                      {tierOptions.find((t) => t.value === client.loyaltyTier)?.label || "Bronze"}
+                  <td className="p-4 py-4">
+                    <Badge variant={client.loyaltyTier === "platinum" ? "default" : client.loyaltyTier === "gold" ? "secondary" : "outline"}>
+                      {tierOptions.find((tier) => tier.value === client.loyaltyTier)?.label || "Bronze"}
                     </Badge>
                   </td>
-                  <td className="py-4 text-right p-4">
+                  <td className="p-4 py-4 text-right">
                     <span className="font-medium text-foreground">{client.loyaltyPoints || 0}</span>
                   </td>
-                  <td className="py-4 text-right p-4">
+                  <td className="p-4 py-4 text-right">
                     <span className="font-medium text-foreground">{(client.totalSpent || 0).toFixed(2)} TND</span>
                   </td>
-                  <td className="py-4 p-4">
+                  <td className="p-4 py-4">
                     <div className="flex items-center justify-center gap-2">
                       <Button variant="ghost" size="icon" onClick={() => openEditDialog(client)}>
                         <EditIcon className="h-4 w-4" />
@@ -345,7 +328,6 @@ export function ClientsManagement() {
         </div>
       </Card>
 
-      {/* Pagination */}
       {filteredClients.length > 0 && (
         <Pagination
           currentPage={currentPage}
@@ -364,13 +346,12 @@ export function ClientsManagement() {
         <div className="flex min-h-[300px] items-center justify-center">
           <div className="text-center">
             <UserPlusIcon className="mx-auto h-12 w-12 text-muted-foreground" />
-            <p className="mt-4 text-lg font-medium text-foreground">Aucun client trouvé</p>
-            <p className="text-sm text-muted-foreground">Ajoutez votre premier client ou modifiez vos filtres</p>
+            <p className="mt-4 text-lg font-medium text-foreground">Aucun client trouve</p>
+            <p className="text-sm text-muted-foreground">La liste est maintenant chargee uniquement depuis le serveur</p>
           </div>
         </div>
       )}
 
-      {/* Add Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -380,59 +361,29 @@ export function ClientsManagement() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Nom complet *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Nom du client"
-              />
+              <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Nom du client" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email *</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="email@exemple.com"
-              />
+              <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="email@exemple.com" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">Téléphone</Label>
-              <Input
-                id="phone"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="+216 XX XXX XXX"
-              />
+              <Label htmlFor="phone">Telephone</Label>
+              <Input id="phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="+216 XX XXX XXX" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="loyaltyPoints">Points de fidélité</Label>
-                <Input
-                  id="loyaltyPoints"
-                  type="number"
-                  value={formData.loyaltyPoints}
-                  onChange={(e) => setFormData({ ...formData, loyaltyPoints: Number.parseInt(e.target.value) || 0 })}
-                />
+                <Label htmlFor="loyaltyPoints">Points de fidelite</Label>
+                <Input id="loyaltyPoints" type="number" value={formData.loyaltyPoints} onChange={(e) => setFormData({ ...formData, loyaltyPoints: Number.parseInt(e.target.value) || 0 })} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="totalSpent">Dépenses totales (TND)</Label>
-                <Input
-                  id="totalSpent"
-                  type="number"
-                  step="0.01"
-                  value={formData.totalSpent}
-                  onChange={(e) => setFormData({ ...formData, totalSpent: Number.parseFloat(e.target.value) || 0 })}
-                />
+                <Label htmlFor="totalSpent">Depenses totales (TND)</Label>
+                <Input id="totalSpent" type="number" step="0.01" value={formData.totalSpent} onChange={(e) => setFormData({ ...formData, totalSpent: Number.parseFloat(e.target.value) || 0 })} />
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="tier">Niveau de fidélité</Label>
-              <Select
-                value={formData.loyaltyTier}
-                onValueChange={(value: LoyaltyTier) => setFormData({ ...formData, loyaltyTier: value })}
-              >
+              <Label htmlFor="tier">Niveau de fidelite</Label>
+              <Select value={formData.loyaltyTier} onValueChange={(value: LoyaltyTier) => setFormData({ ...formData, loyaltyTier: value })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -455,7 +406,6 @@ export function ClientsManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -465,59 +415,29 @@ export function ClientsManagement() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="edit-name">Nom complet *</Label>
-              <Input
-                id="edit-name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Nom du client"
-              />
+              <Input id="edit-name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Nom du client" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-email">Email *</Label>
-              <Input
-                id="edit-email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="email@exemple.com"
-              />
+              <Input id="edit-email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="email@exemple.com" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-phone">Téléphone</Label>
-              <Input
-                id="edit-phone"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="+216 XX XXX XXX"
-              />
+              <Label htmlFor="edit-phone">Telephone</Label>
+              <Input id="edit-phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="+216 XX XXX XXX" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-loyaltyPoints">Points de fidélité</Label>
-                <Input
-                  id="edit-loyaltyPoints"
-                  type="number"
-                  value={formData.loyaltyPoints}
-                  onChange={(e) => setFormData({ ...formData, loyaltyPoints: Number.parseInt(e.target.value) || 0 })}
-                />
+                <Label htmlFor="edit-loyaltyPoints">Points de fidelite</Label>
+                <Input id="edit-loyaltyPoints" type="number" value={formData.loyaltyPoints} onChange={(e) => setFormData({ ...formData, loyaltyPoints: Number.parseInt(e.target.value) || 0 })} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-totalSpent">Dépenses totales (TND)</Label>
-                <Input
-                  id="edit-totalSpent"
-                  type="number"
-                  step="0.01"
-                  value={formData.totalSpent}
-                  onChange={(e) => setFormData({ ...formData, totalSpent: Number.parseFloat(e.target.value) || 0 })}
-                />
+                <Label htmlFor="edit-totalSpent">Depenses totales (TND)</Label>
+                <Input id="edit-totalSpent" type="number" step="0.01" value={formData.totalSpent} onChange={(e) => setFormData({ ...formData, totalSpent: Number.parseFloat(e.target.value) || 0 })} />
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-tier">Niveau de fidélité</Label>
-              <Select
-                value={formData.loyaltyTier}
-                onValueChange={(value: LoyaltyTier) => setFormData({ ...formData, loyaltyTier: value })}
-              >
+              <Label htmlFor="edit-tier">Niveau de fidelite</Label>
+              <Select value={formData.loyaltyTier} onValueChange={(value: LoyaltyTier) => setFormData({ ...formData, loyaltyTier: value })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -540,14 +460,12 @@ export function ClientsManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Supprimer le client</DialogTitle>
             <DialogDescription>
-              Êtes-vous sûr de vouloir supprimer le client <strong>{selectedClient?.name}</strong> ? Cette action est
-              irréversible.
+              Etes-vous sur de vouloir supprimer le client <strong>{selectedClient?.name}</strong> ? Cette action est irreversible.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

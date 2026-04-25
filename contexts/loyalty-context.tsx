@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { apiPost, apiPut } from "@/lib/api-client"
+import { apiGet, apiPost, apiPut } from "@/lib/api-client"
 
 // ============================================
 // CONFIGURATION DU PROGRAMME DE FIDELITE
@@ -353,34 +353,12 @@ function buildLoyaltyClientFromAuth(authClient: StoredAuthClient): LoyaltyClient
 function syncClientToAuthStorage(client: LoyaltyClient) {
   if (typeof window === "undefined") return
 
-  const syncAuthClient = (raw: string | null, isArray: boolean) => {
+  const syncAuthClient = (raw: string | null) => {
     if (!raw) return
 
     try {
       const parsed = JSON.parse(raw)
-
-      if (isArray && Array.isArray(parsed)) {
-        const nextClients = parsed.map((entry: any) =>
-          entry?.id === client.id || entry?.email === client.email
-            ? {
-                ...entry,
-                loyaltyPoints: client.loyaltyPoints,
-                lifetimePoints: client.lifetimePoints,
-                loyaltyTier: client.tier,
-                totalSpent: client.totalSpent,
-                totalOrders: client.totalOrders,
-                lastVisit: client.lastVisit,
-                wallet: client.wallet,
-                referralCode: client.referralCode,
-                referralCount: client.referralCount,
-              }
-            : entry
-        )
-        localStorage.setItem("clients", JSON.stringify(nextClients))
-        return
-      }
-
-      if (!isArray && parsed && (parsed.id === client.id || parsed.email === client.email)) {
+      if (parsed && (parsed.id === client.id || parsed.email === client.email)) {
         localStorage.setItem(
           "currentUser",
           JSON.stringify({
@@ -400,8 +378,7 @@ function syncClientToAuthStorage(client: LoyaltyClient) {
     }
   }
 
-  syncAuthClient(localStorage.getItem("currentUser"), false)
-  syncAuthClient(localStorage.getItem("clients"), true)
+  syncAuthClient(localStorage.getItem("currentUser"))
   window.dispatchEvent(new CustomEvent(AUTH_STORAGE_SYNC_EVENT))
 }
 
@@ -429,46 +406,15 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
   })
   const [shareLinks, setShareLinks] = useState<ShareLink[]>([])
 
-  const syncClientsFromStorage = (applyState = true) => {
-    const storedLoyaltyClients = localStorage.getItem("loyalty_clients")
-    const storedAuthClients = localStorage.getItem("clients")
+  const syncClientsFromCurrentUser = (applyState = true) => {
     const storedCurrentUser = localStorage.getItem("currentUser")
-
-    let loyaltyClients: LoyaltyClient[] = storedLoyaltyClients ? JSON.parse(storedLoyaltyClients) : []
-
-    if (storedAuthClients) {
-      const authClients = JSON.parse(storedAuthClients)
-      const clientsFromAuth = authClients.filter((c: any) => c.role === "client")
-
-      clientsFromAuth.forEach((authClient: StoredAuthClient) => {
-        const existingIndex = loyaltyClients.findIndex((client) => client.id === authClient.id || client.email === authClient.email)
-        if (existingIndex === -1) {
-          loyaltyClients.push(buildLoyaltyClientFromAuth(authClient))
-          return
-        }
-
-        loyaltyClients[existingIndex] = {
-          ...loyaltyClients[existingIndex],
-          ...buildLoyaltyClientFromAuth(authClient),
-          updatedAt: new Date().toISOString(),
-        }
-      })
-    }
+    const loyaltyClients: LoyaltyClient[] = []
 
     if (storedCurrentUser) {
       try {
         const currentUser = JSON.parse(storedCurrentUser) as StoredAuthClient & { role?: string }
         if (currentUser.role === "client") {
-          const existingIndex = loyaltyClients.findIndex((client) => client.id === currentUser.id || client.email === currentUser.email)
-          if (existingIndex === -1) {
-            loyaltyClients.push(buildLoyaltyClientFromAuth(currentUser))
-          } else {
-            loyaltyClients[existingIndex] = {
-              ...loyaltyClients[existingIndex],
-              ...buildLoyaltyClientFromAuth(currentUser),
-              updatedAt: new Date().toISOString(),
-            }
-          }
+          loyaltyClients.push(buildLoyaltyClientFromAuth(currentUser))
         }
       } catch {
         // ignore invalid storage
@@ -482,6 +428,34 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     return loyaltyClients
   }
 
+  const loadClientsFromBackend = async () => {
+    const token = localStorage.getItem("authToken")
+    if (!token) {
+      syncClientsFromCurrentUser()
+      return
+    }
+
+    try {
+      const response = await apiGet<{
+        clients: Array<StoredAuthClient & { _id?: string }>
+      }>("/auth/clients")
+
+      const nextClients = response.clients.map((client) =>
+        buildLoyaltyClientFromAuth({
+          ...client,
+          id: client.id || client._id || "",
+        })
+      )
+
+      setClients(nextClients)
+      return
+    } catch (error) {
+      console.error("Failed to load loyalty clients from backend:", error)
+    }
+
+    syncClientsFromCurrentUser()
+  }
+
   useEffect(() => {
     const storedTransactions = localStorage.getItem("loyalty_transactions")
     const storedRewards = localStorage.getItem("loyalty_rewards")
@@ -493,7 +467,7 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     const storedReferralConfig = localStorage.getItem("loyalty_referral_config")
     const storedShareLinks = localStorage.getItem("loyalty_share_links")
 
-    syncClientsFromStorage()
+    syncClientsFromCurrentUser()
     if (storedTransactions) setTransactions(JSON.parse(storedTransactions))
     if (storedRewards) setRewards(JSON.parse(storedRewards))
     else setRewards(getInitialRewards())
@@ -507,8 +481,10 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     if (storedReferralConfig) setReferralConfig(JSON.parse(storedReferralConfig))
     if (storedShareLinks) setShareLinks(JSON.parse(storedShareLinks))
 
+    void loadClientsFromBackend()
+
     const handleAuthSync = () => {
-      syncClientsFromStorage()
+      void loadClientsFromBackend()
     }
 
     window.addEventListener(AUTH_STORAGE_SYNC_EVENT, handleAuthSync)
@@ -520,9 +496,6 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  useEffect(() => {
-    localStorage.setItem("loyalty_clients", JSON.stringify(clients))
-  }, [clients])
   useEffect(() => {
     localStorage.setItem("loyalty_transactions", JSON.stringify(transactions))
   }, [transactions])
@@ -610,19 +583,19 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     const existingClient = clients.find((c) => c.id === id)
     if (existingClient) return existingClient
 
-    return syncClientsFromStorage(false).find((client) => client.id === id)
+    return syncClientsFromCurrentUser(false).find((client) => client.id === id)
   }
   const getClientByEmail = (email: string) => {
     const existingClient = clients.find((c) => c.email === email)
     if (existingClient) return existingClient
 
-    return syncClientsFromStorage(false).find((client) => client.email === email)
+    return syncClientsFromCurrentUser(false).find((client) => client.email === email)
   }
   const getClientByPhone = (phone: string) => {
     const existingClient = clients.find((c) => c.phone === phone)
     if (existingClient) return existingClient
 
-    return syncClientsFromStorage(false).find((client) => client.phone === phone)
+    return syncClientsFromCurrentUser(false).find((client) => client.phone === phone)
   }
 
   const calculatePointsForPurchase = (amount: number, clientTier: LoyaltyTier): number => {
@@ -642,7 +615,7 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
   ) => {
     let client = clients.find((c) => c.id === clientId)
     if (!client) {
-      client = syncClientsFromStorage(false).find((entry) => entry.id === clientId)
+      client = syncClientsFromCurrentUser(false).find((entry) => entry.id === clientId)
     }
     if (!client) return
     if (points === 0) return

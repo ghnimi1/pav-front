@@ -195,23 +195,6 @@ function normalizeEmployee(apiUser: AuthApiUser): Employee {
 function syncClientUserStorage(user: User | null) {
   if (typeof window === "undefined") return
 
-  if (!user) {
-    window.dispatchEvent(new CustomEvent(AUTH_STORAGE_SYNC_EVENT))
-    return
-  }
-
-  if (user.role === "client") {
-    const rawClients = localStorage.getItem("clients")
-    const clients = rawClients ? JSON.parse(rawClients) : []
-    const nextClients = Array.isArray(clients)
-      ? clients.some((client) => client.id === user.id || client.email === user.email)
-        ? clients.map((client) => (client.id === user.id || client.email === user.email ? { ...client, ...user } : client))
-        : [...clients, user]
-      : [user]
-
-    localStorage.setItem("clients", JSON.stringify(nextClients))
-  }
-
   window.dispatchEvent(new CustomEvent(AUTH_STORAGE_SYNC_EVENT))
 }
 
@@ -379,15 +362,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(updatedUser)
     localStorage.setItem("currentUser", JSON.stringify(updatedUser))
 
-    const clients = JSON.parse(localStorage.getItem("clients") || "[]")
-    const updatedClients = clients.map((client: User) => {
-      if (client.id === user.id) {
-        return { ...client, loyaltyPoints: newPoints, loyaltyTier: newTier, totalSpent: newTotalSpent }
-      }
-      return client
-    })
-    localStorage.setItem("clients", JSON.stringify(updatedClients))
-
     if (newTier !== user.loyaltyTier) {
       notify(addNotification, "success", `Felicitations! Vous etes passe au niveau ${newTier.toUpperCase()}!`)
     }
@@ -397,17 +371,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(updatedUser)
     localStorage.setItem("currentUser", JSON.stringify(updatedUser))
     syncClientUserStorage(updatedUser)
-
-    if (updatedUser.role === "client") {
-      const clients = JSON.parse(localStorage.getItem("clients") || "[]")
-      const updatedClients = clients.map((client: User) => {
-        if (client.id === updatedUser.id) {
-          return { ...client, ...updatedUser }
-        }
-        return client
-      })
-      localStorage.setItem("clients", JSON.stringify(updatedClients))
-    }
   }
 
   const addEmployee = async (employeeData: Omit<Employee, "id" | "createdAt" | "updatedAt" | "lastLogin">): Promise<boolean> => {
