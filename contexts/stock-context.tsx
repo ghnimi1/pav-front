@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "@/lib/api-client"
 
 // ============================================
 // STOCK HIERARCHY: Category > SubCategory > Product > Batch (FIFO)
@@ -314,35 +315,7 @@ interface StockContextType {
 
 const StockContext = createContext<StockContextType | undefined>(undefined)
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api").replace(/\/$/, "")
 const AUTH_TOKEN_KEY = "authToken"
-
-async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, init)
-  const payload = await response.json().catch(() => null)
-
-  if (!response.ok) {
-    const error = payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
-      ? payload.error
-      : "Une erreur est survenue"
-    throw new Error(error)
-  }
-
-  if (payload && typeof payload === "object" && "success" in payload && "data" in payload) {
-    return payload.data as T
-  }
-
-  return payload as T
-}
-
-function getAuthHeaders() {
-  if (typeof window === "undefined") return { "Content-Type": "application/json" }
-  const token = localStorage.getItem(AUTH_TOKEN_KEY)
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  }
-}
 
 // ============================================
 // API FUNCTIONS FOR MENU CATEGORIES
@@ -350,9 +323,7 @@ function getAuthHeaders() {
 
 async function fetchMenuCategories(): Promise<MenuCategory[]> {
   try {
-    const data = await fetchJson<MenuCategory[]>('/menu/categories/all', {
-      headers: getAuthHeaders(),
-    })
+    const data = await apiGet<MenuCategory[]>('/menu/categories/all')
     return data.map(c => ({
       ...c,
       id: (c as any)._id || c.id,
@@ -364,11 +335,7 @@ async function fetchMenuCategories(): Promise<MenuCategory[]> {
 }
 
 async function createMenuCategoryAPI(data: Omit<MenuCategory, 'id'>): Promise<MenuCategory> {
-  const result = await fetchJson<MenuCategory>('/menu/categories', {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify(data),
-  })
+  const result = await apiPost<MenuCategory>('/menu/categories', data)
   return {
     ...result,
     id: (result as any)._id || result.id,
@@ -376,18 +343,11 @@ async function createMenuCategoryAPI(data: Omit<MenuCategory, 'id'>): Promise<Me
 }
 
 async function updateMenuCategoryAPI(id: string, data: Partial<MenuCategory>): Promise<void> {
-  await fetchJson(`/menu/categories/${id}`, {
-    method: 'PUT',
-    headers: getAuthHeaders(),
-    body: JSON.stringify(data),
-  })
+  await apiPut(`/menu/categories/${id}`, data)
 }
 
 async function deleteMenuCategoryAPI(id: string): Promise<void> {
-  await fetchJson(`/menu/categories/${id}`, {
-    method: 'DELETE',
-    headers: getAuthHeaders(),
-  })
+  await apiDelete(`/menu/categories/${id}`)
 }
 
 // ============================================
@@ -396,9 +356,7 @@ async function deleteMenuCategoryAPI(id: string): Promise<void> {
 
 async function fetchMenuItems(): Promise<MenuItem[]> {
   try {
-    const data = await fetchJson<MenuItem[]>('/menu/items', {
-      headers: getAuthHeaders(),
-    })
+    const data = await apiGet<MenuItem[]>('/menu/items')
     return data.map(item => ({
       ...item,
       id: (item as any)._id || item.id,
@@ -412,44 +370,19 @@ async function fetchMenuItems(): Promise<MenuItem[]> {
 }
 
 async function createMenuItemAPI(formData: FormData): Promise<MenuItem> {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY)
-  const response = await fetch(`${API_BASE_URL}/menu/items`, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  })
-  const payload = await response.json()
-  if (!response.ok) {
-    throw new Error(payload.error || 'Failed to create menu item')
-  }
-  return payload.data
+  return apiPost<MenuItem>('/menu/items', formData)
 }
 
 async function updateMenuItemAPI(id: string, formData: FormData): Promise<void> {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY)
-  const response = await fetch(`${API_BASE_URL}/menu/items/${id}`, {
-    method: 'PUT',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  })
-  const payload = await response.json()
-  if (!response.ok) {
-    throw new Error(payload.error || 'Failed to update menu item')
-  }
+  await apiPut(`/menu/items/${id}`, formData)
 }
 
 async function deleteMenuItemAPI(id: string): Promise<void> {
-  await fetchJson(`/menu/items/${id}`, {
-    method: 'DELETE',
-    headers: getAuthHeaders(),
-  })
+  await apiDelete(`/menu/items/${id}`)
 }
 
 async function toggleMenuItemAvailabilityAPI(id: string): Promise<void> {
-  await fetchJson(`/menu/items/${id}/toggle`, {
-    method: 'PATCH',
-    headers: getAuthHeaders(),
-  })
+  await apiPatch(`/menu/items/${id}/toggle`)
 }
 
 // ============================================
@@ -458,9 +391,7 @@ async function toggleMenuItemAvailabilityAPI(id: string): Promise<void> {
 
 async function fetchOffers(): Promise<Offer[]> {
   try {
-    const data = await fetchJson<Offer[]>('/menu/offers/all', {
-      headers: getAuthHeaders(),
-    })
+    const data = await apiGet<Offer[]>('/menu/offers/all')
     return data.map(offer => ({
       ...offer,
       id: (offer as any)._id || offer.id,
@@ -472,11 +403,7 @@ async function fetchOffers(): Promise<Offer[]> {
 }
 
 async function createOfferAPI(data: Omit<Offer, 'id' | 'createdAt' | 'updatedAt'>): Promise<Offer> {
-  const result = await fetchJson<Offer>('/menu/offers', {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify(data),
-  })
+  const result = await apiPost<Offer>('/menu/offers', data)
   return {
     ...result,
     id: (result as any)._id || result.id,
@@ -484,18 +411,11 @@ async function createOfferAPI(data: Omit<Offer, 'id' | 'createdAt' | 'updatedAt'
 }
 
 async function updateOfferAPI(id: string, data: Partial<Offer>): Promise<void> {
-  await fetchJson(`/menu/offers/${id}`, {
-    method: 'PUT',
-    headers: getAuthHeaders(),
-    body: JSON.stringify(data),
-  })
+  await apiPut(`/menu/offers/${id}`, data)
 }
 
 async function deleteOfferAPI(id: string): Promise<void> {
-  await fetchJson(`/menu/offers/${id}`, {
-    method: 'DELETE',
-    headers: getAuthHeaders(),
-  })
+  await apiDelete(`/menu/offers/${id}`)
 }
 
 // ============================================
@@ -504,9 +424,7 @@ async function deleteOfferAPI(id: string): Promise<void> {
 
 async function fetchSupplements(): Promise<Supplement[]> {
   try {
-    const data = await fetchJson<Supplement[]>('/menu/supplements/all', {
-      headers: getAuthHeaders(),
-    })
+    const data = await apiGet<Supplement[]>('/menu/supplements/all')
     return data.map(s => ({
       ...s,
       id: (s as any)._id || s.id,
@@ -521,9 +439,7 @@ async function fetchSupplements(): Promise<Supplement[]> {
 
 async function fetchSupplementCategories(): Promise<SupplementCategory[]> {
   try {
-    const data = await fetchJson<SupplementCategory[]>('/menu/supplement-categories', {
-      headers: getAuthHeaders(),
-    })
+    const data = await apiGet<SupplementCategory[]>('/menu/supplement-categories')
     return data.map(c => ({
       ...c,
       id: (c as any)._id || c.id,
@@ -537,11 +453,7 @@ async function fetchSupplementCategories(): Promise<SupplementCategory[]> {
 }
 
 async function createSupplementAPI(data: Omit<Supplement, 'id' | 'createdAt' | 'updatedAt'>): Promise<Supplement> {
-  const result = await fetchJson<Supplement>('/menu/supplements', {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify(data),
-  })
+  const result = await apiPost<Supplement>('/menu/supplements', data)
   return {
     ...result,
     id: (result as any)._id || result.id,
@@ -551,26 +463,15 @@ async function createSupplementAPI(data: Omit<Supplement, 'id' | 'createdAt' | '
 }
 
 async function updateSupplementAPI(id: string, data: Partial<Supplement>): Promise<void> {
-  await fetchJson(`/menu/supplements/${id}`, {
-    method: 'PUT',
-    headers: getAuthHeaders(),
-    body: JSON.stringify(data),
-  })
+  await apiPut(`/menu/supplements/${id}`, data)
 }
 
 async function deleteSupplementAPI(id: string): Promise<void> {
-  await fetchJson(`/menu/supplements/${id}`, {
-    method: 'DELETE',
-    headers: getAuthHeaders(),
-  })
+  await apiDelete(`/menu/supplements/${id}`)
 }
 
 async function createSupplementCategoryAPI(data: Omit<SupplementCategory, 'id' | 'createdAt' | 'updatedAt'>): Promise<SupplementCategory> {
-  const result = await fetchJson<SupplementCategory>('/menu/supplement-categories', {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify(data),
-  })
+  const result = await apiPost<SupplementCategory>('/menu/supplement-categories', data)
   return {
     ...result,
     id: (result as any)._id || result.id,
@@ -580,18 +481,11 @@ async function createSupplementCategoryAPI(data: Omit<SupplementCategory, 'id' |
 }
 
 async function updateSupplementCategoryAPI(id: string, data: Partial<SupplementCategory>): Promise<void> {
-  await fetchJson(`/menu/supplement-categories/${id}`, {
-    method: 'PUT',
-    headers: getAuthHeaders(),
-    body: JSON.stringify(data),
-  })
+  await apiPut(`/menu/supplement-categories/${id}`, data)
 }
 
 async function deleteSupplementCategoryAPI(id: string): Promise<void> {
-  await fetchJson(`/menu/supplement-categories/${id}`, {
-    method: 'DELETE',
-    headers: getAuthHeaders(),
-  })
+  await apiDelete(`/menu/supplement-categories/${id}`)
 }
 
 // ============================================

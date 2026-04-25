@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api-client"
 
 // ============================================
 // TYPES ET INTERFACES
@@ -96,13 +97,6 @@ interface ApiEntity {
   id?: string
 }
 
-interface ApiResponse<T> {
-  success: boolean
-  data: T
-  error?: string
-}
-
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api").replace(/\/$/, "")
 const AUTH_TOKEN_KEY = "authToken"
 
 const defaultBaseFormulas: BaseFormula[] = [
@@ -185,32 +179,9 @@ function mapFormula(formula: ApiEntity & Omit<BaseFormula, "id">): BaseFormula {
   return { ...formula, id: normalizeId(formula) }
 }
 
-async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, init)
-  const payload = (await response.json().catch(() => null)) as ApiResponse<T> | T | null
-
-  if (!response.ok) {
-    const error =
-      payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
-        ? payload.error
-        : "Une erreur est survenue"
-    throw new Error(error)
-  }
-
-  if (payload && typeof payload === "object" && "success" in payload && "data" in payload) {
-    return payload.data as T
-  }
-
-  return payload as T
-}
-
 async function tryCreate<T>(path: string, body: unknown): Promise<T | null> {
   try {
-    return await fetchJson<T>(path, {
-      method: "POST",
-      headers: getAuthHeaders(),
-      body: JSON.stringify(body),
-    })
+    return await apiPost<T>(path, body)
   } catch (error) {
     const message = error instanceof Error ? error.message : ""
     if (message.toLowerCase().includes("existe")) {
@@ -218,20 +189,6 @@ async function tryCreate<T>(path: string, body: unknown): Promise<T | null> {
     }
     throw error
   }
-}
-
-function getAuthHeaders() {
-  if (typeof window === "undefined") return { "Content-Type": "application/json" }
-  const token = localStorage.getItem(AUTH_TOKEN_KEY)
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  }
-}
-
-function getAuthTokenHeader() {
-  const headers = getAuthHeaders()
-  return headers.Authorization ? { Authorization: headers.Authorization } : {}
 }
 
 function buildBreakfastItemFormData(item: Partial<BreakfastItem>) {
@@ -294,7 +251,7 @@ async function bootstrapBreakfastMenu() {
     )
   )
 
-  const createdCategories = await fetchJson<Array<ApiEntity & Omit<BreakfastCategory, "id">>>("/menu/breakfast/categories")
+  const createdCategories = await apiGet<Array<ApiEntity & Omit<BreakfastCategory, "id">>>("/menu/breakfast/categories")
   const categoryMap = new Map<string, string>()
   defaultCategories.forEach((category) => {
     const created = createdCategories.find((apiCategory) => apiCategory.name === category.name)
@@ -327,8 +284,8 @@ async function bootstrapBreakfastMenu() {
   )
 
   const [createdItems, createdFormulas] = await Promise.all([
-    fetchJson<Array<ApiEntity & Omit<BreakfastItem, "id">>>("/menu/breakfast/items"),
-    fetchJson<Array<ApiEntity & Omit<BaseFormula, "id">>>("/menu/breakfast/formulas"),
+    apiGet<Array<ApiEntity & Omit<BreakfastItem, "id">>>("/menu/breakfast/items"),
+    apiGet<Array<ApiEntity & Omit<BaseFormula, "id">>>("/menu/breakfast/formulas"),
   ])
 
   return {
@@ -359,9 +316,9 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
     const loadBreakfastMenu = async () => {
       try {
         let [apiCategories, apiItems, apiFormulas] = await Promise.all([
-          fetchJson<Array<ApiEntity & Omit<BreakfastCategory, "id">>>("/menu/breakfast/categories"),
-          fetchJson<Array<ApiEntity & Omit<BreakfastItem, "id">>>("/menu/breakfast/items"),
-          fetchJson<Array<ApiEntity & Omit<BaseFormula, "id">>>("/menu/breakfast/formulas"),
+          apiGet<Array<ApiEntity & Omit<BreakfastCategory, "id">>>("/menu/breakfast/categories"),
+          apiGet<Array<ApiEntity & Omit<BreakfastItem, "id">>>("/menu/breakfast/items"),
+          apiGet<Array<ApiEntity & Omit<BaseFormula, "id">>>("/menu/breakfast/formulas"),
         ])
 
         const hasToken = !!localStorage.getItem(AUTH_TOKEN_KEY)
@@ -412,11 +369,7 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
   const addCategory = (category: Omit<BreakfastCategory, "id">) => {
     void (async () => {
       try {
-        const created = await fetchJson<ApiEntity & Omit<BreakfastCategory, "id">>("/menu/breakfast/categories", {
-          method: "POST",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(category),
-        })
+        const created = await apiPost<ApiEntity & Omit<BreakfastCategory, "id">>("/menu/breakfast/categories", category)
         setCategories((prev) => [...prev, mapCategory(created)].sort((a, b) => a.order - b.order))
       } catch (error) {
         console.error("Failed to create breakfast category:", error)
@@ -427,11 +380,7 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
   const updateCategory = (id: string, updates: Partial<BreakfastCategory>) => {
     void (async () => {
       try {
-        await fetchJson(`/menu/breakfast/categories/${id}`, {
-          method: "PUT",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(updates),
-        })
+        await apiPut(`/menu/breakfast/categories/${id}`, updates)
         setCategories((prev) => prev.map((cat) => (cat.id === id ? { ...cat, ...updates } : cat)))
       } catch (error) {
         console.error("Failed to update breakfast category:", error)
@@ -442,10 +391,7 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
   const deleteCategory = (id: string) => {
     void (async () => {
       try {
-        await fetchJson(`/menu/breakfast/categories/${id}`, {
-          method: "DELETE",
-          headers: getAuthHeaders(),
-        })
+        await apiDelete(`/menu/breakfast/categories/${id}`)
         setCategories((prev) => prev.filter((cat) => cat.id !== id))
         setItems((prev) => prev.filter((item) => item.categoryId !== id))
       } catch (error) {
@@ -457,11 +403,10 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
   const addItem = (item: Omit<BreakfastItem, "id">) => {
     void (async () => {
       try {
-        const created = await fetchJson<ApiEntity & Omit<BreakfastItem, "id">>("/menu/breakfast/items", {
-          method: "POST",
-          headers: getAuthTokenHeader(),
-          body: buildBreakfastItemFormData(item),
-        })
+        const created = await apiPost<ApiEntity & Omit<BreakfastItem, "id">>(
+          "/menu/breakfast/items",
+          buildBreakfastItemFormData(item)
+        )
         setItems((prev) => [...prev, mapItem(created)])
       } catch (error) {
         console.error("Failed to create breakfast item:", error)
@@ -507,17 +452,7 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
 
       const formData = buildBreakfastItemFormData(mergedItem)
       
-      const response = await fetch(`${API_BASE_URL}/menu/breakfast/items/${id}`, {
-        method: "PUT",
-        headers: getAuthTokenHeader(),
-        body: formData,
-      })
-      
-      const result = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to update')
-      }
+      await apiPut(`/menu/breakfast/items/${id}`, formData)
       
       // Update local state with merged values
       setItems((prev) =>
@@ -541,10 +476,7 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
   const deleteItem = (id: string) => {
     void (async () => {
       try {
-        await fetchJson(`/menu/breakfast/items/${id}`, {
-          method: "DELETE",
-          headers: getAuthHeaders(),
-        })
+        await apiDelete(`/menu/breakfast/items/${id}`)
         setItems((prev) => prev.filter((item) => item.id !== id))
       } catch (error) {
         console.error("Failed to delete breakfast item:", error)
@@ -569,11 +501,10 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
   const addFormula = (formula: Omit<BaseFormula, "id">) => {
     void (async () => {
       try {
-        const created = await fetchJson<ApiEntity & Omit<BaseFormula, "id">>("/menu/breakfast/formulas", {
-          method: "POST",
-          headers: getAuthTokenHeader(),
-          body: buildBreakfastFormulaFormData(formula),
-        })
+        const created = await apiPost<ApiEntity & Omit<BaseFormula, "id">>(
+          "/menu/breakfast/formulas",
+          buildBreakfastFormulaFormData(formula)
+        )
         setBaseFormulas((prev) => [...prev, mapFormula(created)])
       } catch (error) {
         console.error("Failed to create breakfast formula:", error)
@@ -609,16 +540,7 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
           mergedFormula.imageFile = updates.imageFile
         }
 
-        await fetch(`${API_BASE_URL}/menu/breakfast/formulas/${id}`, {
-          method: "PUT",
-          headers: getAuthTokenHeader(),
-          body: buildBreakfastFormulaFormData(mergedFormula),
-        }).then(async (response) => {
-          const result = await response.json().catch(() => null)
-          if (!response.ok) {
-            throw new Error(result?.error || "Failed to update formula")
-          }
-        })
+        await apiPut(`/menu/breakfast/formulas/${id}`, buildBreakfastFormulaFormData(mergedFormula))
 
         setBaseFormulas((prev) =>
           prev.map((formula) =>
@@ -641,10 +563,7 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
   const deleteFormula = (id: string) => {
     void (async () => {
       try {
-        await fetchJson(`/menu/breakfast/formulas/${id}`, {
-          method: "DELETE",
-          headers: getAuthHeaders(),
-        })
+        await apiDelete(`/menu/breakfast/formulas/${id}`)
         setBaseFormulas((prev) => prev.filter((formula) => formula.id !== id))
       } catch (error) {
         console.error("Failed to delete breakfast formula:", error)

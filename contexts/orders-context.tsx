@@ -1,6 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import { apiGet, apiPatch, apiPost, apiPut } from "@/lib/api-client"
 
 export type OrderStatus = "new" | "confirmed" | "preparing" | "ready" | "delivering" | "completed" | "cancelled"
 export type DeliveryMode = "delivery" | "pickup"
@@ -107,7 +108,6 @@ interface OrdersContextType {
   getEstimatedTime: (mode: DeliveryMode) => number
 }
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api").replace(/\/$/, "")
 const AUTH_TOKEN_KEY = "authToken"
 
 const defaultDeliveryConfig: DeliveryConfig = {
@@ -139,30 +139,6 @@ function getCurrentUser() {
   }
 }
 
-function getAuthHeaders() {
-  const token = getAuthToken()
-  return token ? { Authorization: `Bearer ${token}` } : {}
-}
-
-async function readApi<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, init)
-  const payload = await response.json().catch(() => null)
-
-  if (!response.ok) {
-    const message =
-      payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
-        ? payload.error
-        : "Une erreur est survenue"
-    throw new Error(message)
-  }
-
-  if (payload && typeof payload === "object" && "data" in payload) {
-    return payload.data as T
-  }
-
-  return payload as T
-}
-
 function normalizeOrder(order: any): RemoteOrder {
   return {
     ...order,
@@ -189,7 +165,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
 
     const loadData = async () => {
       try {
-        const config = await readApi<DeliveryConfig>("/orders/config")
+        const config = await apiGet<DeliveryConfig>("/orders/config")
         setDeliveryConfig(config)
         localStorage.setItem("delivery-config", JSON.stringify(config))
       } catch (error) {
@@ -202,11 +178,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
         if (!token || !currentUser?.role) return
 
         if (currentUser.role === "admin") {
-          const apiOrders = await readApi<RemoteOrder[]>("/orders/all", {
-            headers: {
-              ...getAuthHeaders(),
-            },
-          })
+          const apiOrders = await apiGet<RemoteOrder[]>("/orders/all")
           const normalizedOrders = apiOrders.map(normalizeOrder)
           setOrders(normalizedOrders)
           localStorage.setItem("remote-orders", JSON.stringify(normalizedOrders))
@@ -214,11 +186,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
         }
 
         if (currentUser.role === "client") {
-          const apiOrders = await readApi<RemoteOrder[]>("/orders/my", {
-            headers: {
-              ...getAuthHeaders(),
-            },
-          })
+          const apiOrders = await apiGet<RemoteOrder[]>("/orders/my")
           const normalizedOrders = apiOrders.map(normalizeOrder)
           setOrders(normalizedOrders)
           localStorage.setItem("remote-orders", JSON.stringify(normalizedOrders))
@@ -338,12 +306,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
 
     try {
       const order = normalizeOrder(
-        await readApi<RemoteOrder>("/orders", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
+        await apiPost<RemoteOrder>("/orders", {
             items,
             subtotal: itemsTotal,
             total: itemsTotal + (deliveryMode === "delivery" ? getDeliveryFee(itemsTotal) : 0),
@@ -357,8 +320,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
             clientName: clientInfo.name,
             clientPhone: clientInfo.phone,
             customerNote,
-          }),
-        })
+          })
       )
 
       setOrders((prev) => [order, ...prev])
@@ -405,14 +367,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
 
   const updateOrderStatus: OrdersContextType["updateOrderStatus"] = async (orderId, status, staffId) => {
     try {
-      await readApi("/orders/" + orderId + "/status", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...getAuthHeaders(),
-        },
-        body: JSON.stringify({ status, staffId }),
-      })
+      await apiPatch("/orders/" + orderId + "/status", { status, staffId })
     } catch (error) {
       console.error("Failed to update order status in API:", error)
     }
@@ -439,14 +394,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
 
   const cancelOrder: OrdersContextType["cancelOrder"] = async (orderId, reason) => {
     try {
-      await readApi("/orders/" + orderId + "/cancel", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...getAuthHeaders(),
-        },
-        body: JSON.stringify({ reason }),
-      })
+      await apiPatch("/orders/" + orderId + "/cancel", { reason })
     } catch (error) {
       console.error("Failed to cancel order in API:", error)
     }
@@ -467,14 +415,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
 
   const addStaffNote: OrdersContextType["addStaffNote"] = async (orderId, note) => {
     try {
-      await readApi("/orders/" + orderId + "/staff-note", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...getAuthHeaders(),
-        },
-        body: JSON.stringify({ note }),
-      })
+      await apiPatch("/orders/" + orderId + "/staff-note", { note })
     } catch (error) {
       console.error("Failed to save staff note in API:", error)
     }
@@ -484,14 +425,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
 
   const updateDeliveryConfig: OrdersContextType["updateDeliveryConfig"] = async (config) => {
     try {
-      const nextConfig = await readApi<DeliveryConfig>("/orders/config", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...getAuthHeaders(),
-        },
-        body: JSON.stringify(config),
-      })
+      const nextConfig = await apiPut<DeliveryConfig>("/orders/config", config)
       setDeliveryConfig(nextConfig)
       return
     } catch (error) {

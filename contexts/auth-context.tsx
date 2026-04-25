@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 import { useNotification } from "./notification-context"
+import { apiPost, apiRequest } from "@/lib/api-client"
 
 export type UserRole = "admin" | "user" | "client"
 export type LoyaltyTier = "bronze" | "silver" | "gold" | "platinum"
@@ -132,7 +133,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api").replace(/\/$/, "")
 const AUTH_TOKEN_KEY = "authToken"
 
 const defaultSuperAdmin: Employee = {
@@ -191,43 +191,20 @@ function normalizeEmployee(apiUser: AuthApiUser): Employee {
   }
 }
 
-async function parseResponse<T>(response: Response): Promise<T> {
-  const data = await response.json().catch(() => null)
-
-  if (!response.ok) {
-    const errorMessage =
-      data && typeof data === "object" && "error" in data && typeof data.error === "string"
-        ? data.error
-        : "Une erreur est survenue"
-    throw new Error(errorMessage)
-  }
-
-  return data as T
-}
-
 async function postAuth<TBody>(path: string, body: TBody): Promise<AuthApiResponse> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  })
-
-  return parseResponse<AuthApiResponse>(response)
+  return apiPost<AuthApiResponse>(path, body, { skipAuth: true })
 }
 
-async function fetchWithAuth<T>(path: string, token: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
+async function fetchWithAuth<T>(path: string, token: string, init?: { method?: string; body?: unknown }): Promise<T> {
+  return apiRequest<T>({
+    url: path,
+    method: init?.method || "GET",
+    data: init?.body,
     headers: {
-      "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
-      ...(init?.headers || {}),
     },
+    skipAuth: true,
   })
-
-  return parseResponse<T>(response)
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -414,7 +391,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetchWithAuth<EmployeeApiResponse>("/auth/employees", token, {
         method: "POST",
-        body: JSON.stringify({
+        body: {
           name: employeeData.name,
           email: employeeData.email,
           phone: employeeData.phone,
@@ -422,7 +399,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           employeeRole: employeeData.role,
           permissions: employeeData.permissions,
           isActive: employeeData.isActive,
-        }),
+        },
       })
 
       const nextEmployees = [normalizeEmployee(response.employee), ...employees]
@@ -447,7 +424,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetchWithAuth<EmployeeApiResponse>(`/auth/employees/${id}`, token, {
         method: "PUT",
-        body: JSON.stringify({
+        body: {
           name: updates.name,
           email: updates.email,
           phone: updates.phone,
@@ -455,7 +432,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           employeeRole: updates.role,
           permissions: updates.permissions,
           isActive: updates.isActive,
-        }),
+        },
       })
 
       const updatedEmployee = normalizeEmployee(response.employee)
@@ -493,9 +470,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      await fetchWithAuth<{ success: boolean }>(`/auth/employees/${id}`, token, {
-        method: "DELETE",
-      })
+      await fetchWithAuth<{ success: boolean }>(`/auth/employees/${id}`, token, { method: "DELETE" })
 
       const nextEmployees = employees.filter((employee) => employee.id !== id)
       setEmployees(nextEmployees)
