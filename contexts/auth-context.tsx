@@ -134,6 +134,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 const AUTH_TOKEN_KEY = "authToken"
+const AUTH_STORAGE_SYNC_EVENT = "pav-auth-storage-sync"
 
 const defaultSuperAdmin: Employee = {
   id: "super-admin-1",
@@ -189,6 +190,29 @@ function normalizeEmployee(apiUser: AuthApiUser): Employee {
     updatedAt: apiUser.updatedAt || apiUser.createdAt,
     lastLogin: apiUser.lastLogin,
   }
+}
+
+function syncClientUserStorage(user: User | null) {
+  if (typeof window === "undefined") return
+
+  if (!user) {
+    window.dispatchEvent(new CustomEvent(AUTH_STORAGE_SYNC_EVENT))
+    return
+  }
+
+  if (user.role === "client") {
+    const rawClients = localStorage.getItem("clients")
+    const clients = rawClients ? JSON.parse(rawClients) : []
+    const nextClients = Array.isArray(clients)
+      ? clients.some((client) => client.id === user.id || client.email === user.email)
+        ? clients.map((client) => (client.id === user.id || client.email === user.email ? { ...client, ...user } : client))
+        : [...clients, user]
+      : [user]
+
+    localStorage.setItem("clients", JSON.stringify(nextClients))
+  }
+
+  window.dispatchEvent(new CustomEvent(AUTH_STORAGE_SYNC_EVENT))
 }
 
 async function postAuth<TBody>(path: string, body: TBody): Promise<AuthApiResponse> {
@@ -254,6 +278,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setEmployees(normalizedEmployees)
         localStorage.setItem("currentUser", JSON.stringify(normalizedUser))
         localStorage.setItem("employees", JSON.stringify(normalizedEmployees))
+        syncClientUserStorage(normalizedUser)
       } catch {
         localStorage.removeItem(AUTH_TOKEN_KEY)
         localStorage.removeItem("currentUser")
@@ -284,6 +309,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(normalizedUser)
       localStorage.setItem("currentUser", JSON.stringify(normalizedUser))
       localStorage.setItem(AUTH_TOKEN_KEY, token)
+      syncClientUserStorage(normalizedUser)
 
       try {
         const employeeResponse = await fetchWithAuth<EmployeesApiResponse>("/auth/employees", token)
@@ -312,6 +338,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(normalizedUser)
       localStorage.setItem("currentUser", JSON.stringify(normalizedUser))
       localStorage.setItem(AUTH_TOKEN_KEY, token)
+      syncClientUserStorage(normalizedUser)
       notify(addNotification, "success", "Compte cree avec succes", "Bienvenue dans notre programme de fidelite")
       return true
     } catch (error) {
@@ -327,6 +354,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("currentUser")
     localStorage.removeItem("employees")
     localStorage.removeItem(AUTH_TOKEN_KEY)
+    syncClientUserStorage(null)
     notify(addNotification, "success", "Deconnexion reussie")
   }
 
@@ -368,6 +396,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateUser = (updatedUser: User) => {
     setUser(updatedUser)
     localStorage.setItem("currentUser", JSON.stringify(updatedUser))
+    syncClientUserStorage(updatedUser)
 
     if (updatedUser.role === "client") {
       const clients = JSON.parse(localStorage.getItem("clients") || "[]")

@@ -91,7 +91,7 @@ function AdminOrdersContent() {
   const router = useRouter()
   const { user, isAuthenticated } = useAuth()
   const { addNotification } = useNotification()
-  const { addPoints, getClientByEmail, updateClient } = useLoyalty()
+  const { addPoints, getClientByEmail, getClientById, updateClient } = useLoyalty()
   const {
     orders,
     updateOrderStatus,
@@ -179,21 +179,31 @@ function AdminOrdersContent() {
     await updateOrderStatus(order.id, newStatus, user?.id)
 
     // Credit points when order is completed
-    if (newStatus === "completed" && order.clientEmail) {
-      const client = getClientByEmail(order.clientEmail)
-      if (client && order.totalPoints > 0) {
-        addPoints(
-          client.id,
-          order.totalPoints,
-          "earn",
-          `Commande ${order.orderNumber}`,
-          { orderId: order.id }
-        )
-        updateClient(client.id, {
+    if (newStatus === "completed") {
+      const client = (order.clientId && getClientById(order.clientId)) || (order.clientEmail && getClientByEmail(order.clientEmail))
+      if (client) {
+        const loyaltyMetadata = {
+          orderId: order.id,
           totalSpent: (client.totalSpent || 0) + order.total,
-          totalOrders: (client.totalOrders || 0) + 1,
-          lastVisit: new Date().toISOString()
-        })
+          totalOrdersIncrement: 1,
+          lastVisit: new Date().toISOString(),
+        }
+
+        if (order.totalPoints > 0) {
+          addPoints(
+            client.id,
+            order.totalPoints,
+            "earn",
+            `Commande ${order.orderNumber}`,
+            loyaltyMetadata
+          )
+        } else {
+          updateClient(client.id, {
+            totalSpent: loyaltyMetadata.totalSpent,
+            totalOrders: (client.totalOrders || 0) + 1,
+            lastVisit: loyaltyMetadata.lastVisit,
+          })
+        }
       }
     }
 

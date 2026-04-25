@@ -47,7 +47,7 @@ const ITEMS_PER_PAGE = 20
 
 export function BreakfastOrdersManagement() {
   const { orders, validateOrder, cancelOrder } = useBreakfast()
-  const { addPoints, getClientByEmail, updateClient } = useLoyalty()
+  const { addPoints, getClientByEmail, getClientById, updateClient } = useLoyalty()
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null)
   const [tableNumber, setTableNumber] = useState("")
   const [ticketNumber, setTicketNumber] = useState("")
@@ -160,9 +160,16 @@ const handleValidate = () => {
       const order = orders.find(o => o.id === selectedOrder)
       
       // Credit points to client if they have a clientEmail
-      if (order?.clientEmail) {
-        const client = getClientByEmail(order.clientEmail)
+      if (order) {
+        const client = (order.clientId && getClientById(order.clientId)) || (order.clientEmail && getClientByEmail(order.clientEmail))
         if (client) {
+          const loyaltyMetadata = {
+            orderId: order.id,
+            totalSpent: (client.totalSpent || 0) + order.total,
+            totalOrdersIncrement: 1,
+            lastVisit: new Date().toISOString(),
+          }
+
           // Add points from the order
           const pointsToAdd = order.totalPoints || 0
           if (pointsToAdd > 0) {
@@ -171,16 +178,15 @@ const handleValidate = () => {
               pointsToAdd, 
               "earn", 
               `Commande petit-dejeuner #${ticketNumber || order.id.slice(-6)}`,
-              { orderId: order.id }
+              loyaltyMetadata
             )
+          } else {
+            updateClient(client.id, {
+              totalSpent: loyaltyMetadata.totalSpent,
+              totalOrders: (client.totalOrders || 0) + 1,
+              lastVisit: loyaltyMetadata.lastVisit,
+            })
           }
-          
-          // Update client stats
-          updateClient(client.id, {
-            totalSpent: (client.totalSpent || 0) + order.total,
-            totalOrders: (client.totalOrders || 0) + 1,
-            lastVisit: new Date().toISOString()
-          })
         }
       }
       

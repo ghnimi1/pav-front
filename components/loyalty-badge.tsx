@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useAuth, type LoyaltyTier } from "@/contexts/auth-context"
+import { useLoyalty } from "@/contexts/loyalty-context"
 import { useNotification } from "@/contexts/notification-context"
 import { useStock } from "@/contexts/stock-context"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -30,7 +31,7 @@ const tierConfig: Record<
     color: "text-amber-700",
     bgColor: "bg-amber-100",
     nextTier: "silver",
-    benefits: ["1 point par 10 TND dépensés", "Offres exclusives", "Notifications des nouveautés"],
+    benefits: ["1 point par 10 TND depenses", "Offres exclusives", "Notifications des nouveautes"],
     minSpent: 0,
     maxSpent: 200,
   },
@@ -40,11 +41,7 @@ const tierConfig: Record<
     color: "text-gray-600",
     bgColor: "bg-gray-100",
     nextTier: "gold",
-    benefits: [
-      "1.5 points par 10 TND dépensés",
-      "10% de réduction sur votre anniversaire",
-      "Accès prioritaire aux nouveaux produits",
-    ],
+    benefits: ["1.5 points par 10 TND depenses", "10% de reduction anniversaire", "Acces prioritaire"],
     minSpent: 200,
     maxSpent: 500,
   },
@@ -54,12 +51,7 @@ const tierConfig: Record<
     color: "text-yellow-600",
     bgColor: "bg-yellow-100",
     nextTier: "platinum",
-    benefits: [
-      "2 points par 10 TND dépensés",
-      "15% de réduction toute l'année",
-      "Produit offert chaque mois",
-      "Livraison gratuite",
-    ],
+    benefits: ["2 points par 10 TND depenses", "15% de reduction", "Produit offert chaque mois", "Livraison gratuite"],
     minSpent: 500,
     maxSpent: 1000,
   },
@@ -68,13 +60,7 @@ const tierConfig: Record<
     icon: CrownIcon,
     color: "text-purple-600",
     bgColor: "bg-purple-100",
-    benefits: [
-      "3 points par 10 TND dépensés",
-      "20% de réduction permanente",
-      "Événements VIP exclusifs",
-      "Service personnalisé",
-      "Produits en avant-première",
-    ],
+    benefits: ["3 points par 10 TND depenses", "20% de reduction permanente", "Evenements VIP", "Service personnalise"],
     minSpent: 1000,
   },
 }
@@ -85,18 +71,20 @@ interface LoyaltyBadgeProps {
 }
 
 export function LoyaltyBadge({ open, onClose }: LoyaltyBadgeProps) {
-  const { user, updateUser } = useAuth()
+  const { user } = useAuth()
+  const { getClientByEmail, redeemReward } = useLoyalty()
   const { addNotification } = useNotification()
   const { getActiveRewards } = useStock()
   const [activeTab, setActiveTab] = useState("overview")
 
   if (!user || user.role !== "client") return null
 
-  const tier = user.loyaltyTier || "bronze"
+  const loyaltyClient = getClientByEmail(user.email)
+  const tier = loyaltyClient?.tier || user.loyaltyTier || "bronze"
   const config = tierConfig[tier]
   const Icon = config.icon
-  const points = user.loyaltyPoints || 0
-  const totalSpent = user.totalSpent || 0
+  const points = loyaltyClient?.loyaltyPoints ?? user.loyaltyPoints ?? 0
+  const totalSpent = loyaltyClient?.totalSpent ?? user.totalSpent ?? 0
 
   const nextTierConfig = config.nextTier ? tierConfig[config.nextTier] : null
   const progressToNextTier = nextTierConfig
@@ -105,17 +93,18 @@ export function LoyaltyBadge({ open, onClose }: LoyaltyBadgeProps) {
 
   const handleRedeemReward = (reward: any) => {
     if (points < reward.pointsCost) {
-      addNotification("Vous n'avez pas assez de points pour cette récompense", "error")
+      addNotification("Vous n'avez pas assez de points pour cette recompense", "error")
       return
     }
 
-    const newPoints = points - reward.pointsCost
-    updateUser({
-      ...user,
-      loyaltyPoints: newPoints,
-    })
+    const success = redeemReward(loyaltyClient?.id || user.id, reward.id)
+    if (!success) {
+      addNotification("Impossible d'echanger cette recompense", "error")
+      return
+    }
 
-    addNotification(`Récompense échangée avec succès! "${reward.name}" - Il vous reste ${newPoints} points`, "success")
+    const remainingPoints = points - reward.pointsCost
+    addNotification(`Recompense echangee avec succes! "${reward.name}" - Il vous reste ${remainingPoints} points`, "success")
   }
 
   const rewards = getActiveRewards()
@@ -126,18 +115,17 @@ export function LoyaltyBadge({ open, onClose }: LoyaltyBadgeProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-2xl">
             <GiftIcon className="h-6 w-6 text-amber-600" />
-            Programme de Fidélité
+            Programme de Fidelite
           </DialogTitle>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="overview">Vue d'ensemble</TabsTrigger>
-            <TabsTrigger value="rewards">Récompenses</TabsTrigger>
+            <TabsTrigger value="rewards">Recompenses</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6 mt-6">
-            {/* Current Tier Card */}
             <Card className={`${config.bgColor} border-2 p-6`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -156,7 +144,6 @@ export function LoyaltyBadge({ open, onClose }: LoyaltyBadgeProps) {
               </div>
             </Card>
 
-            {/* Progress to Next Tier */}
             {nextTierConfig && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
@@ -167,13 +154,11 @@ export function LoyaltyBadge({ open, onClose }: LoyaltyBadgeProps) {
                 </div>
                 <Progress value={progressToNextTier} className="h-2" />
                 <p className="text-xs text-muted-foreground">
-                  Plus que {(nextTierConfig.minSpent - totalSpent).toFixed(2)} TND pour atteindre le niveau{" "}
-                  {nextTierConfig.name}
+                  Plus que {(nextTierConfig.minSpent - totalSpent).toFixed(2)} TND pour atteindre le niveau {nextTierConfig.name}
                 </p>
               </div>
             )}
 
-            {/* Benefits */}
             <div>
               <h4 className="mb-3 font-semibold">Vos avantages {config.name}</h4>
               <div className="space-y-2">
@@ -194,21 +179,20 @@ export function LoyaltyBadge({ open, onClose }: LoyaltyBadgeProps) {
               </div>
             </div>
 
-            {/* All Tiers Overview */}
             <div>
               <h4 className="mb-3 font-semibold">Tous les niveaux</h4>
               <div className="grid gap-3 sm:grid-cols-2">
-                {Object.entries(tierConfig).map(([key, config]) => {
-                  const TierIcon = config.icon
+                {Object.entries(tierConfig).map(([key, tierDetails]) => {
+                  const TierIcon = tierDetails.icon
                   const isCurrent = key === tier
                   return (
                     <Card key={key} className={`p-4 ${isCurrent ? "border-2 border-amber-600 bg-amber-50" : "border"}`}>
                       <div className="flex items-center gap-3">
-                        <TierIcon className={`h-6 w-6 ${config.color}`} />
+                        <TierIcon className={`h-6 w-6 ${tierDetails.color}`} />
                         <div>
-                          <h5 className="font-semibold">{config.name}</h5>
+                          <h5 className="font-semibold">{tierDetails.name}</h5>
                           <p className="text-xs text-muted-foreground">
-                            À partir de {config.minSpent} TND
+                            A partir de {tierDetails.minSpent} TND
                             {isCurrent && <span className="ml-1 text-amber-600">(Actuel)</span>}
                           </p>
                         </div>
@@ -244,21 +228,13 @@ export function LoyaltyBadge({ open, onClose }: LoyaltyBadgeProps) {
                     }`}
                   >
                     <div className="p-5">
-                      {reward.image && (
-                        <div className="mb-4 overflow-hidden rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 shadow-md">
-                          <img
-                            src={reward.image || "/placeholder.svg"}
-                            alt={reward.name}
-                            className="h-40 w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          />
-                        </div>
-                      )}
-
-                      {!reward.image && (
-                        <div className="mb-4 flex h-40 items-center justify-center rounded-xl bg-gradient-to-br from-amber-50 to-orange-100">
+                      <div className="mb-4 flex h-40 items-center justify-center rounded-xl bg-gradient-to-br from-amber-50 to-orange-100">
+                        {reward.image ? (
+                          <img src={reward.image} alt={reward.name} className="h-40 w-full rounded-xl object-cover" />
+                        ) : (
                           <GiftIcon className="h-16 w-16 text-amber-300" />
-                        </div>
-                      )}
+                        )}
+                      </div>
 
                       <div className="space-y-4">
                         <div>
@@ -277,23 +253,17 @@ export function LoyaltyBadge({ open, onClose }: LoyaltyBadgeProps) {
                             size="sm"
                             disabled={!canRedeem}
                             onClick={() => handleRedeemReward(reward)}
-                            className={`shadow-md transition-all duration-300 ${
+                            className={
                               canRedeem
-                                ? "bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 hover:shadow-lg"
+                                ? "bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
                                 : "bg-gray-300 text-gray-500"
-                            }`}
+                            }
                           >
-                            {canRedeem ? "Échanger" : "Insuffisant"}
+                            {canRedeem ? "Echanger" : "Insuffisant"}
                           </Button>
                         </div>
                       </div>
                     </div>
-
-                    {canRedeem && (
-                      <div className="absolute right-3 top-3 rounded-full bg-green-500 px-2 py-1 text-xs font-semibold text-white shadow-md">
-                        Disponible
-                      </div>
-                    )}
                   </Card>
                 )
               })}

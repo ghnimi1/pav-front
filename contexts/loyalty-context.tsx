@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { apiPost, apiPut } from "@/lib/api-client"
 
 // ============================================
 // CONFIGURATION DU PROGRAMME DE FIDELITE
@@ -86,6 +87,7 @@ export interface PointsTransaction {
   staffId?: string
   createdAt: string
   metadata?: {
+    orderId?: string
     multiplier?: number
     bonusReason?: string
     gameType?: GameType
@@ -202,6 +204,7 @@ interface LoyaltyContextType {
   updateClient: (id: string, updates: Partial<LoyaltyClient>) => void
   deleteClient: (id: string) => void
   getClientByQR: (qrCode: string) => LoyaltyClient | undefined
+  getClientById: (id: string) => LoyaltyClient | undefined
   getClientByEmail: (email: string) => LoyaltyClient | undefined
   getClientByPhone: (phone: string) => LoyaltyClient | undefined
 
@@ -274,6 +277,30 @@ interface LoyaltyContextType {
 }
 
 const LoyaltyContext = createContext<LoyaltyContextType | undefined>(undefined)
+const AUTH_STORAGE_SYNC_EVENT = "pav-auth-storage-sync"
+
+type StoredAuthClient = {
+  id: string
+  email: string
+  name: string
+  role?: string
+  phone?: string
+  gender?: Gender
+  birthDate?: string
+  loyaltyPoints?: number
+  lifetimePoints?: number
+  loyaltyTier?: LoyaltyTier
+  tier?: LoyaltyTier
+  totalSpent?: number
+  totalOrders?: number
+  lastVisit?: string
+  wallet?: number
+  walletBalance?: number
+  referralCode?: string
+  referralCount?: number
+  qrCode?: string
+  createdAt?: string
+}
 
 function generateQRCode(): string {
   return `LPA-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
@@ -292,6 +319,101 @@ function calculateTier(lifetimePoints: number): LoyaltyTier {
   return "bronze"
 }
 
+function buildLoyaltyClientFromAuth(authClient: StoredAuthClient): LoyaltyClient {
+  const lifetimePoints = authClient.lifetimePoints ?? authClient.loyaltyPoints ?? 0
+
+  return {
+    id: authClient.id,
+    name: authClient.name,
+    email: authClient.email,
+    phone: authClient.phone || "",
+    gender: authClient.gender || "male",
+    birthDate: authClient.birthDate || "",
+    loyaltyPoints: authClient.loyaltyPoints || 0,
+    lifetimePoints,
+    tier: authClient.loyaltyTier || authClient.tier || calculateTier(lifetimePoints),
+    totalSpent: authClient.totalSpent || 0,
+    totalOrders: authClient.totalOrders || 0,
+    lastVisit: authClient.lastVisit || authClient.createdAt,
+    wallet: authClient.wallet ?? authClient.walletBalance ?? 0,
+    referralCode: authClient.referralCode || generateReferralCode(authClient.name),
+    referralCount: authClient.referralCount || 0,
+    qrCode: authClient.qrCode || generateQRCode(),
+    createdAt: authClient.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    isActive: true,
+    preferences: {
+      notifications: true,
+      emailMarketing: true,
+      smsMarketing: false,
+    },
+  }
+}
+
+function syncClientToAuthStorage(client: LoyaltyClient) {
+  if (typeof window === "undefined") return
+
+  const syncAuthClient = (raw: string | null, isArray: boolean) => {
+    if (!raw) return
+
+    try {
+      const parsed = JSON.parse(raw)
+
+      if (isArray && Array.isArray(parsed)) {
+        const nextClients = parsed.map((entry: any) =>
+          entry?.id === client.id || entry?.email === client.email
+            ? {
+                ...entry,
+                loyaltyPoints: client.loyaltyPoints,
+                lifetimePoints: client.lifetimePoints,
+                loyaltyTier: client.tier,
+                totalSpent: client.totalSpent,
+                totalOrders: client.totalOrders,
+                lastVisit: client.lastVisit,
+                wallet: client.wallet,
+                referralCode: client.referralCode,
+                referralCount: client.referralCount,
+              }
+            : entry
+        )
+        localStorage.setItem("clients", JSON.stringify(nextClients))
+        return
+      }
+
+      if (!isArray && parsed && (parsed.id === client.id || parsed.email === client.email)) {
+        localStorage.setItem(
+          "currentUser",
+          JSON.stringify({
+            ...parsed,
+            loyaltyPoints: client.loyaltyPoints,
+            lifetimePoints: client.lifetimePoints,
+            loyaltyTier: client.tier,
+            totalSpent: client.totalSpent,
+            totalOrders: client.totalOrders,
+            lastVisit: client.lastVisit,
+            wallet: client.wallet,
+          })
+        )
+      }
+    } catch {
+      return
+    }
+  }
+
+  syncAuthClient(localStorage.getItem("currentUser"), false)
+  syncAuthClient(localStorage.getItem("clients"), true)
+  window.dispatchEvent(new CustomEvent(AUTH_STORAGE_SYNC_EVENT))
+}
+
+function shouldPersistClientUpdate(updates: Partial<LoyaltyClient>) {
+  return (
+    updates.totalSpent !== undefined ||
+    updates.totalOrders !== undefined ||
+    updates.lastVisit !== undefined ||
+    updates.wallet !== undefined
+  )
+}
+
 export function LoyaltyProvider({ children }: { children: ReactNode }) {
   const [clients, setClients] = useState<LoyaltyClient[]>([])
   const [transactions, setTransactions] = useState<PointsTransaction[]>([])
@@ -307,9 +429,60 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
   })
   const [shareLinks, setShareLinks] = useState<ShareLink[]>([])
 
-  useEffect(() => {
+  const syncClientsFromStorage = (applyState = true) => {
     const storedLoyaltyClients = localStorage.getItem("loyalty_clients")
     const storedAuthClients = localStorage.getItem("clients")
+    const storedCurrentUser = localStorage.getItem("currentUser")
+
+    let loyaltyClients: LoyaltyClient[] = storedLoyaltyClients ? JSON.parse(storedLoyaltyClients) : []
+
+    if (storedAuthClients) {
+      const authClients = JSON.parse(storedAuthClients)
+      const clientsFromAuth = authClients.filter((c: any) => c.role === "client")
+
+      clientsFromAuth.forEach((authClient: StoredAuthClient) => {
+        const existingIndex = loyaltyClients.findIndex((client) => client.id === authClient.id || client.email === authClient.email)
+        if (existingIndex === -1) {
+          loyaltyClients.push(buildLoyaltyClientFromAuth(authClient))
+          return
+        }
+
+        loyaltyClients[existingIndex] = {
+          ...loyaltyClients[existingIndex],
+          ...buildLoyaltyClientFromAuth(authClient),
+          updatedAt: new Date().toISOString(),
+        }
+      })
+    }
+
+    if (storedCurrentUser) {
+      try {
+        const currentUser = JSON.parse(storedCurrentUser) as StoredAuthClient & { role?: string }
+        if (currentUser.role === "client") {
+          const existingIndex = loyaltyClients.findIndex((client) => client.id === currentUser.id || client.email === currentUser.email)
+          if (existingIndex === -1) {
+            loyaltyClients.push(buildLoyaltyClientFromAuth(currentUser))
+          } else {
+            loyaltyClients[existingIndex] = {
+              ...loyaltyClients[existingIndex],
+              ...buildLoyaltyClientFromAuth(currentUser),
+              updatedAt: new Date().toISOString(),
+            }
+          }
+        }
+      } catch {
+        // ignore invalid storage
+      }
+    }
+
+    if (applyState) {
+      setClients(loyaltyClients)
+    }
+
+    return loyaltyClients
+  }
+
+  useEffect(() => {
     const storedTransactions = localStorage.getItem("loyalty_transactions")
     const storedRewards = localStorage.getItem("loyalty_rewards")
     const storedMissions = localStorage.getItem("loyalty_missions")
@@ -320,60 +493,7 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     const storedReferralConfig = localStorage.getItem("loyalty_referral_config")
     const storedShareLinks = localStorage.getItem("loyalty_share_links")
 
-    // Charger les clients du systeme de fidelite
-    let loyaltyClients: LoyaltyClient[] = storedLoyaltyClients ? JSON.parse(storedLoyaltyClients) : []
-    
-    // Synchroniser avec les clients de l'authentification
-    if (storedAuthClients) {
-      const authClients = JSON.parse(storedAuthClients)
-      const clientsFromAuth = authClients.filter((c: any) => c.role === "client")
-      
-      clientsFromAuth.forEach((authClient: any) => {
-        // Verifier si ce client existe deja dans loyalty_clients
-        const existingClient = loyaltyClients.find(
-          (lc) => lc.email === authClient.email || lc.id === authClient.id
-        )
-        
-        if (!existingClient) {
-          // Ajouter le client au systeme de fidelite
-          const newLoyaltyClient: LoyaltyClient = {
-            id: authClient.id,
-            name: authClient.name,
-            email: authClient.email,
-            phone: authClient.phone || "",
-            gender: authClient.gender || "male",
-            birthDate: authClient.birthDate || "",
-            loyaltyPoints: authClient.loyaltyPoints || 0,
-            lifetimePoints: authClient.lifetimePoints || authClient.loyaltyPoints || 0,
-            tier: authClient.loyaltyTier || authClient.tier || "bronze",
-            totalSpent: authClient.totalSpent || 0,
-            totalOrders: authClient.totalOrders || 0,
-            lastVisit: authClient.lastVisit || authClient.createdAt,
-            walletBalance: authClient.walletBalance || 0,
-            referralCode: authClient.referralCode || generateReferralCode(authClient.name),
-            referralCount: authClient.referralCount || 0,
-            qrCode: authClient.qrCode || generateQRCode(),
-            createdAt: authClient.createdAt || new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          }
-          loyaltyClients.push(newLoyaltyClient)
-        } else {
-          // Mettre a jour les infos si necessaire
-          const idx = loyaltyClients.findIndex((lc) => lc.email === authClient.email || lc.id === authClient.id)
-          if (idx !== -1) {
-            loyaltyClients[idx] = {
-              ...loyaltyClients[idx],
-              name: authClient.name,
-              loyaltyPoints: Math.max(loyaltyClients[idx].loyaltyPoints, authClient.loyaltyPoints || 0),
-              totalSpent: Math.max(loyaltyClients[idx].totalSpent, authClient.totalSpent || 0),
-              totalOrders: Math.max(loyaltyClients[idx].totalOrders, authClient.totalOrders || 0),
-            }
-          }
-        }
-      })
-    }
-    
-    setClients(loyaltyClients)
+    syncClientsFromStorage()
     if (storedTransactions) setTransactions(JSON.parse(storedTransactions))
     if (storedRewards) setRewards(JSON.parse(storedRewards))
     else setRewards(getInitialRewards())
@@ -386,6 +506,18 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     if (storedReferrals) setReferrals(JSON.parse(storedReferrals))
     if (storedReferralConfig) setReferralConfig(JSON.parse(storedReferralConfig))
     if (storedShareLinks) setShareLinks(JSON.parse(storedShareLinks))
+
+    const handleAuthSync = () => {
+      syncClientsFromStorage()
+    }
+
+    window.addEventListener(AUTH_STORAGE_SYNC_EVENT, handleAuthSync)
+    window.addEventListener("focus", handleAuthSync)
+
+    return () => {
+      window.removeEventListener(AUTH_STORAGE_SYNC_EVENT, handleAuthSync)
+      window.removeEventListener("focus", handleAuthSync)
+    }
   }, [])
 
   useEffect(() => {
@@ -434,13 +566,39 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
       updatedAt: new Date().toISOString(),
     }
     setClients((prev) => [...prev, newClient])
+    syncClientToAuthStorage(newClient)
     return newClient
   }
 
   const updateClient = (id: string, updates: Partial<LoyaltyClient>) => {
-    setClients((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c)),
-    )
+    setClients((prev) => {
+      let updatedClient: LoyaltyClient | null = null
+
+      const nextClients = prev.map((c) => {
+        if (c.id !== id) return c
+
+        updatedClient = { ...c, ...updates, updatedAt: new Date().toISOString() }
+        return updatedClient
+      })
+
+      if (updatedClient) {
+        syncClientToAuthStorage(updatedClient)
+      }
+
+      return nextClients
+    })
+
+    if (shouldPersistClientUpdate(updates)) {
+      void apiPut("/auth/loyalty/client", {
+        userId: id,
+        totalSpent: updates.totalSpent,
+        totalOrders: updates.totalOrders,
+        lastVisit: updates.lastVisit,
+        walletBalance: updates.wallet,
+      }).catch((error) => {
+        console.error("Failed to persist loyalty client update:", error)
+      })
+    }
   }
 
   const deleteClient = (id: string) => {
@@ -448,8 +606,24 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
   }
 
   const getClientByQR = (qrCode: string) => clients.find((c) => c.qrCode === qrCode)
-  const getClientByEmail = (email: string) => clients.find((c) => c.email === email)
-  const getClientByPhone = (phone: string) => clients.find((c) => c.phone === phone)
+  const getClientById = (id: string) => {
+    const existingClient = clients.find((c) => c.id === id)
+    if (existingClient) return existingClient
+
+    return syncClientsFromStorage(false).find((client) => client.id === id)
+  }
+  const getClientByEmail = (email: string) => {
+    const existingClient = clients.find((c) => c.email === email)
+    if (existingClient) return existingClient
+
+    return syncClientsFromStorage(false).find((client) => client.email === email)
+  }
+  const getClientByPhone = (phone: string) => {
+    const existingClient = clients.find((c) => c.phone === phone)
+    if (existingClient) return existingClient
+
+    return syncClientsFromStorage(false).find((client) => client.phone === phone)
+  }
 
   const calculatePointsForPurchase = (amount: number, clientTier: LoyaltyTier): number => {
     const basePoints = Math.floor(amount * LOYALTY_CONFIG.pointsPerTND)
@@ -466,8 +640,25 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     description: string,
     metadata?: any,
   ) => {
-    const client = clients.find((c) => c.id === clientId)
+    let client = clients.find((c) => c.id === clientId)
+    if (!client) {
+      client = syncClientsFromStorage(false).find((entry) => entry.id === clientId)
+    }
     if (!client) return
+    if (points === 0) return
+
+    if (
+      type === "earn" &&
+      metadata?.orderId &&
+      transactions.some(
+        (transaction) =>
+          transaction.clientId === clientId &&
+          transaction.type === "earn" &&
+          transaction.metadata?.orderId === metadata.orderId
+      )
+    ) {
+      return
+    }
 
     const transaction: PointsTransaction = {
       id: `txn-${Date.now()}`,
@@ -482,11 +673,51 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
 
     const newLifetimePoints = client.lifetimePoints + points
     const newTier = calculateTier(newLifetimePoints)
+    const nextTotalSpent = metadata?.totalSpent ?? client.totalSpent
+    const nextTotalOrders =
+      metadata?.totalOrders !== undefined
+        ? metadata.totalOrders
+        : metadata?.totalOrdersIncrement !== undefined
+          ? client.totalOrders + metadata.totalOrdersIncrement
+          : client.totalOrders
+    const nextLastVisit = metadata?.lastVisit ?? client.lastVisit
 
-    updateClient(clientId, {
-      loyaltyPoints: client.loyaltyPoints + points,
-      lifetimePoints: newLifetimePoints,
-      tier: newTier,
+    setClients((prev) => {
+      let updatedClient: LoyaltyClient | null = null
+
+      const nextClients = prev.map((entry) => {
+        if (entry.id !== clientId) return entry
+
+        updatedClient = {
+          ...entry,
+          loyaltyPoints: entry.loyaltyPoints + points,
+          lifetimePoints: newLifetimePoints,
+          tier: newTier,
+          totalSpent: nextTotalSpent,
+          totalOrders: nextTotalOrders,
+          lastVisit: nextLastVisit,
+          updatedAt: new Date().toISOString(),
+        }
+
+        return updatedClient
+      })
+
+      if (updatedClient) {
+        syncClientToAuthStorage(updatedClient)
+      }
+
+      return nextClients
+    })
+
+    void apiPost("/auth/loyalty/points", {
+      userId: clientId,
+      points,
+      description,
+      totalSpent: metadata?.totalSpent,
+      totalOrdersIncrement: metadata?.totalOrdersIncrement,
+      lastVisit: metadata?.lastVisit,
+    }).catch((error) => {
+      console.error("Failed to persist loyalty points:", error)
     })
   }
 
@@ -990,6 +1221,7 @@ setGamePlays((prev) => [...prev, gamePlay])
         updateClient,
         deleteClient,
         getClientByQR,
+        getClientById,
         getClientByEmail,
         getClientByPhone,
         transactions,

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { apiGet, apiPatch, apiPost, apiPut } from "@/lib/api-client"
+import { useLoyalty } from "@/contexts/loyalty-context"
 
 export type OrderStatus = "new" | "confirmed" | "preparing" | "ready" | "delivering" | "completed" | "cancelled"
 export type DeliveryMode = "delivery" | "pickup"
@@ -151,6 +152,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<OrderItem[]>([])
   const [deliveryConfig, setDeliveryConfig] = useState<DeliveryConfig>(defaultDeliveryConfig)
   const [orderCounter, setOrderCounter] = useState(1000)
+  const { addPoints, getClientById, getClientByEmail, updateClient } = useLoyalty()
 
   useEffect(() => {
     const savedCart = localStorage.getItem("remote-cart")
@@ -324,6 +326,36 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
       )
 
       setOrders((prev) => [order, ...prev])
+
+      const loyaltyClient =
+        (order.clientId && getClientById(order.clientId)) ||
+        (order.clientEmail && getClientByEmail(order.clientEmail))
+
+      if (loyaltyClient) {
+        const loyaltyMetadata = {
+          orderId: order.id,
+          totalSpent: (loyaltyClient.totalSpent || 0) + order.total,
+          totalOrdersIncrement: 1,
+          lastVisit: new Date().toISOString(),
+        }
+
+        if (order.totalPoints > 0) {
+          addPoints(
+            loyaltyClient.id,
+            order.totalPoints,
+            "earn",
+            `Commande ${order.orderNumber}`,
+            loyaltyMetadata
+          )
+        } else {
+          updateClient(loyaltyClient.id, {
+            totalSpent: loyaltyMetadata.totalSpent,
+            totalOrders: (loyaltyClient.totalOrders || 0) + 1,
+            lastVisit: loyaltyMetadata.lastVisit,
+          })
+        }
+      }
+
       if (clearProviderCart) {
         clearCart()
       }
@@ -358,6 +390,36 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
       }
 
       setOrders((prev) => [fallbackOrder, ...prev])
+
+      const loyaltyClient =
+        (fallbackOrder.clientId && getClientById(fallbackOrder.clientId)) ||
+        (fallbackOrder.clientEmail && getClientByEmail(fallbackOrder.clientEmail))
+
+      if (loyaltyClient) {
+        const loyaltyMetadata = {
+          orderId: fallbackOrder.id,
+          totalSpent: (loyaltyClient.totalSpent || 0) + fallbackOrder.total,
+          totalOrdersIncrement: 1,
+          lastVisit: new Date().toISOString(),
+        }
+
+        if (fallbackOrder.totalPoints > 0) {
+          addPoints(
+            loyaltyClient.id,
+            fallbackOrder.totalPoints,
+            "earn",
+            `Commande ${fallbackOrder.orderNumber}`,
+            loyaltyMetadata
+          )
+        } else {
+          updateClient(loyaltyClient.id, {
+            totalSpent: loyaltyMetadata.totalSpent,
+            totalOrders: (loyaltyClient.totalOrders || 0) + 1,
+            lastVisit: loyaltyMetadata.lastVisit,
+          })
+        }
+      }
+
       if (clearProviderCart) {
         clearCart()
       }

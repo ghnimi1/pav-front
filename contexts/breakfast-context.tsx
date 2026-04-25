@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api-client"
+import { useLoyalty } from "@/contexts/loyalty-context"
 
 // ============================================
 // TYPES ET INTERFACES
@@ -303,6 +304,7 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([])
   const [orders, setOrders] = useState<BreakfastOrder[]>([])
   const [userTotalPoints, setUserTotalPoints] = useState(0)
+  const { addPoints, getClientById, getClientByEmail, updateClient } = useLoyalty()
 
   useEffect(() => {
     let cancelled = false
@@ -683,18 +685,42 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
     }
 
     setOrders((prev) => [order, ...prev])
+
+    const loyaltyClient =
+      (order.clientId && getClientById(order.clientId)) ||
+      (order.clientEmail && getClientByEmail(order.clientEmail))
+
+    if (loyaltyClient) {
+      const loyaltyMetadata = {
+        orderId: order.id,
+        totalSpent: (loyaltyClient.totalSpent || 0) + order.total,
+        totalOrdersIncrement: 1,
+        lastVisit: new Date().toISOString(),
+      }
+
+      if (order.totalPoints > 0) {
+        addPoints(
+          loyaltyClient.id,
+          order.totalPoints,
+          "earn",
+          `Commande petit-dejeuner ${order.id.slice(-6)}`,
+          loyaltyMetadata
+        )
+      } else {
+        updateClient(loyaltyClient.id, {
+          totalSpent: loyaltyMetadata.totalSpent,
+          totalOrders: (loyaltyClient.totalOrders || 0) + 1,
+          lastVisit: loyaltyMetadata.lastVisit,
+        })
+      }
+    }
+
     clearCart()
     setSelectedFormula(null)
     return order
   }
 
   const validateOrder = (orderId: string, tableNumber: string, ticketNumber: string, staffId?: string) => {
-    const orderToValidate = orders.find((order) => order.id === orderId)
-    if (orderToValidate && orderToValidate.status === "pending") {
-      const orderPoints = orderToValidate.items.reduce((sum, cartItem) => sum + ((cartItem.item?.points || 0) * cartItem.quantity), 0)
-      setUserTotalPoints((prev) => prev + orderPoints)
-    }
-
     setOrders((prev) =>
       prev.map((order) =>
         order.id === orderId

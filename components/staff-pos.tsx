@@ -65,6 +65,15 @@ export function StaffPOS() {
 
   const { addNotification } = useNotification()
 
+  useEffect(() => {
+    if (!selectedClient) return
+
+    const syncedClient = clients.find((client) => client.id === selectedClient.id)
+    if (syncedClient) {
+      setSelectedClient(syncedClient)
+    }
+  }, [clients, selectedClient])
+
   const handleSearch = () => {
     if (!searchQuery.trim()) return
 
@@ -89,16 +98,22 @@ export function StaffPOS() {
     const multiplier = getTodayMultiplier(selectedClient.gender)
 
     // Add points
-    addPoints(selectedClient.id, pointsEarned, "earn", `Achat de ${amount} TND`, {
+    const loyaltyMetadata = {
       multiplier: multiplier > 1 ? multiplier : undefined,
-    })
-
-    // Update client stats
-    updateClient(selectedClient.id, {
       totalSpent: selectedClient.totalSpent + amount,
-      totalOrders: selectedClient.totalOrders + 1,
+      totalOrdersIncrement: 1,
       lastVisit: new Date().toISOString(),
-    })
+    }
+
+    if (pointsEarned > 0) {
+      addPoints(selectedClient.id, pointsEarned, "earn", `Achat de ${amount} TND`, loyaltyMetadata)
+    } else {
+      updateClient(selectedClient.id, {
+        totalSpent: loyaltyMetadata.totalSpent,
+        totalOrders: selectedClient.totalOrders + 1,
+        lastVisit: loyaltyMetadata.lastVisit,
+      })
+    }
 
     // Verifier si c'est le premier achat d'un client parraine
     const pendingRef = referrals.find(
@@ -114,12 +129,6 @@ export function StaffPOS() {
         `Parrainage valide! ${referrer?.name || "Le parrain"} recoit ${pendingRef.referrerReward} points`,
         "success"
       )
-    }
-
-    // Refresh selected client
-    const updatedClient = clients.find((c) => c.id === selectedClient.id)
-    if (updatedClient) {
-      setSelectedClient({ ...updatedClient, loyaltyPoints: updatedClient.loyaltyPoints + pointsEarned })
     }
 
     addNotification(
@@ -154,11 +163,6 @@ export function StaffPOS() {
 
     const points = parseInt(manualPoints)
     addPoints(selectedClient.id, points, "adjustment", manualReason)
-
-    const updatedClient = clients.find((c) => c.id === selectedClient.id)
-    if (updatedClient) {
-      setSelectedClient({ ...updatedClient, loyaltyPoints: updatedClient.loyaltyPoints + points })
-    }
 
     addNotification(`${points} points ajoutes manuellement`, "success")
     setManualPoints("")

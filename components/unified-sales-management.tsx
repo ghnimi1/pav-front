@@ -80,8 +80,11 @@ type ManagedOrder = {
   discount: number
   deliveryFee: number
   createdAt: string
+  clientId?: string
+  clientEmail?: string
   clientName?: string
   tableNumber?: string
+  pointsEarned: number
   customerNote?: string
   items: { quantity: number; name: string; total: number }[]
 }
@@ -114,7 +117,7 @@ export function UnifiedSalesManagement() {
 
   const { recipes, recipeCategories, showcases, getAvailableItems, decrementShowcaseStock } = useProduction()
   const { items: breakfastItems, categories: breakfastCategories } = useBreakfast()
-  const { clients, addPoints } = useLoyalty()
+  const { clients, addPoints, getClientById, getClientByEmail, updateClient } = useLoyalty()
   const { menuItems, menuCategories } = useStock()
 
   // Main tab state
@@ -257,8 +260,11 @@ export function UnifiedSalesManagement() {
       discount: sale.discount,
       deliveryFee: sale.deliveryFee,
       createdAt: sale.createdAt,
+      clientId: sale.clientId,
+      clientEmail: sale.clientEmail,
       clientName: sale.clientName,
       tableNumber: sale.tableNumber,
+      pointsEarned: sale.pointsEarned,
       customerNote: sale.customerNote,
       items: sale.items.map((item) => ({
         quantity: item.quantity,
@@ -279,8 +285,11 @@ export function UnifiedSalesManagement() {
       discount: 0,
       deliveryFee: order.deliveryFee,
       createdAt: order.createdAt,
+      clientId: order.clientId,
+      clientEmail: order.clientEmail,
       clientName: order.clientName,
       tableNumber: undefined,
+      pointsEarned: order.totalPoints,
       customerNote: order.customerNote,
       items: order.items.map((item) => ({
         quantity: item.quantity,
@@ -415,8 +424,23 @@ export function UnifiedSalesManagement() {
     })
 
     // Add loyalty points
-    if (client && pointsToEarn > 0) {
-      addPoints(client.id, pointsToEarn, `Achat ${newSale.saleNumber}`)
+    if (client) {
+      const loyaltyMetadata = {
+        orderId: newSale.id,
+        totalSpent: (client.totalSpent || 0) + total,
+        totalOrdersIncrement: 1,
+        lastVisit: new Date().toISOString(),
+      }
+
+      if (pointsToEarn > 0) {
+        addPoints(client.id, pointsToEarn, "earn", `Achat ${newSale.saleNumber}`, loyaltyMetadata)
+      } else {
+        updateClient(client.id, {
+          totalSpent: loyaltyMetadata.totalSpent,
+          totalOrders: (client.totalOrders || 0) + 1,
+          lastVisit: loyaltyMetadata.lastVisit,
+        })
+      }
     }
 
     setLastSale(newSale)
@@ -430,6 +454,28 @@ export function UnifiedSalesManagement() {
   // ============================================
 
   const handleOrderAction = async (sale: ManagedOrder, action: string) => {
+    const applyOrderLoyalty = () => {
+      const client = (sale.clientId && getClientById(sale.clientId)) || (sale.clientEmail && getClientByEmail(sale.clientEmail))
+      if (!client) return
+
+      const loyaltyMetadata = {
+        orderId: sale.id,
+        totalSpent: (client.totalSpent || 0) + sale.total,
+        totalOrdersIncrement: 1,
+        lastVisit: new Date().toISOString(),
+      }
+
+      if (sale.pointsEarned > 0) {
+        addPoints(client.id, sale.pointsEarned, "earn", `Commande ${sale.orderNumber}`, loyaltyMetadata)
+      } else {
+        updateClient(client.id, {
+          totalSpent: loyaltyMetadata.totalSpent,
+          totalOrders: (client.totalOrders || 0) + 1,
+          lastVisit: loyaltyMetadata.lastVisit,
+        })
+      }
+    }
+
     if (sale.sourceType === "remote") {
       switch (action) {
         case "confirm":
@@ -443,6 +489,7 @@ export function UnifiedSalesManagement() {
           break
         case "complete":
           await updateOrderStatus(sale.id, "completed")
+          applyOrderLoyalty()
           break
         case "cancel":
           await cancelRemoteOrder(sale.id)
@@ -463,6 +510,7 @@ export function UnifiedSalesManagement() {
         break
       case "complete":
         completeSale(sale.id)
+        applyOrderLoyalty()
         break
       case "cancel":
         cancelSale(sale.id)
