@@ -45,6 +45,7 @@ import Image from "next/image"
 import { StockProvider, useStock, type Supplement, type MenuItem, type ProductSupplementConfig } from "@/contexts/stock-context"
 import { BreakfastProvider, useBreakfast, type BreakfastItem } from "@/contexts/breakfast-context"
 import { AuthProvider, useAuth } from "@/contexts/auth-context"
+import { LoyaltyProvider } from "@/contexts/loyalty-context"
 import { NotificationProvider, useNotification } from "@/contexts/notification-context"
 import { NotificationContainer } from "@/components/notification-container"
 
@@ -545,9 +546,11 @@ export default function MenuAdminPage() {
     <NotificationProvider>
       <AuthProvider>
         <StockProvider>
-          <BreakfastProvider>
-            <MenuAdminContent />
-          </BreakfastProvider>
+          <LoyaltyProvider>
+            <BreakfastProvider>
+              <MenuAdminContent />
+            </BreakfastProvider>
+          </LoyaltyProvider>
         </StockProvider>
       </AuthProvider>
     </NotificationProvider>

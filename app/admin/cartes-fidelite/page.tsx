@@ -44,6 +44,7 @@ import {
 import { StockProvider, useStock, type MenuItem } from "@/contexts/stock-context"
 import { BreakfastProvider, useBreakfast, type BreakfastItem } from "@/contexts/breakfast-context"
 import { AuthProvider, useAuth } from "@/contexts/auth-context"
+import { LoyaltyProvider } from "@/contexts/loyalty-context"
 import { NotificationProvider, useNotification } from "@/contexts/notification-context"
 import { NotificationContainer } from "@/components/notification-container"
 import { 
@@ -893,12 +894,14 @@ export default function LoyaltyCardsAdminPage() {
     <NotificationProvider>
       <AuthProvider>
         <StockProvider>
-          <BreakfastProvider>
-            <LoyaltyCardsProvider>
-              <LoyaltyCardsAdminContent />
-              <NotificationContainer />
-            </LoyaltyCardsProvider>
-          </BreakfastProvider>
+          <LoyaltyProvider>
+            <BreakfastProvider>
+              <LoyaltyCardsProvider>
+                <LoyaltyCardsAdminContent />
+                <NotificationContainer />
+              </LoyaltyCardsProvider>
+            </BreakfastProvider>
+          </LoyaltyProvider>
         </StockProvider>
       </AuthProvider>
     </NotificationProvider>

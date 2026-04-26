@@ -199,6 +199,13 @@ type ReferralsApiResponse = {
   referrals: Referral[]
 }
 
+type ReferralConfigApiResponse = {
+  config: {
+    referrerReward: number
+    referredReward: number
+  }
+}
+
 // ============================================
 // CONTEXTE
 // ============================================
@@ -476,6 +483,19 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const loadReferralConfigFromBackend = async () => {
+    const token = localStorage.getItem("authToken")
+    if (!token) return
+
+    try {
+      const response = await apiGet<ReferralConfigApiResponse>("/auth/referral-config")
+      setReferralConfig(response.config)
+      return
+    } catch (error) {
+      console.error("Failed to load referral config from backend:", error)
+    }
+  }
+
   useEffect(() => {
     const storedTransactions = localStorage.getItem("loyalty_transactions")
     const storedRewards = localStorage.getItem("loyalty_rewards")
@@ -501,10 +521,12 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
 
     void loadClientsFromBackend()
     void loadReferralsFromBackend()
+    void loadReferralConfigFromBackend()
 
     const handleAuthSync = () => {
       void loadClientsFromBackend()
       void loadReferralsFromBackend()
+      void loadReferralConfigFromBackend()
     }
 
     window.addEventListener(AUTH_STORAGE_SYNC_EVENT, handleAuthSync)
@@ -544,6 +566,13 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
   // Fonction pour mettre a jour la configuration du parrainage
   const updateReferralConfig = (config: { referrerReward: number; referredReward: number }) => {
     setReferralConfig(config)
+    void apiPut<ReferralConfigApiResponse>("/auth/referral-config", config)
+      .then((response) => {
+        setReferralConfig(response.config)
+      })
+      .catch((error) => {
+        console.error("Failed to update referral config:", error)
+      })
   }
 
   const addClient = (clientData: Omit<LoyaltyClient, "id" | "qrCode" | "referralCode" | "createdAt" | "updatedAt">) => {
