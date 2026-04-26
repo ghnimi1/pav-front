@@ -195,6 +195,10 @@ export interface Referral {
   completedAt?: string
 }
 
+type ReferralsApiResponse = {
+  referrals: Referral[]
+}
+
 // ============================================
 // CONTEXTE
 // ============================================
@@ -456,6 +460,22 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     syncClientsFromCurrentUser()
   }
 
+  const loadReferralsFromBackend = async () => {
+    const token = localStorage.getItem("authToken")
+    if (!token) {
+      setReferrals([])
+      return
+    }
+
+    try {
+      const response = await apiGet<ReferralsApiResponse>("/auth/referrals")
+      setReferrals(response.referrals)
+      return
+    } catch (error) {
+      console.error("Failed to load referrals from backend:", error)
+    }
+  }
+
   useEffect(() => {
     const storedTransactions = localStorage.getItem("loyalty_transactions")
     const storedRewards = localStorage.getItem("loyalty_rewards")
@@ -463,7 +483,6 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     const storedClientMissions = localStorage.getItem("loyalty_client_missions")
     const storedGamePlays = localStorage.getItem("loyalty_game_plays")
     const storedSpecialDays = localStorage.getItem("loyalty_special_days")
-    const storedReferrals = localStorage.getItem("loyalty_referrals")
     const storedReferralConfig = localStorage.getItem("loyalty_referral_config")
     const storedShareLinks = localStorage.getItem("loyalty_share_links")
 
@@ -477,14 +496,15 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     if (storedGamePlays) setGamePlays(JSON.parse(storedGamePlays))
     if (storedSpecialDays) setSpecialDays(JSON.parse(storedSpecialDays))
     else setSpecialDays(getInitialSpecialDays())
-    if (storedReferrals) setReferrals(JSON.parse(storedReferrals))
     if (storedReferralConfig) setReferralConfig(JSON.parse(storedReferralConfig))
     if (storedShareLinks) setShareLinks(JSON.parse(storedShareLinks))
 
     void loadClientsFromBackend()
+    void loadReferralsFromBackend()
 
     const handleAuthSync = () => {
       void loadClientsFromBackend()
+      void loadReferralsFromBackend()
     }
 
     window.addEventListener(AUTH_STORAGE_SYNC_EVENT, handleAuthSync)
@@ -514,9 +534,6 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     localStorage.setItem("loyalty_special_days", JSON.stringify(specialDays))
   }, [specialDays])
-  useEffect(() => {
-    localStorage.setItem("loyalty_referrals", JSON.stringify(referrals))
-  }, [referrals])
   useEffect(() => {
     localStorage.setItem("loyalty_share_links", JSON.stringify(shareLinks))
   }, [shareLinks])
@@ -979,38 +996,20 @@ setGamePlays((prev) => [...prev, gamePlay])
   }
 
   const completeReferral = (referralCode: string, newClientId: string, newClientName: string, newClientEmail: string) => {
-    const referrer = clients.find((c) => c.referralCode === referralCode)
-    if (!referrer) return
-
-    // Verifier si ce client n'a pas deja ete parraine
-    const existingReferral = referrals.find((r) => r.referredId === newClientId || r.referredEmail === newClientEmail)
-    if (existingReferral) return
-
-    const referral: Referral = {
-      id: `ref-${Date.now()}`,
-      referrerId: referrer.id,
-      referredId: newClientId,
-      referredName: newClientName,
-      referredEmail: newClientEmail,
-      status: "first_purchase_pending", // En attente du premier achat
-      referrerReward: referralConfig.referrerReward,
-      referredReward: referralConfig.referredReward,
-      createdAt: new Date().toISOString(),
-    }
-
-    setReferrals((prev) => [...prev, referral])
-
-    // Le filleul recoit ses points de bienvenue immediatement
-    addPoints(newClientId, referralConfig.referredReward, "bonus", `Bonus bienvenue - parrainage (${referralConfig.referredReward} pts)`)
-    
-    // Le parrain ne recevra ses points qu'apres le premier achat du filleul
-    updateClient(referrer.id, { referralCount: referrer.referralCount + 1 })
+    void referralCode
+    void newClientId
+    void newClientName
+    void newClientEmail
   }
 
   // Valider le parrainage apres le premier achat du filleul
   const validateReferralFirstPurchase = (referralId: string, purchaseAmount: number, validatedBy: string) => {
     const referral = referrals.find((r) => r.id === referralId)
     if (!referral || referral.status !== "first_purchase_pending") return
+
+    const referrerClient =
+      clients.find((client) => client.id === referral.referrerId) ||
+      syncClientsFromCurrentUser(false).find((client) => client.id === referral.referrerId)
 
     // Mettre a jour le parrainage
     setReferrals((prev) =>
@@ -1028,8 +1027,42 @@ setGamePlays((prev) => [...prev, gamePlay])
       )
     )
 
-    // Donner les points au parrain maintenant
-    addPoints(referral.referrerId, referral.referrerReward, "referral", `Bonus parrainage - 1er achat de ${referral.referredName} (${purchaseAmount} TND)`)
+    if (referrerClient && referral.referrerReward > 0) {
+      setClients((prev) => {
+        let updatedClient: LoyaltyClient | null = null
+
+        const nextClients = prev.map((client) => {
+          if (client.id !== referrerClient.id) return client
+
+          const nextLifetimePoints = (client.lifetimePoints || 0) + referral.referrerReward
+          updatedClient = {
+            ...client,
+            loyaltyPoints: (client.loyaltyPoints || 0) + referral.referrerReward,
+            lifetimePoints: nextLifetimePoints,
+            tier: calculateTier(nextLifetimePoints),
+            updatedAt: new Date().toISOString(),
+          }
+
+          return updatedClient
+        })
+
+        if (updatedClient) {
+          syncClientToAuthStorage(updatedClient)
+        }
+
+        return nextClients
+      })
+    }
+
+    void validatedBy
+
+    void apiPost(`/auth/referrals/${referralId}/validate`, {
+      purchaseAmount,
+    })
+      .then(() => Promise.all([loadReferralsFromBackend(), loadClientsFromBackend()]))
+      .catch((error) => {
+        console.error("Failed to validate referral first purchase:", error)
+      })
   }
 
   // Obtenir tous les parrainages d'un parrain

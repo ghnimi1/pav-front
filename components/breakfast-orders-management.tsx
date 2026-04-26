@@ -47,7 +47,7 @@ const ITEMS_PER_PAGE = 20
 
 export function BreakfastOrdersManagement() {
   const { orders, validateOrder, cancelOrder } = useBreakfast()
-  const { addPoints, getClientByEmail, getClientById, updateClient } = useLoyalty()
+  const { addPoints, getClientByEmail, getClientById, updateClient, referrals, validateReferralFirstPurchase } = useLoyalty()
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null)
   const [tableNumber, setTableNumber] = useState("")
   const [ticketNumber, setTicketNumber] = useState("")
@@ -186,6 +186,16 @@ const handleValidate = () => {
               totalOrders: (client.totalOrders || 0) + 1,
               lastVisit: loyaltyMetadata.lastVisit,
             })
+          }
+
+          const pendingReferral = referrals.find(
+            (referral) =>
+              referral.status === "first_purchase_pending" &&
+              (referral.referredId === client.id || referral.referredEmail === client.email)
+          )
+
+          if (pendingReferral) {
+            validateReferralFirstPurchase(pendingReferral.id, order.total, "admin")
           }
         }
       }

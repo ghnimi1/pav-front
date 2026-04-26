@@ -13,7 +13,7 @@ import { NotificationProvider, useNotification } from "@/contexts/notification-c
 import { NotificationContainer } from "@/components/notification-container"
 import { Lock, Mail, User, Coffee, ArrowLeft, ShoppingCartIcon, UserPlusIcon } from "lucide-react"
 import Link from "next/link"
-import { useLoyalty, LoyaltyProvider } from "@/contexts/loyalty-context"
+import { LoyaltyProvider } from "@/contexts/loyalty-context"
 
 function RegisterForm() {
   const [name, setName] = useState("")
@@ -25,7 +25,6 @@ function RegisterForm() {
   const [hasPendingCart, setHasPendingCart] = useState(false)
   const { register, isAuthenticated, isLoading: authLoading, user } = useAuth()
   const { addNotification } = useNotification()
-  const { completeReferral, clients } = useLoyalty()
   const router = useRouter()
 
   // Redirect if already authenticated
@@ -72,14 +71,6 @@ function RegisterForm() {
     const success = await register(email, password, name, referralCode.trim() || undefined)
 
     if (success) {
-      if (referralCode.trim()) {
-        const referrer = clients.find((c) => c.referralCode === referralCode.trim().toUpperCase())
-        if (referrer) {
-          const newClientId = `client-${Date.now()}`
-          completeReferral(referralCode.trim().toUpperCase(), newClientId, name, email)
-        }
-      }
-
       if (hasPendingCart) {
         addNotification({
           type: "success",

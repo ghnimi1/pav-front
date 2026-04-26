@@ -91,7 +91,7 @@ function AdminOrdersContent() {
   const router = useRouter()
   const { user, isAuthenticated } = useAuth()
   const { addNotification } = useNotification()
-  const { addPoints, getClientByEmail, getClientById, updateClient } = useLoyalty()
+  const { addPoints, getClientByEmail, getClientById, updateClient, referrals, validateReferralFirstPurchase } = useLoyalty()
   const {
     orders,
     updateOrderStatus,
@@ -110,22 +110,6 @@ function AdminOrdersContent() {
   const [filterStatus, setFilterStatus] = useState<OrderStatus | "all">("all")
   const [filterMode, setFilterMode] = useState<"all" | "delivery" | "pickup">("all")
   const [dateFilter, setDateFilter] = useState<"today" | "week" | "month" | "all">("today")
-
-  // Check admin access
-  if (!isAuthenticated || user?.role !== "admin") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-stone-50">
-        <Card className="p-8 text-center max-w-md">
-          <BanIcon className="h-12 w-12 mx-auto text-red-500 mb-4" />
-          <h2 className="text-xl font-bold mb-2">Acces refuse</h2>
-          <p className="text-stone-500 mb-4">Vous devez etre administrateur pour acceder a cette page.</p>
-          <Button onClick={() => router.push("/")} className="bg-amber-500 hover:bg-amber-600">
-            Retour a l&apos;accueil
-          </Button>
-        </Card>
-      </div>
-    )
-  }
 
   // Filter orders
   const filteredOrders = useMemo(() => {
@@ -166,6 +150,22 @@ function AdminOrdersContent() {
     return result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   }, [orders, dateFilter, filterStatus, filterMode, searchQuery])
 
+  // Check admin access
+  if (!isAuthenticated || user?.role !== "admin") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-stone-50">
+        <Card className="p-8 text-center max-w-md">
+          <BanIcon className="h-12 w-12 mx-auto text-red-500 mb-4" />
+          <h2 className="text-xl font-bold mb-2">Acces refuse</h2>
+          <p className="text-stone-500 mb-4">Vous devez etre administrateur pour acceder a cette page.</p>
+          <Button onClick={() => router.push("/")} className="bg-amber-500 hover:bg-amber-600">
+            Retour a l&apos;accueil
+          </Button>
+        </Card>
+      </div>
+    )
+  }
+
   // Kanban columns
   const kanbanColumns = [
     { status: "new" as OrderStatus, title: "Nouvelles", color: "border-t-blue-500" },
@@ -203,6 +203,16 @@ function AdminOrdersContent() {
             totalOrders: (client.totalOrders || 0) + 1,
             lastVisit: loyaltyMetadata.lastVisit,
           })
+        }
+
+        const pendingReferral = referrals.find(
+          (referral) =>
+            referral.status === "first_purchase_pending" &&
+            (referral.referredId === client.id || referral.referredEmail === client.email)
+        )
+
+        if (pendingReferral) {
+          validateReferralFirstPurchase(pendingReferral.id, order.total, user?.id || "admin")
         }
       }
     }

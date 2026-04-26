@@ -8,6 +8,8 @@ import { useUnifiedSales } from "@/contexts/unified-sales-context"
 import { useLoyalty } from "@/contexts/loyalty-context"
 import { useAuth } from "@/contexts/auth-context"
 import { useDiscount } from "@/contexts/discount-context"
+import { useOrders, type OrderItem } from "@/contexts/orders-context"
+import { useNotification } from "@/contexts/notification-context"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -82,8 +84,10 @@ const getFormulaImageSrc = (image?: string) => {
 
 export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
   const { user } = useAuth()
+  const { addNotification } = useNotification()
   const { getClientByEmail } = useLoyalty()
   const { addSale } = useUnifiedSales()
+  const { createOrderFromItems, deliveryConfig } = useOrders()
   const {
     categories,
     items,
@@ -109,6 +113,7 @@ export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [showCartSummary, setShowCartSummary] = useState(false)
   const [showOrderSuccess, setShowOrderSuccess] = useState(false)
+  const [lastClientOrder, setLastClientOrder] = useState<{ orderNumber: string; estimatedTime: number } | null>(null)
   const [customerNote, setCustomerNote] = useState("")
   const [tableNumber, setTableNumber] = useState("")
   const [showFormulaStep, setShowFormulaStep] = useState(false) // For mandatory formula selection in compose mode
@@ -118,6 +123,7 @@ export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
   // Get client loyalty data
   const loyaltyClient = user?.role === "client" && user?.email ? getClientByEmail(user.email) : null
   const clientPoints = loyaltyClient?.loyaltyPoints ?? 0
+  const canCreateRemoteClientOrder = !!user?.id && !!user?.email && user.role !== "admin"
 
   // ============================================
   // SMART PROGRESSIVE DISCOUNT SYSTEM (Configurable)
@@ -201,7 +207,7 @@ export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
   }
 
   // Handle order submission
-  const handleSubmitOrder = () => {
+  const handleSubmitOrder = async () => {
     if (cartItemsCount === 0 && !selectedFormula) return
 
     // Calculate totals including formula
@@ -209,6 +215,79 @@ export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
     const formulaPoints = getFormulaPoints()
     const totalPrice = cartTotal + formulaPrice
     const totalPoints = cartTotalPoints + formulaPoints
+
+    if (totalPrice < deliveryConfig.minOrderAmount) {
+      addNotification({
+        type: "error",
+        title: "Commande non envoyee",
+        message: `Le minimum de commande est ${deliveryConfig.minOrderAmount.toFixed(2)} TND.`,
+      })
+      return
+    }
+
+    const remoteOrderItems: OrderItem[] = [
+      ...(selectedFormula
+        ? [{
+            id: `formula-${selectedFormula}`,
+            name: baseFormulas.find((formula) => formula.type === selectedFormula)?.name || "Formule de base",
+            price: formulaPrice,
+            quantity: 1,
+            points: formulaPoints,
+            image: baseFormulas.find((formula) => formula.type === selectedFormula)?.image,
+          }]
+        : []),
+      ...cart.map((cartItem) => ({
+        id: `${cartItem.item.id}-${(cartItem.selectedSupplements || []).map((s) => `${s.supplementId}:${s.quantity}`).join(",")}`,
+        name: cartItem.item.name,
+        price: cartItem.item.price,
+        quantity: cartItem.quantity,
+        image: cartItem.item.image,
+        points: cartItem.item.points || 0,
+        supplements: (cartItem.selectedSupplements || []).flatMap((supplement) =>
+          Array.from({ length: supplement.quantity }, () => ({
+            name: supplement.name,
+            price: supplement.price,
+          }))
+        ),
+      })),
+    ]
+
+    if (canCreateRemoteClientOrder) {
+      const clientOrder = await createOrderFromItems(
+        remoteOrderItems,
+        "pickup",
+        "cash_on_pickup",
+        {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        },
+        undefined,
+        undefined,
+        [customerNote, tableNumber ? `Table: ${tableNumber}` : ""].filter(Boolean).join(" | ")
+      )
+
+      if (clientOrder) {
+        clearCart()
+        selectFormula(null)
+        setLastClientOrder({
+          orderNumber: clientOrder.orderNumber,
+          estimatedTime: clientOrder.estimatedTime,
+        })
+        setShowCartSummary(false)
+        setShowOrderSuccess(true)
+        setCustomerNote("")
+        setTableNumber("")
+        return
+      }
+
+      addNotification({
+        type: "error",
+        title: "Commande non envoyee",
+        message: "La requete n'a pas ete envoyee ou a echoue avant validation.",
+      })
+      return
+    }
 
     // Create order in breakfast context
     createOrder(customerNote, {
@@ -271,6 +350,7 @@ export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
     })
 
     setShowCartSummary(false)
+    setLastClientOrder(null)
     setShowOrderSuccess(true)
     setCustomerNote("")
     setTableNumber("")
@@ -615,8 +695,15 @@ export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
           </motion.div>
           <h1 className="text-3xl font-bold text-stone-900 mb-3">Commande envoyee !</h1>
           <p className="text-stone-600 mb-2">
-            Votre commande a ete transmise en cuisine.
+            {lastClientOrder
+              ? `Votre commande ${lastClientOrder.orderNumber} a ete transmise en cuisine.`
+              : "Votre commande a ete transmise en cuisine."}
           </p>
+          {lastClientOrder && (
+            <p className="text-amber-600 font-medium mb-2">
+              Temps estime: ~{lastClientOrder.estimatedTime} min
+            </p>
+          )}
           {cartTotalPoints > 0 && (
             <p className="text-emerald-600 font-medium mb-8">
               Vous allez gagner +{cartTotalPoints} points fidelite
@@ -910,7 +997,7 @@ export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
               )}
 
               <Button
-                onClick={handleSubmitOrder}
+                onClick={() => void handleSubmitOrder()}
                 disabled={cartItemsCount === 0 && !selectedFormula}
                 className="w-full bg-white text-amber-600 hover:bg-stone-100 py-6 rounded-2xl text-lg font-semibold shadow-lg"
               >

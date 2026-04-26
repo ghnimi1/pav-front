@@ -304,7 +304,7 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([])
   const [orders, setOrders] = useState<BreakfastOrder[]>([])
   const [userTotalPoints, setUserTotalPoints] = useState(0)
-  const { addPoints, getClientById, getClientByEmail, updateClient } = useLoyalty()
+  const { addPoints, getClientById, getClientByEmail, updateClient, referrals, validateReferralFirstPurchase } = useLoyalty()
 
   useEffect(() => {
     let cancelled = false
@@ -685,6 +685,16 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
     }
 
     setOrders((prev) => [order, ...prev])
+
+    const pendingReferral = referrals.find(
+      (referral) =>
+        referral.status === "first_purchase_pending" &&
+        (referral.referredId === order.clientId || referral.referredEmail === order.clientEmail)
+    )
+
+    if (pendingReferral) {
+      validateReferralFirstPurchase(pendingReferral.id, order.total, "system-breakfast-order")
+    }
 
     const loyaltyClient =
       (order.clientId && getClientById(order.clientId)) ||

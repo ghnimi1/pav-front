@@ -9,6 +9,7 @@ import { useLoyalty } from "@/contexts/loyalty-context"
 import { useAuth } from "@/contexts/auth-context"
 import { useDiscount } from "@/contexts/discount-context"
 import { useOrders, type OrderItem } from "@/contexts/orders-context"
+import { useNotification } from "@/contexts/notification-context"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -69,9 +70,10 @@ interface OfferCartItem {
 
 export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
   const { user } = useAuth()
+  const { addNotification } = useNotification()
   const { getClientByEmail } = useLoyalty()
   const { addSale } = useUnifiedSales()
-  const { createOrderFromItems } = useOrders()
+  const { createOrderFromItems, deliveryConfig } = useOrders()
   const {
     menuItems,
     menuCategories,
@@ -101,6 +103,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
   // Get client loyalty data
   const loyaltyClient = user?.role === "client" && user?.email ? getClientByEmail(user.email) : null
   const clientPoints = loyaltyClient?.loyaltyPoints ?? 0
+  const canCreateRemoteClientOrder = !!user?.id && !!user?.email && user.role !== "admin"
   
   // Use discount context
   const discountContext = useDiscount()
@@ -300,6 +303,15 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
   const handleSubmitOrder = async () => {
     if (cartItemsCount === 0) return
 
+    if (cartTotal < deliveryConfig.minOrderAmount) {
+      addNotification({
+        type: "error",
+        title: "Commande non envoyee",
+        message: `Le minimum de commande est ${deliveryConfig.minOrderAmount.toFixed(2)} TND.`,
+      })
+      return
+    }
+
     const remoteOrderItems: OrderItem[] = [
       ...offerCart.map((offerItem) => ({
         id: `offer-${offerItem.offer.id}`,
@@ -325,7 +337,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
       })),
     ]
 
-    if (user?.role === "client") {
+    if (canCreateRemoteClientOrder) {
       const clientOrder = await createOrderFromItems(
         remoteOrderItems,
         "pickup",
@@ -352,6 +364,13 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
         setTableNumber("")
         return
       }
+
+      addNotification({
+        type: "error",
+        title: "Commande non envoyee",
+        message: "La requete n'a pas ete envoyee ou a echoue avant validation.",
+      })
+      return
     }
     
     // Build items array

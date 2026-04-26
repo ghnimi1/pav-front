@@ -152,7 +152,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<OrderItem[]>([])
   const [deliveryConfig, setDeliveryConfig] = useState<DeliveryConfig>(defaultDeliveryConfig)
   const [orderCounter, setOrderCounter] = useState(1000)
-  const { addPoints, getClientById, getClientByEmail, updateClient } = useLoyalty()
+  const { referrals, validateReferralFirstPurchase } = useLoyalty()
 
   useEffect(() => {
     const savedCart = localStorage.getItem("remote-cart")
@@ -284,12 +284,12 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
 
   const createOrderFromItems = async (
     items: OrderItem[],
-    deliveryMode,
-    paymentMethod,
-    clientInfo,
-    deliveryAddress,
-    pickupTime,
-    customerNote,
+    deliveryMode: any,
+    paymentMethod: any,
+    clientInfo: any,
+    deliveryAddress: any,
+    pickupTime: any,
+    customerNote: any,
     clearProviderCart = false
   ): Promise<RemoteOrder | null> => {
     if (items.length === 0) return null
@@ -327,33 +327,14 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
 
       setOrders((prev) => [order, ...prev])
 
-      const loyaltyClient =
-        (order.clientId && getClientById(order.clientId)) ||
-        (order.clientEmail && getClientByEmail(order.clientEmail))
+      const pendingReferral = referrals.find(
+        (referral) =>
+          referral.status === "first_purchase_pending" &&
+          (referral.referredId === order.clientId || referral.referredEmail === order.clientEmail)
+      )
 
-      if (loyaltyClient) {
-        const loyaltyMetadata = {
-          orderId: order.id,
-          totalSpent: (loyaltyClient.totalSpent || 0) + order.total,
-          totalOrdersIncrement: 1,
-          lastVisit: new Date().toISOString(),
-        }
-
-        if (order.totalPoints > 0) {
-          addPoints(
-            loyaltyClient.id,
-            order.totalPoints,
-            "earn",
-            `Commande ${order.orderNumber}`,
-            loyaltyMetadata
-          )
-        } else {
-          updateClient(loyaltyClient.id, {
-            totalSpent: loyaltyMetadata.totalSpent,
-            totalOrders: (loyaltyClient.totalOrders || 0) + 1,
-            lastVisit: loyaltyMetadata.lastVisit,
-          })
-        }
+      if (pendingReferral) {
+        validateReferralFirstPurchase(pendingReferral.id, order.total, "system-order-create")
       }
 
       if (clearProviderCart) {
@@ -361,69 +342,8 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
       }
       return order
     } catch (error) {
-      console.error("Failed to create remote order, using local fallback:", error)
-
-      const newCounter = orderCounter + 1
-      setOrderCounter(newCounter)
-
-      const deliveryFee = deliveryMode === "delivery" ? getDeliveryFee(itemsTotal) : 0
-      const fallbackOrder: RemoteOrder = {
-        id: `RO-${Date.now()}`,
-        orderNumber: `CMD-${newCounter}`,
-        items: [...items],
-        subtotal: itemsTotal,
-        deliveryFee,
-        total: itemsTotal + deliveryFee,
-        totalPoints: itemsTotalPoints,
-        status: "new",
-        deliveryMode,
-        paymentMethod,
-        deliveryAddress,
-        pickupTime,
-        estimatedTime: getEstimatedTime(deliveryMode),
-        createdAt: new Date().toISOString(),
-        clientId: clientInfo.id,
-        clientEmail: clientInfo.email,
-        clientName: clientInfo.name,
-        clientPhone: clientInfo.phone,
-        customerNote,
-      }
-
-      setOrders((prev) => [fallbackOrder, ...prev])
-
-      const loyaltyClient =
-        (fallbackOrder.clientId && getClientById(fallbackOrder.clientId)) ||
-        (fallbackOrder.clientEmail && getClientByEmail(fallbackOrder.clientEmail))
-
-      if (loyaltyClient) {
-        const loyaltyMetadata = {
-          orderId: fallbackOrder.id,
-          totalSpent: (loyaltyClient.totalSpent || 0) + fallbackOrder.total,
-          totalOrdersIncrement: 1,
-          lastVisit: new Date().toISOString(),
-        }
-
-        if (fallbackOrder.totalPoints > 0) {
-          addPoints(
-            loyaltyClient.id,
-            fallbackOrder.totalPoints,
-            "earn",
-            `Commande ${fallbackOrder.orderNumber}`,
-            loyaltyMetadata
-          )
-        } else {
-          updateClient(loyaltyClient.id, {
-            totalSpent: loyaltyMetadata.totalSpent,
-            totalOrders: (loyaltyClient.totalOrders || 0) + 1,
-            lastVisit: loyaltyMetadata.lastVisit,
-          })
-        }
-      }
-
-      if (clearProviderCart) {
-        clearCart()
-      }
-      return fallbackOrder
+      console.error("Failed to create remote order:", error)
+      return null
     }
   }
 
