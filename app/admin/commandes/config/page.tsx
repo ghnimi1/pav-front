@@ -28,6 +28,7 @@ import { AuthProvider, useAuth } from "@/contexts/auth-context"
 import { OrdersProvider, useOrders, type DeliveryConfig } from "@/contexts/orders-context"
 import { NotificationProvider, useNotification } from "@/contexts/notification-context"
 import { NotificationContainer } from "@/components/notification-container"
+import { LoyaltyProvider } from "@/contexts/loyalty-context"
 
 function DeliveryConfigContent() {
   const router = useRouter()
@@ -386,9 +387,11 @@ export default function DeliveryConfigPage() {
   return (
     <NotificationProvider>
       <AuthProvider>
-        <OrdersProvider>
-          <DeliveryConfigContent />
-        </OrdersProvider>
+        <LoyaltyProvider>  {/* Loyalty likely depends on auth */}
+          <OrdersProvider>  {/* Orders might depend on loyalty */}
+            <DeliveryConfigContent />
+          </OrdersProvider>
+        </LoyaltyProvider>
         <NotificationContainer />
       </AuthProvider>
     </NotificationProvider>
