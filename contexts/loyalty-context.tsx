@@ -152,6 +152,26 @@ export interface GamePlay {
   playedAt: string
 }
 
+export interface GameReward {
+  id: string
+  name: string
+  points: number
+  probability: number
+  color: string
+}
+
+export interface GameConfig {
+  id: string
+  name: string
+  icon: "roulette" | "chichbich"
+  enabled: boolean
+  startHour: number
+  endHour: number
+  maxPlaysPerDay: number
+  minPointsRequired: number
+  rewards: GameReward[]
+}
+
 export interface ShareLink {
   id: string
   clientId: string
@@ -230,6 +250,18 @@ type ClientMissionApiResponse = {
   clientMission: ClientMission
 }
 
+type GamesConfigApiResponse = {
+  gamesConfig: GameConfig[]
+}
+
+type GamePlaysApiResponse = {
+  gamePlays: GamePlay[]
+}
+
+type GamePlayApiResponse = {
+  gamePlay: GamePlay
+}
+
 // ============================================
 // CONTEXTE
 // ============================================
@@ -262,9 +294,11 @@ interface LoyaltyContextType {
   updateMissionProgress: (clientId: string, missionId: string, progress: number) => void
 
   gamePlays: GamePlay[]
+  gamesConfig: GameConfig[]
   canPlayGame: (clientId: string, gameType: GameType) => boolean
-  playGame: (clientId: string, gameType: GameType) => GamePlay
+  playGame: (clientId: string, gameType: GameType, prizeOverride?: GamePlay["prize"]) => GamePlay
   resetGamePlays: (clientId?: string) => void
+  saveGamesConfig: (configs: GameConfig[]) => void
 
   specialDays: SpecialDay[]
   addSpecialDay: (day: Omit<SpecialDay, "id" | "createdAt">) => void
@@ -447,6 +481,44 @@ function isClientBirthdayToday(client?: LoyaltyClient) {
   )
 }
 
+function getInitialGamesConfig(): GameConfig[] {
+  return [
+    {
+      id: "roulette",
+      name: "Roulette de la Chance",
+      icon: "roulette",
+      enabled: true,
+      startHour: 10,
+      endHour: 14,
+      maxPlaysPerDay: 3,
+      minPointsRequired: 50,
+      rewards: [
+        { id: "r1", name: "5 Points Bonus", points: 5, probability: 30, color: "#22c55e" },
+        { id: "r2", name: "10 Points Bonus", points: 10, probability: 25, color: "#3b82f6" },
+        { id: "r3", name: "25 Points Bonus", points: 25, probability: 15, color: "#a855f7" },
+        { id: "r4", name: "50 Points Bonus", points: 50, probability: 8, color: "#f59e0b" },
+        { id: "r5", name: "100 Points Bonus", points: 100, probability: 2, color: "#ef4444" },
+        { id: "r6", name: "Rejouer", points: 0, probability: 20, color: "#64748b" },
+      ],
+    },
+    {
+      id: "chichbich",
+      name: "Chichbich (Des Tunisiens)",
+      icon: "chichbich",
+      enabled: true,
+      startHour: 18,
+      endHour: 22,
+      maxPlaysPerDay: 2,
+      minPointsRequired: 100,
+      rewards: [
+        { id: "c1", name: "Double (x2)", points: 20, probability: 16.67, color: "#22c55e" },
+        { id: "c2", name: "Triple", points: 50, probability: 2.78, color: "#f59e0b" },
+        { id: "c3", name: "Chichbich!", points: 200, probability: 0.46, color: "#ef4444" },
+      ],
+    },
+  ]
+}
+
 export function LoyaltyProvider({ children }: { children: ReactNode }) {
   const [clients, setClients] = useState<LoyaltyClient[]>([])
   const [transactions, setTransactions] = useState<PointsTransaction[]>([])
@@ -454,6 +526,7 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
   const [missions, setMissions] = useState<Mission[]>([])
   const [clientMissions, setClientMissions] = useState<ClientMission[]>([])
   const [gamePlays, setGamePlays] = useState<GamePlay[]>([])
+  const [gamesConfig, setGamesConfig] = useState<GameConfig[]>([])
   const [specialDays, setSpecialDays] = useState<SpecialDay[]>([])
   const [referrals, setReferrals] = useState<Referral[]>([])
   const [referralConfig, setReferralConfig] = useState({
@@ -580,6 +653,32 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const loadGamesConfigFromBackend = async () => {
+    const token = localStorage.getItem("authToken")
+    if (!token) return
+
+    try {
+      const response = await apiGet<GamesConfigApiResponse>("/auth/games-config")
+      setGamesConfig(response.gamesConfig)
+      return
+    } catch (error) {
+      console.error("Failed to load games config from backend:", error)
+    }
+  }
+
+  const loadGamePlaysFromBackend = async () => {
+    const token = localStorage.getItem("authToken")
+    if (!token) return
+
+    try {
+      const response = await apiGet<GamePlaysApiResponse>("/auth/game-plays")
+      setGamePlays(response.gamePlays)
+      return
+    } catch (error) {
+      console.error("Failed to load game plays from backend:", error)
+    }
+  }
+
   useEffect(() => {
     const storedTransactions = localStorage.getItem("loyalty_transactions")
     const storedRewards = localStorage.getItem("loyalty_rewards")
@@ -589,6 +688,7 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     const storedSpecialDays = localStorage.getItem("loyalty_special_days")
     const storedReferralConfig = localStorage.getItem("loyalty_referral_config")
     const storedShareLinks = localStorage.getItem("loyalty_share_links")
+    const storedGamesConfig = localStorage.getItem("loyalty_games_config")
 
     syncClientsFromCurrentUser()
     if (storedTransactions) setTransactions(JSON.parse(storedTransactions))
@@ -598,6 +698,8 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     else setMissions(getInitialMissions())
     if (storedClientMissions) setClientMissions(JSON.parse(storedClientMissions))
     if (storedGamePlays) setGamePlays(JSON.parse(storedGamePlays))
+    if (storedGamesConfig) setGamesConfig(JSON.parse(storedGamesConfig))
+    else setGamesConfig(getInitialGamesConfig())
     if (storedSpecialDays) setSpecialDays(JSON.parse(storedSpecialDays))
     else setSpecialDays(getInitialSpecialDays())
     if (storedReferralConfig) setReferralConfig(JSON.parse(storedReferralConfig))
@@ -609,6 +711,8 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     void loadMissionsFromBackend()
     void loadSpecialDaysFromBackend()
     void loadClientMissionsFromBackend()
+    void loadGamesConfigFromBackend()
+    void loadGamePlaysFromBackend()
 
     const handleAuthSync = () => {
       void loadClientsFromBackend()
@@ -617,6 +721,8 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
       void loadMissionsFromBackend()
       void loadSpecialDaysFromBackend()
       void loadClientMissionsFromBackend()
+      void loadGamesConfigFromBackend()
+      void loadGamePlaysFromBackend()
     }
 
     window.addEventListener(AUTH_STORAGE_SYNC_EVENT, handleAuthSync)
@@ -643,6 +749,9 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     localStorage.setItem("loyalty_game_plays", JSON.stringify(gamePlays))
   }, [gamePlays])
+  useEffect(() => {
+    localStorage.setItem("loyalty_games_config", JSON.stringify(gamesConfig))
+  }, [gamesConfig])
   useEffect(() => {
     localStorage.setItem("loyalty_special_days", JSON.stringify(specialDays))
   }, [specialDays])
@@ -1063,66 +1172,55 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
   const canPlayGame = (clientId: string, gameType: GameType): boolean => {
     const now = new Date()
     const hour = now.getHours()
+    const client = getClientById(clientId)
+    const gameConfig = gamesConfig.find((game) => game.id === gameType)
 
-    // Lire la configuration admin depuis localStorage
-    let gamesConfig: any[] = []
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("pave_art_games_config")
-      if (saved) {
-        gamesConfig = JSON.parse(saved)
-      }
-    }
-
-    const gameConfig = gamesConfig.find((g: any) => g.id === gameType)
-    const isEnabled = gameConfig?.enabled ?? true
-    
-    if (!isEnabled) {
+    if (!client || !gameConfig || !gameConfig.enabled) {
       return false
     }
 
-    // Verifier la plage horaire configuree par l'admin
-    if (gameType === "roulette") {
-      const startHour = gameConfig?.startHour ?? LOYALTY_CONFIG.games.roulette.startHour
-      const endHour = gameConfig?.endHour ?? LOYALTY_CONFIG.games.roulette.endHour
-      if (hour < startHour || hour >= endHour) {
-        return false
-      }
-    } else if (gameType === "chichbich") {
-      const startHour = gameConfig?.startHour ?? LOYALTY_CONFIG.games.chichbich.startHour
-      const endHour = gameConfig?.endHour ?? LOYALTY_CONFIG.games.chichbich.endHour
-      if (hour < startHour || hour >= endHour) {
-        return false
-      }
+    if (hour < gameConfig.startHour || hour >= gameConfig.endHour) {
+      return false
     }
 
-    // Verifier la limite de parties quotidiennes
-    const today = now.toISOString().split("T")[0]
-    const playedToday = gamePlays.some(
-      (gp) => gp.clientId === clientId && gp.gameType === gameType && gp.playedAt.startsWith(today),
-    )
+    if (client.loyaltyPoints < gameConfig.minPointsRequired) {
+      return false
+    }
 
-    return !playedToday
+    const today = now.toISOString().split("T")[0]
+    const playedTodayCount = gamePlays.filter(
+      (gp) => gp.clientId === clientId && gp.gameType === gameType && gp.playedAt.startsWith(today),
+    ).length
+
+    return playedTodayCount < gameConfig.maxPlaysPerDay
   }
 
-  const playGame = (clientId: string, gameType: GameType): GamePlay => {
-    const prizes = [
-      { type: "points" as const, value: 10, description: "10 points bonus", probability: 0.3 },
-      { type: "points" as const, value: 25, description: "25 points bonus", probability: 0.2 },
-      { type: "points" as const, value: 50, description: "50 points bonus", probability: 0.1 },
-      { type: "discount" as const, value: 5, description: "5 TND de reduction", probability: 0.15 },
-      { type: "discount" as const, value: 10, description: "10 TND de reduction", probability: 0.05 },
-      { type: "free_item" as const, value: 1, description: "Croissant offert", probability: 0.1 },
-    ]
+  const playGame = (clientId: string, gameType: GameType, prizeOverride?: GamePlay["prize"]): GamePlay => {
+    let wonPrize = prizeOverride
 
-    const random = Math.random()
-    let cumulativeProbability = 0
-    let wonPrize = null
+    if (!wonPrize) {
+      const gameConfig = gamesConfig.find((game) => game.id === gameType)
+      const rewards = gameConfig?.rewards || []
+      const normalizedRewards = rewards.map((reward) => ({
+        reward,
+        probability: Math.max(reward.probability, 0),
+      }))
+      const totalProbability = normalizedRewards.reduce((sum, item) => sum + item.probability, 0)
+      const random = Math.random() * (totalProbability || 1)
+      let cursor = 0
 
-    for (const prize of prizes) {
-      cumulativeProbability += prize.probability
-      if (random <= cumulativeProbability) {
-        wonPrize = prize
-        break
+      for (const item of normalizedRewards) {
+        cursor += item.probability
+        if (random <= cursor) {
+          if (item.reward.points > 0) {
+            wonPrize = {
+              type: "points",
+              value: item.reward.points,
+              description: item.reward.name,
+            }
+          }
+          break
+        }
       }
     }
 
@@ -1131,21 +1229,23 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
       clientId,
       gameType,
       result: wonPrize ? "win" : "lose",
-      prize: wonPrize
-        ? {
-            type: wonPrize.type,
-            value: wonPrize.value,
-            description: wonPrize.description,
-          }
-        : undefined,
+      prize: wonPrize || undefined,
       playedAt: new Date().toISOString(),
     }
 
-setGamePlays((prev) => [...prev, gamePlay])
+    setGamePlays((prev) => [...prev, gamePlay])
 
-    if (wonPrize && wonPrize.type === "points") {
+    void apiPost<GamePlayApiResponse>("/auth/game-plays", gamePlay)
+      .then((response) => {
+        setGamePlays((prev) => prev.map((entry) => (entry.id === gamePlay.id ? response.gamePlay : entry)))
+      })
+      .catch((error) => {
+        console.error("Failed to persist game play:", error)
+      })
+
+    if (wonPrize?.type === "points") {
       addPoints(clientId, wonPrize.value, "game_win", `Gain ${gameType}: ${wonPrize.description}`, { gameType })
-    } else if (wonPrize && wonPrize.type === "discount") {
+    } else if (wonPrize?.type === "discount") {
       const client = clients.find((c) => c.id === clientId)
       if (client) {
         addToWallet(clientId, wonPrize.value, `Gain ${gameType}: ${wonPrize.description}`)
@@ -1158,12 +1258,26 @@ setGamePlays((prev) => [...prev, gamePlay])
   // Reinitialiser les parties jouees (pour un client specifique ou tous)
   const resetGamePlays = (clientId?: string) => {
     if (clientId) {
-      // Reinitialiser uniquement pour un client specifique
       setGamePlays((prev) => prev.filter((gp) => gp.clientId !== clientId))
     } else {
-      // Reinitialiser toutes les parties jouees
       setGamePlays([])
     }
+
+    const query = clientId ? `?clientId=${encodeURIComponent(clientId)}` : ""
+    void apiDelete(`/auth/game-plays${query}`).catch((error) => {
+      console.error("Failed to reset game plays:", error)
+    })
+  }
+
+  const saveGamesConfig = (configs: GameConfig[]) => {
+    setGamesConfig(configs)
+    void apiPut<GamesConfigApiResponse>("/auth/games-config", { gamesConfig: configs })
+      .then((response) => {
+        setGamesConfig(response.gamesConfig)
+      })
+      .catch((error) => {
+        console.error("Failed to save games config:", error)
+      })
   }
 
   const addSpecialDay = (dayData: Omit<SpecialDay, "id" | "createdAt">) => {
@@ -1461,10 +1575,12 @@ setGamePlays((prev) => [...prev, gamePlay])
         updateMission,
         deleteMission,
         updateMissionProgress,
-gamePlays,
-  canPlayGame,
-  playGame,
-  resetGamePlays,
+        gamePlays,
+        gamesConfig,
+        canPlayGame,
+        playGame,
+        resetGamePlays,
+        saveGamesConfig,
         specialDays,
         addSpecialDay,
         updateSpecialDay,

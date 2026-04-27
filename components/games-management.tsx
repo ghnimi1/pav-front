@@ -35,64 +35,8 @@ import {
   PauseIcon,
   RefreshCwIcon,
 } from "lucide-react"
-import { useLoyalty } from "@/contexts/loyalty-context"
+import { useLoyalty, type GameConfig, type GameReward } from "@/contexts/loyalty-context"
 import { useNotification } from "@/contexts/notification-context"
-
-interface GameReward {
-  id: string
-  name: string
-  points: number
-  probability: number
-  color: string
-}
-
-interface GameConfig {
-  id: string
-  name: string
-  icon: "roulette" | "chichbich"
-  enabled: boolean
-  startHour: number
-  endHour: number
-  maxPlaysPerDay: number
-  minPointsRequired: number
-  rewards: GameReward[]
-}
-
-const defaultGamesConfig: GameConfig[] = [
-  {
-    id: "roulette",
-    name: "Roulette de la Chance",
-    icon: "roulette",
-    enabled: true,
-    startHour: 10,
-    endHour: 14,
-    maxPlaysPerDay: 3,
-    minPointsRequired: 50,
-    rewards: [
-      { id: "r1", name: "5 Points Bonus", points: 5, probability: 30, color: "#22c55e" },
-      { id: "r2", name: "10 Points Bonus", points: 10, probability: 25, color: "#3b82f6" },
-      { id: "r3", name: "25 Points Bonus", points: 25, probability: 15, color: "#a855f7" },
-      { id: "r4", name: "50 Points Bonus", points: 50, probability: 8, color: "#f59e0b" },
-      { id: "r5", name: "100 Points Bonus", points: 100, probability: 2, color: "#ef4444" },
-      { id: "r6", name: "Rejouer", points: 0, probability: 20, color: "#64748b" },
-    ],
-  },
-  {
-    id: "chichbich",
-    name: "Chichbich (Des Tunisiens)",
-    icon: "chichbich",
-    enabled: true,
-    startHour: 18,
-    endHour: 22,
-    maxPlaysPerDay: 2,
-    minPointsRequired: 100,
-    rewards: [
-      { id: "c1", name: "Double (x2)", points: 20, probability: 16.67, color: "#22c55e" },
-      { id: "c2", name: "Triple", points: 50, probability: 2.78, color: "#f59e0b" },
-      { id: "c3", name: "Chichbich!", points: 200, probability: 0.46, color: "#ef4444" },
-    ],
-  },
-]
 
 export function GamesManagement() {
   const [gamesConfig, setGamesConfig] = useState<GameConfig[]>([])
@@ -102,21 +46,19 @@ export function GamesManagement() {
   const [editingReward, setEditingReward] = useState<GameReward | null>(null)
   const [hasChanges, setHasChanges] = useState(false)
 
-  const { resetGamePlays, gamePlays } = useLoyalty()
+  const { resetGamePlays, gamePlays, gamesConfig: storedGamesConfig, saveGamesConfig } = useLoyalty()
   const { addNotification } = useNotification()
 
   useEffect(() => {
-    const saved = localStorage.getItem("pave_art_games_config")
-    if (saved) {
-      setGamesConfig(JSON.parse(saved))
-    } else {
-      setGamesConfig(defaultGamesConfig)
+    if (storedGamesConfig.length > 0) {
+      setGamesConfig(storedGamesConfig)
     }
-  }, [])
+  }, [storedGamesConfig])
 
   const saveConfig = () => {
-    localStorage.setItem("pave_art_games_config", JSON.stringify(gamesConfig))
+    saveGamesConfig(gamesConfig)
     setHasChanges(false)
+    addNotification("Configuration des jeux sauvegardee", "success")
   }
 
   const handleResetAllGamePlays = () => {

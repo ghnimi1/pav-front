@@ -21,7 +21,7 @@ import {
   ImageIcon,
   XIcon,
 } from "lucide-react"
-import { useLoyalty, type LoyaltyClient } from "@/contexts/loyalty-context"
+import { useLoyalty, type GameConfig, type LoyaltyClient } from "@/contexts/loyalty-context"
 import { useNotification } from "@/contexts/notification-context"
 import { useStock } from "@/contexts/stock-context"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog"
@@ -421,16 +421,6 @@ function Confetti({ show }: { show: boolean }) {
   )
 }
 
-interface GameConfig {
-  id: string
-  name: string
-  enabled: boolean
-  startHour: number
-  endHour: number
-  maxPlaysPerDay: number
-  minPointsRequired: number
-}
-
 interface LoyaltyGamesProps {
   client: LoyaltyClient
 }
@@ -448,7 +438,6 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
   const [rouletteResult, setRouletteResult] = useState<any>(null)
   const [chichbichResult, setChichbichResult] = useState<{ dice1: number; dice2: number; reward: any } | null>(null)
   const [currentTime, setCurrentTime] = useState(new Date())
-  const [gamesConfig, setGamesConfig] = useState<GameConfig[]>(defaultGamesConfig)
   const [wheelRotation, setWheelRotation] = useState(0)
   const [winningSegmentIndex, setWinningSegmentIndex] = useState<number | null>(null)
   const [dice1Value, setDice1Value] = useState(1)
@@ -466,17 +455,9 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const { canPlayGame, playGame, createShareLink, getClientShareLink, hasValidShareToday } = useLoyalty()
+  const { canPlayGame, playGame, createShareLink, getClientShareLink, hasValidShareToday, gamesConfig } = useLoyalty()
   const { menuItems, menuCategories } = useStock()
   const { addNotification } = useNotification()
-
-  // Charger la configuration des jeux depuis localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem("pave_art_games_config")
-    if (saved) {
-      setGamesConfig(JSON.parse(saved))
-    }
-  }, [])
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000)
@@ -519,15 +500,27 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
 
     // Attendre la fin de l'animation
     setTimeout(() => {
-      const result = playGame(client.id, "roulette")
       const segment = WHEEL_SEGMENTS[randomIndex]
+      const prize = segment.prize
+        ? {
+            type:
+              segment.prize.type === "gift"
+                ? "free_item"
+                : segment.prize.type === "jackpot"
+                  ? "points"
+                  : segment.prize.type,
+            value: typeof segment.prize.value === "number" ? segment.prize.value : 1,
+            description: segment.label,
+          }
+        : undefined
+      playGame(client.id, "roulette", prize)
       
-      if (segment.prize) {
+      if (prize) {
         setRouletteResult({ 
           result: "win", 
           prize: { 
             description: segment.label,
-            ...segment.prize 
+            ...prize 
           } 
         })
         setShowConfetti(true)
@@ -697,12 +690,8 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
       setDice1Value(finalDice1)
       setDice2Value(finalDice2)
       
-      const result = playGame(client.id, "chichbich")
-      
-      // Recompenses basees sur le total des des
       let reward = null
       if (finalDice1 === finalDice2) {
-        // Double! Bonus special
         reward = { description: `Double ${finalDice1}! +${finalDice1 * 20} points`, type: "points", value: finalDice1 * 20 }
         setShowConfetti(true)
       } else if (total >= 10) {
@@ -717,6 +706,8 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
         dice2: finalDice2,
         reward: reward,
       })
+
+      playGame(client.id, "chichbich", reward ?? undefined)
       
       if (reward) {
         addNotification(`Chichbich! ${reward.description}`, "success")
