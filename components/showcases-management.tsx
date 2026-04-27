@@ -82,27 +82,27 @@ export function ShowcasesManagement() {
     setIsDialogOpen(true)
   }
   
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.name.trim()) return
     
     if (editingShowcase) {
-      updateShowcase(editingShowcase.id, form)
+      await updateShowcase(editingShowcase.id, form)
     } else {
-      addShowcase(form)
+      await addShowcase(form)
     }
     
     setIsDialogOpen(false)
     resetForm()
   }
   
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     const stock = getShowcaseStock(id)
     if (stock.length > 0) {
       alert("Impossible de supprimer cette vitrine car elle contient des produits")
       return
     }
     if (confirm("Supprimer cette vitrine?")) {
-      deleteShowcase(id)
+      await deleteShowcase(id)
     }
   }
   

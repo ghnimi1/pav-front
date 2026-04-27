@@ -138,30 +138,30 @@ interface ProductionContextType {
   
   // Showcases
   showcases: Showcase[]
-  addShowcase: (showcase: Omit<Showcase, "id" | "createdAt" | "updatedAt">) => void
-  updateShowcase: (id: string, showcase: Partial<Showcase>) => void
-  deleteShowcase: (id: string) => void
+  addShowcase: (showcase: Omit<Showcase, "id" | "createdAt" | "updatedAt">) => Promise<void>
+  updateShowcase: (id: string, showcase: Partial<Showcase>) => Promise<void>
+  deleteShowcase: (id: string) => Promise<void>
   
   // Production Orders
   productionOrders: ProductionOrder[]
-  addProductionOrder: (order: Omit<ProductionOrder, "id" | "createdAt" | "updatedAt">) => void
-  updateProductionOrder: (id: string, order: Partial<ProductionOrder>) => void
-  deleteProductionOrder: (id: string) => void
-  startProduction: (orderId: string, employeeId: string) => boolean
-  completeProduction: (orderId: string) => boolean
-  cancelProduction: (orderId: string) => void
+  addProductionOrder: (order: Omit<ProductionOrder, "id" | "createdAt" | "updatedAt">) => Promise<void>
+  updateProductionOrder: (id: string, order: Partial<ProductionOrder>) => Promise<void>
+  deleteProductionOrder: (id: string) => Promise<void>
+  startProduction: (orderId: string, employeeId: string) => Promise<boolean>
+  completeProduction: (orderId: string) => Promise<boolean>
+  cancelProduction: (orderId: string) => Promise<void>
   checkIngredientAvailability: (recipeId: string, quantity: number) => { available: boolean; missing: { productId: string; needed: number; available: number }[] }
   
   // Showcase Stock
   showcaseItems: ShowcaseItem[]
-  addShowcaseItem: (item: Omit<ShowcaseItem, "id" | "createdAt" | "updatedAt">) => void
-  updateShowcaseItem: (id: string, item: Partial<ShowcaseItem>) => void
-  deleteShowcaseItem: (id: string) => void
+  addShowcaseItem: (item: Omit<ShowcaseItem, "id" | "createdAt" | "updatedAt">) => Promise<void>
+  updateShowcaseItem: (id: string, item: Partial<ShowcaseItem>) => Promise<void>
+  deleteShowcaseItem: (id: string) => Promise<void>
   getShowcaseStock: (showcaseId: string) => ShowcaseItem[]
   getAvailableItems: (showcaseId?: string) => ShowcaseItem[]
   getExpiringItems: (hours?: number) => ShowcaseItem[]
   getLowStockItems: () => ShowcaseItem[]
-  transferItem: (itemId: string, targetShowcaseId: string, quantity: number) => void
+  transferItem: (itemId: string, targetShowcaseId: string, quantity: number) => Promise<void>
   
   // Stock Management for Sales
   decrementShowcaseStock: (recipeId: string, quantity: number) => boolean // Returns true if successful
@@ -210,6 +210,70 @@ function normalizeRecipe(recipe: Partial<Recipe> & { _id?: string }): Recipe {
   }
 }
 
+function toDateOnly(value: string | Date | undefined): string {
+  if (!value) return new Date().toISOString().split("T")[0]
+  if (typeof value === "string") {
+    return value.includes("T") ? value.split("T")[0] : value
+  }
+  return value.toISOString().split("T")[0]
+}
+
+function normalizeShowcase(showcase: Partial<Showcase> & { _id?: string }): Showcase {
+  const now = new Date().toISOString()
+  return {
+    id: showcase._id || showcase.id || `show-${Date.now()}`,
+    name: showcase.name || "",
+    type: showcase.type || "ambient",
+    temperature: showcase.temperature,
+    capacity: typeof showcase.capacity === "number" ? showcase.capacity : undefined,
+    location: showcase.location || "",
+    isActive: showcase.isActive !== false,
+    createdAt: showcase.createdAt || now,
+    updatedAt: showcase.updatedAt || now,
+  }
+}
+
+function normalizeProductionOrder(order: Partial<ProductionOrder> & { _id?: string }): ProductionOrder {
+  const now = new Date().toISOString()
+  return {
+    id: order._id || order.id || `prod-${Date.now()}`,
+    recipeId: order.recipeId || "",
+    showcaseId: order.showcaseId || "",
+    quantity: typeof order.quantity === "number" ? order.quantity : 1,
+    scheduledDate: toDateOnly(order.scheduledDate),
+    scheduledTime: order.scheduledTime,
+    status: order.status || "planned",
+    producedBy: order.producedBy,
+    startedAt: order.startedAt,
+    completedAt: order.completedAt,
+    notes: order.notes,
+    createdAt: order.createdAt || now,
+    updatedAt: order.updatedAt || now,
+  }
+}
+
+function normalizeShowcaseItem(item: Partial<ShowcaseItem> & { _id?: string }): ShowcaseItem {
+  const now = new Date().toISOString()
+  return {
+    id: item._id || item.id || `si-${Date.now()}`,
+    recipeId: item.recipeId || "",
+    productionOrderId: item.productionOrderId || "",
+    showcaseId: item.showcaseId || "",
+    batchNumber: item.batchNumber || "",
+    quantity: typeof item.quantity === "number" ? item.quantity : 0,
+    initialQuantity: typeof item.initialQuantity === "number" ? item.initialQuantity : 0,
+    productionDate: toDateOnly(item.productionDate),
+    productionTime: item.productionTime || "00:00",
+    expirationDate: toDateOnly(item.expirationDate),
+    expirationTime: item.expirationTime || "00:00",
+    unitCost: typeof item.unitCost === "number" ? item.unitCost : 0,
+    sellingPrice: typeof item.sellingPrice === "number" ? item.sellingPrice : 0,
+    status: item.status || "available",
+    createdAt: item.createdAt || now,
+    updatedAt: item.updatedAt || now,
+  }
+}
+
 async function fetchRecipeCategories(): Promise<RecipeCategory[]> {
   try {
     const data = await apiGet<Array<Partial<RecipeCategory> & { _id?: string }>>("/production/recipe-categories")
@@ -254,6 +318,87 @@ async function updateRecipeAPI(id: string, data: Partial<Recipe>): Promise<void>
 
 async function deleteRecipeAPI(id: string): Promise<void> {
   await apiDelete(`/production/recipes/${id}`)
+}
+
+async function fetchShowcases(): Promise<Showcase[]> {
+  try {
+    const data = await apiGet<Array<Partial<Showcase> & { _id?: string }>>("/production/showcases")
+    return data.map(normalizeShowcase)
+  } catch (error) {
+    console.error("Failed to fetch showcases:", error)
+    return initialShowcases
+  }
+}
+
+async function createShowcaseAPI(data: Omit<Showcase, "id" | "createdAt" | "updatedAt">): Promise<Showcase> {
+  const result = await apiPost<Partial<Showcase> & { _id?: string }>("/production/showcases", data)
+  return normalizeShowcase(result)
+}
+
+async function updateShowcaseAPI(id: string, data: Partial<Showcase>): Promise<void> {
+  await apiPut(`/production/showcases/${id}`, data)
+}
+
+async function deleteShowcaseAPI(id: string): Promise<void> {
+  await apiDelete(`/production/showcases/${id}`)
+}
+
+async function fetchProductionOrders(): Promise<ProductionOrder[]> {
+  try {
+    const data = await apiGet<Array<Partial<ProductionOrder> & { _id?: string }>>("/production/orders")
+    return data.map(normalizeProductionOrder)
+  } catch (error) {
+    console.error("Failed to fetch production orders:", error)
+    return []
+  }
+}
+
+async function createProductionOrderAPI(data: Omit<ProductionOrder, "id" | "createdAt" | "updatedAt">): Promise<ProductionOrder> {
+  const result = await apiPost<Partial<ProductionOrder> & { _id?: string }>("/production/orders", data)
+  return normalizeProductionOrder(result)
+}
+
+async function updateProductionOrderAPI(id: string, data: Partial<ProductionOrder>): Promise<void> {
+  await apiPut(`/production/orders/${id}`, data)
+}
+
+async function deleteProductionOrderAPI(id: string): Promise<void> {
+  await apiDelete(`/production/orders/${id}`)
+}
+
+async function startProductionAPI(id: string, employeeId: string): Promise<void> {
+  await apiPost(`/production/orders/${id}/start`, { employeeId })
+}
+
+async function completeProductionAPI(id: string): Promise<ShowcaseItem> {
+  const result = await apiPost<Partial<ShowcaseItem> & { _id?: string }>(`/production/orders/${id}/complete`)
+  return normalizeShowcaseItem(result)
+}
+
+async function cancelProductionAPI(id: string): Promise<void> {
+  await apiPost(`/production/orders/${id}/cancel`)
+}
+
+async function fetchShowcaseItems(): Promise<ShowcaseItem[]> {
+  try {
+    const data = await apiGet<Array<Partial<ShowcaseItem> & { _id?: string }>>("/production/items/available")
+    return data.map(normalizeShowcaseItem)
+  } catch (error) {
+    console.error("Failed to fetch showcase items:", error)
+    return getInitialShowcaseItems()
+  }
+}
+
+async function updateShowcaseItemAPI(id: string, data: Partial<ShowcaseItem>): Promise<void> {
+  await apiPut(`/production/items/${id}`, data)
+}
+
+async function transferShowcaseItemAPI(id: string, targetShowcaseId: string, quantity: number): Promise<void> {
+  await apiPost(`/production/items/${id}/transfer`, { targetShowcaseId, quantity })
+}
+
+async function deleteShowcaseItemAPI(id: string): Promise<void> {
+  await apiDelete(`/production/items/${id}`)
 }
 
 // Initial Data
@@ -612,23 +757,24 @@ export function ProductionProvider({ children }: { children: ReactNode }) {
   const [sales, setSales] = useState<Sale[]>([])
 
   useEffect(() => {
-    setShowcases(initialShowcases)
-    setShowcaseItems(getInitialShowcaseItems())
-  }, [])
-
-  useEffect(() => {
     let isMounted = true
 
     const loadProductionData = async () => {
-      const [categoriesData, recipesData] = await Promise.all([
+      const [categoriesData, recipesData, showcasesData, ordersData, itemsData] = await Promise.all([
         fetchRecipeCategories(),
         fetchRecipes(),
+        fetchShowcases(),
+        fetchProductionOrders(),
+        fetchShowcaseItems(),
       ])
 
       if (!isMounted) return
 
       setRecipeCategories(categoriesData)
       setRecipes(recipesData)
+      setShowcases(showcasesData)
+      setProductionOrders(ordersData)
+      setShowcaseItems(itemsData)
     }
 
     void loadProductionData()
@@ -771,48 +917,66 @@ const getRecipeMargin = (recipeId: string): number => {
   // SHOWCASES CRUD
   // ============================================
   
-  const addShowcase = (showcase: Omit<Showcase, "id" | "createdAt" | "updatedAt">) => {
-    const newShowcase: Showcase = {
-      ...showcase,
-      id: `show-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+  const addShowcase = async (showcase: Omit<Showcase, "id" | "createdAt" | "updatedAt">) => {
+    try {
+      const newShowcase = await createShowcaseAPI(showcase)
+      setShowcases(prev => [...prev, newShowcase])
+    } catch (error) {
+      console.error("Failed to create showcase:", error)
     }
-    setShowcases(prev => [...prev, newShowcase])
   }
   
-  const updateShowcase = (id: string, updates: Partial<Showcase>) => {
-    setShowcases(prev => prev.map(s => 
-      s.id === id ? { ...s, ...updates, updatedAt: new Date().toISOString() } : s
-    ))
+  const updateShowcase = async (id: string, updates: Partial<Showcase>) => {
+    try {
+      await updateShowcaseAPI(id, updates)
+      setShowcases(prev => prev.map(s =>
+        s.id === id ? { ...s, ...updates, updatedAt: new Date().toISOString() } : s
+      ))
+    } catch (error) {
+      console.error("Failed to update showcase:", error)
+    }
   }
   
-  const deleteShowcase = (id: string) => {
-    setShowcases(prev => prev.filter(s => s.id !== id))
+  const deleteShowcase = async (id: string) => {
+    try {
+      await deleteShowcaseAPI(id)
+      setShowcases(prev => prev.filter(s => s.id !== id))
+    } catch (error) {
+      console.error("Failed to delete showcase:", error)
+    }
   }
   
   // ============================================
   // PRODUCTION ORDERS CRUD
   // ============================================
   
-  const addProductionOrder = (order: Omit<ProductionOrder, "id" | "createdAt" | "updatedAt">) => {
-    const newOrder: ProductionOrder = {
-      ...order,
-      id: `prod-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+  const addProductionOrder = async (order: Omit<ProductionOrder, "id" | "createdAt" | "updatedAt">) => {
+    try {
+      const newOrder = await createProductionOrderAPI(order)
+      setProductionOrders(prev => [...prev, newOrder])
+    } catch (error) {
+      console.error("Failed to create production order:", error)
     }
-    setProductionOrders(prev => [...prev, newOrder])
   }
   
-  const updateProductionOrder = (id: string, updates: Partial<ProductionOrder>) => {
-    setProductionOrders(prev => prev.map(o => 
-      o.id === id ? { ...o, ...updates, updatedAt: new Date().toISOString() } : o
-    ))
+  const updateProductionOrder = async (id: string, updates: Partial<ProductionOrder>) => {
+    try {
+      await updateProductionOrderAPI(id, updates)
+      setProductionOrders(prev => prev.map(o =>
+        o.id === id ? { ...o, ...updates, updatedAt: new Date().toISOString() } : o
+      ))
+    } catch (error) {
+      console.error("Failed to update production order:", error)
+    }
   }
   
-  const deleteProductionOrder = (id: string) => {
-    setProductionOrders(prev => prev.filter(o => o.id !== id))
+  const deleteProductionOrder = async (id: string) => {
+    try {
+      await deleteProductionOrderAPI(id)
+      setProductionOrders(prev => prev.filter(o => o.id !== id))
+    } catch (error) {
+      console.error("Failed to delete production order:", error)
+    }
   }
   
   const checkIngredientAvailability = (recipeId: string, quantity: number) => {
@@ -834,7 +998,7 @@ const getRecipeMargin = (recipeId: string): number => {
     return { available: missing.length === 0, missing }
   }
   
-  const startProduction = (orderId: string, employeeId: string): boolean => {
+  const startProduction = async (orderId: string, employeeId: string): Promise<boolean> => {
     const order = productionOrders.find(o => o.id === orderId)
     if (!order || order.status !== "planned") return false
     
@@ -846,71 +1010,72 @@ const getRecipeMargin = (recipeId: string): number => {
     if (!available) return false
     
     // Consume ingredients from stock (FIFO)
-    for (const ing of recipe.ingredients) {
-      const needed = ing.quantity * order.quantity
-      consumeFromBatches?.(ing.productId, needed)
+    try {
+      await startProductionAPI(orderId, employeeId)
+      for (const ing of recipe.ingredients) {
+        const needed = ing.quantity * order.quantity
+        consumeFromBatches?.(ing.productId, needed)
+      }
+
+      setProductionOrders(prev => prev.map(o =>
+        o.id === orderId
+          ? {
+              ...o,
+              status: "in-progress",
+              producedBy: employeeId,
+              startedAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            }
+          : o
+      ))
+      return true
+    } catch (error) {
+      console.error("Failed to start production:", error)
+      return false
     }
-    
-    // Update order status
-    updateProductionOrder(orderId, {
-      status: "in-progress",
-      producedBy: employeeId,
-      startedAt: new Date().toISOString(),
-    })
-    
-    return true
   }
   
-  const completeProduction = (orderId: string): boolean => {
+  const completeProduction = async (orderId: string): Promise<boolean> => {
     const order = productionOrders.find(o => o.id === orderId)
     if (!order || order.status !== "in-progress") return false
     
     const recipe = recipes.find(r => r.id === order.recipeId)
     if (!recipe) return false
     
-    const now = new Date()
-    const expirationDate = new Date(now.getTime() + recipe.shelfLife * 60 * 60 * 1000)
-    
-    // Create showcase item
-    const showcaseItem: ShowcaseItem = {
-      id: `si-${Date.now()}`,
-      recipeId: recipe.id,
-      productionOrderId: orderId,
-      showcaseId: order.showcaseId,
-      batchNumber: `PROD-${Date.now().toString().slice(-8)}`,
-      quantity: recipe.yield * order.quantity,
-      initialQuantity: recipe.yield * order.quantity,
-      productionDate: now.toISOString().split("T")[0],
-      productionTime: now.toTimeString().slice(0, 5),
-      expirationDate: expirationDate.toISOString().split("T")[0],
-      expirationTime: expirationDate.toTimeString().slice(0, 5),
-      unitCost: getRecipeCost(recipe.id),
-      sellingPrice: recipe.sellingPrice,
-      status: "available",
-      createdAt: now.toISOString(),
-      updatedAt: now.toISOString(),
+    try {
+      const showcaseItem = await completeProductionAPI(orderId)
+      const now = new Date().toISOString()
+
+      setShowcaseItems(prev => [...prev, showcaseItem])
+      setProductionOrders(prev => prev.map(o =>
+        o.id === orderId
+          ? { ...o, status: "completed", completedAt: now, updatedAt: now }
+          : o
+      ))
+
+      return true
+    } catch (error) {
+      console.error("Failed to complete production:", error)
+      return false
     }
-    
-    setShowcaseItems(prev => [...prev, showcaseItem])
-    
-    // Update order
-    updateProductionOrder(orderId, {
-      status: "completed",
-      completedAt: now.toISOString(),
-    })
-    
-    return true
   }
   
-  const cancelProduction = (orderId: string) => {
-    updateProductionOrder(orderId, { status: "cancelled" })
+  const cancelProduction = async (orderId: string) => {
+    try {
+      await cancelProductionAPI(orderId)
+      setProductionOrders(prev => prev.map(o =>
+        o.id === orderId ? { ...o, status: "cancelled", updatedAt: new Date().toISOString() } : o
+      ))
+    } catch (error) {
+      console.error("Failed to cancel production:", error)
+    }
   }
   
   // ============================================
   // SHOWCASE ITEMS CRUD
   // ============================================
   
-  const addShowcaseItem = (item: Omit<ShowcaseItem, "id" | "createdAt" | "updatedAt">) => {
+  const addShowcaseItem = async (item: Omit<ShowcaseItem, "id" | "createdAt" | "updatedAt">) => {
     const newItem: ShowcaseItem = {
       ...item,
       id: `si-${Date.now()}`,
@@ -920,14 +1085,24 @@ const getRecipeMargin = (recipeId: string): number => {
     setShowcaseItems(prev => [...prev, newItem])
   }
   
-  const updateShowcaseItem = (id: string, updates: Partial<ShowcaseItem>) => {
-    setShowcaseItems(prev => prev.map(item => 
-      item.id === id ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item
-    ))
+  const updateShowcaseItem = async (id: string, updates: Partial<ShowcaseItem>) => {
+    try {
+      await updateShowcaseItemAPI(id, updates)
+      setShowcaseItems(prev => prev.map(item =>
+        item.id === id ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item
+      ))
+    } catch (error) {
+      console.error("Failed to update showcase item:", error)
+    }
   }
   
-  const deleteShowcaseItem = (id: string) => {
-    setShowcaseItems(prev => prev.filter(item => item.id !== id))
+  const deleteShowcaseItem = async (id: string) => {
+    try {
+      await deleteShowcaseItemAPI(id)
+      setShowcaseItems(prev => prev.filter(item => item.id !== id))
+    } catch (error) {
+      console.error("Failed to delete showcase item:", error)
+    }
   }
   
   const getShowcaseStock = (showcaseId: string) => {
@@ -969,24 +1144,17 @@ const getRecipeMargin = (recipeId: string): number => {
     })
   }
   
-  const transferItem = (itemId: string, targetShowcaseId: string, quantity: number) => {
+  const transferItem = async (itemId: string, targetShowcaseId: string, quantity: number) => {
     const item = showcaseItems.find(i => i.id === itemId)
     if (!item || quantity > item.quantity) return
-    
-    // Reduce from source
-    updateShowcaseItem(itemId, { quantity: item.quantity - quantity })
-    
-    // Add to target
-    const newItem: ShowcaseItem = {
-      ...item,
-      id: `si-${Date.now()}`,
-      showcaseId: targetShowcaseId,
-      quantity,
-      initialQuantity: quantity,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+
+    try {
+      await transferShowcaseItemAPI(itemId, targetShowcaseId, quantity)
+      const refreshedItems = await fetchShowcaseItems()
+      setShowcaseItems(refreshedItems)
+    } catch (error) {
+      console.error("Failed to transfer showcase item:", error)
     }
-    setShowcaseItems(prev => [...prev, newItem])
   }
   
   // ============================================

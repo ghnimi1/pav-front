@@ -109,17 +109,17 @@ export function ShowcaseStock() {
     setTransferDialogOpen(true)
   }
   
-  const handleTransfer = () => {
+  const handleTransfer = async () => {
     if (!selectedItem || !transferForm.targetShowcaseId) return
     
-    transferItem(selectedItem.id, transferForm.targetShowcaseId, transferForm.quantity)
+    await transferItem(selectedItem.id, transferForm.targetShowcaseId, transferForm.quantity)
     setTransferDialogOpen(false)
     setSelectedItem(null)
   }
   
-  const handleMarkExpired = (itemId: string) => {
+  const handleMarkExpired = async (itemId: string) => {
     if (confirm("Marquer ce lot comme expire et le retirer du stock?")) {
-      updateShowcaseItem(itemId, { quantity: 0, status: "expired" })
+      await updateShowcaseItem(itemId, { quantity: 0, status: "expired" })
     }
   }
   

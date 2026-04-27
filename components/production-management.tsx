@@ -85,10 +85,10 @@ export function ProductionManagement() {
     })
   }
   
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.recipeId || !form.showcaseId) return
     
-    addProductionOrder({
+    await addProductionOrder({
       recipeId: form.recipeId,
       showcaseId: form.showcaseId,
       quantity: form.quantity,
@@ -102,7 +102,7 @@ export function ProductionManagement() {
     resetForm()
   }
   
-  const handleStart = (orderId: string) => {
+  const handleStart = async (orderId: string) => {
     const order = productionOrders?.find(o => o.id === orderId)
     if (!order) return
     
@@ -119,22 +119,22 @@ export function ProductionManagement() {
       return
     }
     
-    const success = startProduction(orderId, currentEmployee?.id || "unknown")
+    const success = await startProduction(orderId, currentEmployee?.id || "unknown")
     if (success) {
       setSelectedTab("in-progress")
     }
   }
   
-  const handleComplete = (orderId: string) => {
-    const success = completeProduction(orderId)
+  const handleComplete = async (orderId: string) => {
+    const success = await completeProduction(orderId)
     if (success) {
       setSelectedTab("completed")
     }
   }
   
-  const handleCancel = (orderId: string) => {
+  const handleCancel = async (orderId: string) => {
     if (confirm("Annuler cette production?")) {
-      cancelProduction(orderId)
+      await cancelProduction(orderId)
     }
   }
   
