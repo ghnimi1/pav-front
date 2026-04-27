@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useUnifiedSales, type UnifiedSale, type UnifiedSaleItem } from "@/contexts/unified-sales-context"
 import { useOrders } from "@/contexts/orders-context"
 import { useProduction } from "@/contexts/production-context"
 import { useBreakfast } from "@/contexts/breakfast-context"
 import { useLoyalty } from "@/contexts/loyalty-context"
 import { useStock } from "@/contexts/stock-context"
+import { useNotification } from "@/contexts/notification-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -117,8 +118,9 @@ export function UnifiedSalesManagement() {
 
   const { recipes, recipeCategories, showcases, getAvailableItems, decrementShowcaseStock } = useProduction()
   const { items: breakfastItems, categories: breakfastCategories } = useBreakfast()
-  const { clients, addPoints, getClientById, getClientByEmail, updateClient } = useLoyalty()
+  const { clients, addPoints, redeemPoints, useWallet, getClientById, getClientByEmail, updateClient } = useLoyalty()
   const { menuItems, menuCategories } = useStock()
+  const { addNotification } = useNotification()
 
   // Main tab state
   const [activeTab, setActiveTab] = useState<"pos" | "orders" | "dashboard">("pos")
@@ -241,7 +243,18 @@ export function UnifiedSalesManagement() {
 
   // Selected client (handle "anonymous" as no client)
   const client = selectedClient && selectedClient !== "anonymous" ? clients?.find(c => c.id === selectedClient) : undefined
-  const maxPointsToUse = client ? Math.min(client.points, Math.floor(subtotal * 100)) : 0
+  const maxPointsToUse = client ? Math.min(client.loyaltyPoints, Math.floor(subtotal * 100)) : 0
+
+  useEffect(() => {
+    if (!client && pointsToUse !== 0) {
+      setPointsToUse(0)
+      return
+    }
+
+    if (pointsToUse > maxPointsToUse) {
+      setPointsToUse(maxPointsToUse)
+    }
+  }, [client, maxPointsToUse, pointsToUse])
 
   // Today stats
   const todayStats = getTodayStats()
@@ -387,6 +400,24 @@ export function UnifiedSalesManagement() {
 
   const processPOSSale = (paymentMethod: UnifiedSale["paymentMethod"]) => {
     if (cart.length === 0) return
+    if (saleType === "table" && !tableNumber.trim()) {
+      addNotification("Veuillez saisir un numero de table", "error")
+      return
+    }
+    if (pointsToUse > 0 && !client) {
+      addNotification("Selectionnez un client pour utiliser des points", "error")
+      return
+    }
+    if (paymentMethod === "wallet") {
+      if (!client) {
+        addNotification("Selectionnez un client pour payer avec le wallet", "error")
+        return
+      }
+      if ((client.wallet || 0) < total) {
+        addNotification("Solde wallet insuffisant", "error")
+        return
+      }
+    }
 
     const saleItems: UnifiedSaleItem[] = cart.map(c => ({
       id: `item-${Date.now()}-${Math.random()}`,
@@ -399,6 +430,22 @@ export function UnifiedSalesManagement() {
       recipeId: c.recipeId,
       categoryId: c.categoryId,
     }))
+
+    if (client && pointsToUse > 0) {
+      const redeemed = redeemPoints(client.id, pointsToUse, `Utilisation points - vente POS`)
+      if (!redeemed) {
+        addNotification("Impossible d'utiliser ces points", "error")
+        return
+      }
+    }
+
+    if (client && paymentMethod === "wallet") {
+      const walletUsed = useWallet(client.id, total)
+      if (!walletUsed) {
+        addNotification("Impossible de debiter le wallet client", "error")
+        return
+      }
+    }
 
     const newSale = addSale({
       type: saleType,
@@ -443,6 +490,8 @@ export function UnifiedSalesManagement() {
         })
       }
     }
+
+    addNotification("Vente enregistree avec succes", "success")
 
     setLastSale(newSale)
     setPaymentDialogOpen(false)
@@ -865,7 +914,7 @@ export function UnifiedSalesManagement() {
                       <SelectItem value="anonymous">Client anonyme</SelectItem>
                       {clients?.map(c => (
                         <SelectItem key={c.id} value={c.id}>
-                          {c.name} ({c.points} pts)
+                          {c.name} ({c.loyaltyPoints} pts)
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -896,10 +945,10 @@ export function UnifiedSalesManagement() {
                   </div>
                 </div>
 
-                {client && client.points > 0 && (
+                {client && client.loyaltyPoints > 0 && (
                   <div>
                     <Label className="text-xs text-muted-foreground mb-1 block">
-                      Utiliser points ({client.points} disponibles)
+                      Utiliser points ({client.loyaltyPoints} disponibles)
                     </Label>
                     <Input
                       type="number"
@@ -908,6 +957,11 @@ export function UnifiedSalesManagement() {
                       max={maxPointsToUse}
                       className="h-9"
                     />
+                  </div>
+                )}
+                {client && (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">
+                    Wallet disponible: <strong>{(client.wallet || 0).toFixed(2)} TND</strong>
                   </div>
                 )}
               </div>
@@ -1182,6 +1236,7 @@ export function UnifiedSalesManagement() {
                 variant="outline"
                 className="h-20 flex-col gap-2 hover:border-amber-300 hover:bg-amber-50"
                 onClick={() => processPOSSale("wallet")}
+                disabled={!client || (client.wallet || 0) < total}
               >
                 <WalletIcon className="h-8 w-8 text-amber-600" />
                 <span>Wallet</span>
