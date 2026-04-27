@@ -34,8 +34,7 @@ export function ShowcaseStock() {
     getExpiringItems,
     getLowStockItems,
     transferItem,
-    updateShowcaseItem,
-    deleteShowcaseItem
+    updateShowcaseItem
   } = useProduction()
   
   const [searchTerm, setSearchTerm] = useState("")
@@ -47,24 +46,26 @@ export function ShowcaseStock() {
   
   // Get items based on selected tab
   const getItems = () => {
+    const showcaseId = selectedShowcase === "all" ? undefined : selectedShowcase
+
     switch (selectedTab) {
       case "expiring":
-        return getExpiringItems(4)
+        return getExpiringItems(4).filter(item => !showcaseId || item.showcaseId === showcaseId)
       case "low":
-        return getLowStockItems()
+        return getLowStockItems().filter(item => !showcaseId || item.showcaseId === showcaseId)
       default:
-        return getAvailableItems(selectedShowcase === "all" ? undefined : selectedShowcase)
+        return getAvailableItems(showcaseId)
     }
   }
   
   const items = getItems().filter(item => {
     const recipe = recipes?.find(r => r.id === item.recipeId)
-    return recipe?.name.toLowerCase().includes(searchTerm.toLowerCase())
+    return recipe?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   })
   
   // Stats
   const totalItems = showcaseItems?.filter(i => i.quantity > 0).length || 0
-  const totalQuantity = showcaseItems?.reduce((sum, i) => sum + i.quantity, 0) || 0
+  const totalQuantity = showcaseItems?.filter(i => i.quantity > 0).reduce((sum, i) => sum + i.quantity, 0) || 0
   const expiringCount = getExpiringItems(4).length
   const lowStockCount = getLowStockItems().length
   
@@ -81,16 +82,10 @@ export function ShowcaseStock() {
   const getShowcaseName = (showcaseId: string) => {
     return showcases?.find(s => s.id === showcaseId)?.name || "Vitrine inconnue"
   }
-  
-  const formatTime = (date: string, time: string) => {
-    const d = new Date(`${date}T${time}`)
-    return d.toLocaleString("fr-FR", { 
-      day: "2-digit", 
-      month: "2-digit", 
-      hour: "2-digit", 
-      minute: "2-digit" 
-    })
-  }
+
+  const availableTransferTargets = selectedItem
+    ? (showcases || []).filter(s => s.id !== selectedItem.showcaseId && s.isActive)
+    : []
   
   const getExpirationStatus = (item: ShowcaseItem) => {
     const now = new Date()
@@ -339,7 +334,7 @@ export function ShowcaseStock() {
       
       {/* Transfer Dialog */}
       <Dialog open={transferDialogOpen} onOpenChange={setTransferDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ArrowRightLeftIcon className="h-5 w-5 text-amber-600" />
@@ -349,14 +344,29 @@ export function ShowcaseStock() {
           
           {selectedItem && (
             <div className="space-y-4">
-              <div className="p-3 rounded-lg bg-muted/50">
-                <p className="font-medium">{getRecipeName(selectedItem.recipeId)}</p>
-                <p className="text-sm text-muted-foreground">
-                  De: {getShowcaseName(selectedItem.showcaseId)}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Quantite disponible: {selectedItem.quantity} unites
-                </p>
+              <div className="rounded-xl border bg-muted/40 p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">{getRecipeName(selectedItem.recipeId)}</p>
+                    <p className="text-sm text-muted-foreground font-mono">{selectedItem.batchNumber}</p>
+                  </div>
+                  {getRecipeCategory(selectedItem.recipeId) && (
+                    <Badge className={getRecipeCategory(selectedItem.recipeId)?.color || ""} variant="outline">
+                      {getRecipeCategory(selectedItem.recipeId)?.icon} {getRecipeCategory(selectedItem.recipeId)?.name}
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-lg bg-background p-3 border">
+                    <p className="text-xs text-muted-foreground mb-1">Vitrine source</p>
+                    <p className="font-medium">{getShowcaseName(selectedItem.showcaseId)}</p>
+                  </div>
+                  <div className="rounded-lg bg-background p-3 border">
+                    <p className="text-xs text-muted-foreground mb-1">Stock disponible</p>
+                    <p className="font-medium">{selectedItem.quantity} unites</p>
+                  </div>
+                </div>
               </div>
               
               <div className="space-y-2">
@@ -364,32 +374,48 @@ export function ShowcaseStock() {
                 <Select 
                   value={transferForm.targetShowcaseId || undefined} 
                   onValueChange={(v) => setTransferForm({ ...transferForm, targetShowcaseId: v })}
+                  disabled={availableTransferTargets.length === 0}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Selectionner" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(showcases || [])
-                      .filter(s => s.id !== selectedItem.showcaseId && s.isActive)
-                      .map(s => (
-                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                      ))}
+                    {availableTransferTargets.map(s => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                {availableTransferTargets.length === 0 && (
+                  <p className="text-sm text-amber-700">
+                    Aucune autre vitrine active n&apos;est disponible pour recevoir ce lot.
+                  </p>
+                )}
               </div>
               
               <div className="space-y-2">
                 <Label>Quantite a transferer</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  max={selectedItem.quantity}
-                  value={transferForm.quantity}
-                  onChange={(e) => setTransferForm({ 
-                    ...transferForm, 
-                    quantity: Math.min(parseInt(e.target.value) || 1, selectedItem.quantity) 
-                  })}
-                />
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min="1"
+                    max={selectedItem.quantity}
+                    value={transferForm.quantity}
+                    onChange={(e) => setTransferForm({ 
+                      ...transferForm, 
+                      quantity: Math.min(parseInt(e.target.value) || 1, selectedItem.quantity) 
+                    })}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setTransferForm({ ...transferForm, quantity: selectedItem.quantity })}
+                  >
+                    Max
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Maximum transferable: {selectedItem.quantity} unite(s)
+                </p>
               </div>
             </div>
           )}
@@ -399,7 +425,7 @@ export function ShowcaseStock() {
             <Button 
               onClick={handleTransfer} 
               className="bg-amber-600 hover:bg-amber-700"
-              disabled={!transferForm.targetShowcaseId}
+              disabled={!transferForm.targetShowcaseId || availableTransferTargets.length === 0}
             >
               Transferer
             </Button>

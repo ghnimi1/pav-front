@@ -381,7 +381,7 @@ async function cancelProductionAPI(id: string): Promise<void> {
 
 async function fetchShowcaseItems(): Promise<ShowcaseItem[]> {
   try {
-    const data = await apiGet<Array<Partial<ShowcaseItem> & { _id?: string }>>("/production/items/available")
+    const data = await apiGet<Array<Partial<ShowcaseItem> & { _id?: string }>>("/production/items")
     return data.map(normalizeShowcaseItem)
   } catch (error) {
     console.error("Failed to fetch showcase items:", error)
