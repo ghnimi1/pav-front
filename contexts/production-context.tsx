@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { useStock } from "./stock-context"
+import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api-client"
 
 // ============================================
 // PRODUCTION FLOW: Recipe > Production Order > Showcase Stock > Sale
@@ -176,6 +177,84 @@ interface ProductionContextType {
 }
 
 const ProductionContext = createContext<ProductionContextType | undefined>(undefined)
+
+function normalizeRecipeCategory(category: Partial<RecipeCategory> & { _id?: string }): RecipeCategory {
+  return {
+    id: category._id || category.id || `rcat-${Date.now()}`,
+    name: category.name || "",
+    icon: category.icon || "🍰",
+    color: category.color || "bg-amber-100 text-amber-800",
+    isActive: category.isActive !== false,
+  }
+}
+
+function normalizeRecipe(recipe: Partial<Recipe> & { _id?: string }): Recipe {
+  const now = new Date().toISOString()
+  return {
+    id: recipe._id || recipe.id || `rec-${Date.now()}`,
+    name: recipe.name || "",
+    description: recipe.description,
+    categoryId: recipe.categoryId || "",
+    ingredients: recipe.ingredients || [],
+    yield: typeof recipe.yield === "number" ? recipe.yield : 1,
+    yieldUnit: recipe.yieldUnit || "pieces",
+    preparationTime: typeof recipe.preparationTime === "number" ? recipe.preparationTime : 0,
+    cookingTime: typeof recipe.cookingTime === "number" ? recipe.cookingTime : 0,
+    shelfLife: typeof recipe.shelfLife === "number" ? recipe.shelfLife : 24,
+    sellingPrice: typeof recipe.sellingPrice === "number" ? recipe.sellingPrice : 0,
+    image: recipe.image,
+    instructions: recipe.instructions,
+    isActive: recipe.isActive !== false,
+    createdAt: recipe.createdAt || now,
+    updatedAt: recipe.updatedAt || now,
+  }
+}
+
+async function fetchRecipeCategories(): Promise<RecipeCategory[]> {
+  try {
+    const data = await apiGet<Array<Partial<RecipeCategory> & { _id?: string }>>("/production/recipe-categories")
+    return data.map(normalizeRecipeCategory)
+  } catch (error) {
+    console.error("Failed to fetch recipe categories:", error)
+    return initialRecipeCategories
+  }
+}
+
+async function createRecipeCategoryAPI(data: Omit<RecipeCategory, "id">): Promise<RecipeCategory> {
+  const result = await apiPost<Partial<RecipeCategory> & { _id?: string }>("/production/recipe-categories", data)
+  return normalizeRecipeCategory(result)
+}
+
+async function updateRecipeCategoryAPI(id: string, data: Partial<RecipeCategory>): Promise<void> {
+  await apiPut(`/production/recipe-categories/${id}`, data)
+}
+
+async function deleteRecipeCategoryAPI(id: string): Promise<void> {
+  await apiDelete(`/production/recipe-categories/${id}`)
+}
+
+async function fetchRecipes(): Promise<Recipe[]> {
+  try {
+    const data = await apiGet<Array<Partial<Recipe> & { _id?: string }>>("/production/recipes")
+    return data.map(normalizeRecipe)
+  } catch (error) {
+    console.error("Failed to fetch recipes:", error)
+    return initialRecipes
+  }
+}
+
+async function createRecipeAPI(data: Omit<Recipe, "id" | "createdAt" | "updatedAt">): Promise<Recipe> {
+  const result = await apiPost<Partial<Recipe> & { _id?: string }>("/production/recipes", data)
+  return normalizeRecipe(result)
+}
+
+async function updateRecipeAPI(id: string, data: Partial<Recipe>): Promise<void> {
+  await apiPut(`/production/recipes/${id}`, data)
+}
+
+async function deleteRecipeAPI(id: string): Promise<void> {
+  await apiDelete(`/production/recipes/${id}`)
+}
 
 // Initial Data
 const initialRecipeCategories: RecipeCategory[] = [
@@ -531,49 +610,68 @@ export function ProductionProvider({ children }: { children: ReactNode }) {
   const [productionOrders, setProductionOrders] = useState<ProductionOrder[]>([])
   const [showcaseItems, setShowcaseItems] = useState<ShowcaseItem[]>([])
   const [sales, setSales] = useState<Sale[]>([])
-  
-  // Load from localStorage
-/*   useEffect(() => {
-    const stored = {
-      recipeCategories: localStorage.getItem("recipe-categories"),
-      recipes: localStorage.getItem("recipes"),
-      showcases: localStorage.getItem("showcases"),
-      productionOrders: localStorage.getItem("production-orders"),
-      showcaseItems: localStorage.getItem("showcase-items"),
-      sales: localStorage.getItem("sales"),
+
+  useEffect(() => {
+    setShowcases(initialShowcases)
+    setShowcaseItems(getInitialShowcaseItems())
+  }, [])
+
+  useEffect(() => {
+    let isMounted = true
+
+    const loadProductionData = async () => {
+      const [categoriesData, recipesData] = await Promise.all([
+        fetchRecipeCategories(),
+        fetchRecipes(),
+      ])
+
+      if (!isMounted) return
+
+      setRecipeCategories(categoriesData)
+      setRecipes(recipesData)
     }
-    
-    setRecipeCategories(stored.recipeCategories ? JSON.parse(stored.recipeCategories) : initialRecipeCategories)
-    setRecipes(stored.recipes ? JSON.parse(stored.recipes) : initialRecipes)
-    setShowcases(stored.showcases ? JSON.parse(stored.showcases) : initialShowcases)
-    setProductionOrders(stored.productionOrders ? JSON.parse(stored.productionOrders) : [])
-    setShowcaseItems(stored.showcaseItems ? JSON.parse(stored.showcaseItems) : getInitialShowcaseItems())
-    setSales(stored.sales ? JSON.parse(stored.sales) : [])
-  }, []) 
-  
-  // Save to localStorage
-  useEffect(() => { if (recipeCategories.length) localStorage.setItem("recipe-categories", JSON.stringify(recipeCategories)) }, [recipeCategories])
-  useEffect(() => { if (recipes.length) localStorage.setItem("recipes", JSON.stringify(recipes)) }, [recipes])
-  useEffect(() => { if (showcases.length) localStorage.setItem("showcases", JSON.stringify(showcases)) }, [showcases])
-  useEffect(() => { localStorage.setItem("production-orders", JSON.stringify(productionOrders)) }, [productionOrders])
-  useEffect(() => { localStorage.setItem("showcase-items", JSON.stringify(showcaseItems)) }, [showcaseItems])
-  useEffect(() => { localStorage.setItem("sales", JSON.stringify(sales)) }, [sales])
-  */
+
+    void loadProductionData()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
   // ============================================
   // RECIPE CATEGORIES CRUD
   // ============================================
   
   const addRecipeCategory = (cat: Omit<RecipeCategory, "id">) => {
-    const newCat: RecipeCategory = { ...cat, id: `rcat-${Date.now()}` }
-    setRecipeCategories(prev => [...prev, newCat])
+    void (async () => {
+      try {
+        const newCategory = await createRecipeCategoryAPI(cat)
+        setRecipeCategories(prev => [...prev, newCategory])
+      } catch (error) {
+        console.error("Failed to create recipe category:", error)
+      }
+    })()
   }
   
   const updateRecipeCategory = (id: string, updates: Partial<RecipeCategory>) => {
-    setRecipeCategories(prev => prev.map(cat => cat.id === id ? { ...cat, ...updates } : cat))
+    void (async () => {
+      try {
+        await updateRecipeCategoryAPI(id, updates)
+        setRecipeCategories(prev => prev.map(cat => cat.id === id ? { ...cat, ...updates } : cat))
+      } catch (error) {
+        console.error("Failed to update recipe category:", error)
+      }
+    })()
   }
   
   const deleteRecipeCategory = (id: string) => {
-    setRecipeCategories(prev => prev.filter(cat => cat.id !== id))
+    void (async () => {
+      try {
+        await deleteRecipeCategoryAPI(id)
+        setRecipeCategories(prev => prev.filter(cat => cat.id !== id))
+      } catch (error) {
+        console.error("Failed to delete recipe category:", error)
+      }
+    })()
   }
   
   // ============================================
@@ -581,23 +679,38 @@ export function ProductionProvider({ children }: { children: ReactNode }) {
   // ============================================
   
   const addRecipe = (recipe: Omit<Recipe, "id" | "createdAt" | "updatedAt">) => {
-    const newRecipe: Recipe = {
-      ...recipe,
-      id: `rec-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-    setRecipes(prev => [...prev, newRecipe])
+    void (async () => {
+      try {
+        const newRecipe = await createRecipeAPI(recipe)
+        setRecipes(prev => [...prev, newRecipe])
+      } catch (error) {
+        console.error("Failed to create recipe:", error)
+      }
+    })()
   }
   
   const updateRecipe = (id: string, updates: Partial<Recipe>) => {
-    setRecipes(prev => prev.map(rec => 
-      rec.id === id ? { ...rec, ...updates, updatedAt: new Date().toISOString() } : rec
-    ))
+    void (async () => {
+      try {
+        await updateRecipeAPI(id, updates)
+        setRecipes(prev => prev.map(rec =>
+          rec.id === id ? { ...rec, ...updates, updatedAt: new Date().toISOString() } : rec
+        ))
+      } catch (error) {
+        console.error("Failed to update recipe:", error)
+      }
+    })()
   }
   
   const deleteRecipe = (id: string) => {
-    setRecipes(prev => prev.filter(rec => rec.id !== id))
+    void (async () => {
+      try {
+        await deleteRecipeAPI(id)
+        setRecipes(prev => prev.filter(rec => rec.id !== id))
+      } catch (error) {
+        console.error("Failed to delete recipe:", error)
+      }
+    })()
   }
   
   const getRecipeCost = (recipeId: string): number => {

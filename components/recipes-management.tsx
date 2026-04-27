@@ -480,7 +480,7 @@ export function RecipesManagement() {
       
       {/* Recipe Fullscreen Modal */}
       {isRecipeDialogOpen && (
-        <div className="fixed inset-0 z-50 bg-background">
+        <div className="fixed inset-0 z-50 bg-background overflow-auto">
           <div className="h-full flex flex-col p-6">
             {/* Header */}
             <div className="flex items-center justify-between pb-4 border-b">
@@ -858,7 +858,7 @@ export function RecipesManagement() {
             </div>
             
             {/* Footer */}
-            <div className="flex justify-end gap-4 pt-4 border-t">
+            <div className="flex justify-end gap-4 p-4 border-t">
               <Button variant="outline" size="lg" onClick={() => setIsRecipeDialogOpen(false)}>
                 Annuler
               </Button>
