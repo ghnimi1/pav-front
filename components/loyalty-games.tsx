@@ -524,10 +524,10 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
           } 
         })
         setShowConfetti(true)
-        addNotification(`Felicitations! Vous avez gagne: ${segment.label}`, "success")
+        addNotification( "success",`Felicitations! Vous avez gagne: ${segment.label}`)
       } else {
         setRouletteResult({ result: "lose" })
-        addNotification("Pas de chance cette fois! Reessayez demain.", "info")
+        addNotification( "info","Pas de chance cette fois! Reessayez demain.")
       }
       setIsSpinning(false)
     }, 4200)
@@ -551,7 +551,7 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
         setIsCameraActive(true)
       }
     } catch (err) {
-      addNotification("Impossible d'acceder a la camera", "error")
+      addNotification( "error","Impossible d'acceder a la camera")
     }
   }
 
@@ -594,13 +594,13 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
   const handleGenerateShareLink = (platform: string) => {
     // Pour le partage depuis le menu
     if (shareTab === "menu" && !selectedProductToShare) {
-      addNotification("Selectionnez un produit a partager", "error")
+      addNotification( "error","Selectionnez un produit a partager")
       return
     }
     
     // Pour le partage depuis la camera
     if (shareTab === "camera" && !capturedPhoto) {
-      addNotification("Prenez une photo a partager", "error")
+      addNotification( "error","Prenez une photo a partager")
       return
     }
 
@@ -624,7 +624,7 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
     await navigator.clipboard.writeText(url)
     setCopySuccess(true)
     setTimeout(() => setCopySuccess(false), 2000)
-    addNotification("Lien copie!", "success")
+    addNotification( "success","Lien copie!")
   }
 
   const shareOnPlatform = (platform: string) => {
@@ -649,7 +649,7 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
         break
       case "instagram":
         navigator.clipboard.writeText(shareText + " " + url)
-        addNotification("Texte copie! Partagez-le sur Instagram", "success")
+        addNotification( "success","Texte copie! Partagez-le sur Instagram")
         return
     }
 
@@ -710,9 +710,9 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
       playGame(client.id, "chichbich", reward ?? undefined)
       
       if (reward) {
-        addNotification(`Chichbich! ${reward.description}`, "success")
+        addNotification("success",`Chichbich! ${reward.description}`)
       } else {
-        addNotification("Pas de chance cette fois!", "info")
+        addNotification("info","Pas de chance cette fois!")
       }
       setIsRolling(false)
     }, 2000)
