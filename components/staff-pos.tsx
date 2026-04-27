@@ -94,12 +94,13 @@ export function StaffPOS() {
 
     setIsProcessing(true)
     const amount = parseFloat(purchaseAmount)
-    const pointsEarned = calculatePointsForPurchase(amount, selectedClient.tier)
+    const pointsEarned = calculatePointsForPurchase(amount, selectedClient.tier, selectedClient.gender)
     const multiplier = getTodayMultiplier(selectedClient.gender)
 
     // Add points
     const loyaltyMetadata = {
       multiplier: multiplier > 1 ? multiplier : undefined,
+      purchaseAmount: amount,
       totalSpent: selectedClient.totalSpent + amount,
       totalOrdersIncrement: 1,
       lastVisit: new Date().toISOString(),
@@ -357,7 +358,7 @@ export function StaffPOS() {
                   <p className="text-sm text-green-700">Points a gagner</p>
                   <p className="text-2xl font-bold text-green-600">
                     {purchaseAmount
-                      ? calculatePointsForPurchase(parseFloat(purchaseAmount), selectedClient.tier)
+                      ? calculatePointsForPurchase(parseFloat(purchaseAmount), selectedClient.tier, selectedClient.gender)
                       : 0}
                   </p>
                 </div>

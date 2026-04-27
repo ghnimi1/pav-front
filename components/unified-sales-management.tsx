@@ -427,6 +427,7 @@ export function UnifiedSalesManagement() {
     if (client) {
       const loyaltyMetadata = {
         orderId: newSale.id,
+        purchaseAmount: total,
         totalSpent: (client.totalSpent || 0) + total,
         totalOrdersIncrement: 1,
         lastVisit: new Date().toISOString(),
@@ -460,6 +461,7 @@ export function UnifiedSalesManagement() {
 
       const loyaltyMetadata = {
         orderId: sale.id,
+        purchaseAmount: sale.total,
         totalSpent: (client.totalSpent || 0) + sale.total,
         totalOrdersIncrement: 1,
         lastVisit: new Date().toISOString(),

@@ -184,6 +184,7 @@ function AdminOrdersContent() {
       if (client) {
         const loyaltyMetadata = {
           orderId: order.id,
+          purchaseAmount: order.total,
           totalSpent: (client.totalSpent || 0) + order.total,
           totalOrdersIncrement: 1,
           lastVisit: new Date().toISOString(),

@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { apiGet, apiPost, apiPut } from "@/lib/api-client"
+import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api-client"
 
 // ============================================
 // CONFIGURATION DU PROGRAMME DE FIDELITE
@@ -206,6 +206,30 @@ type ReferralConfigApiResponse = {
   }
 }
 
+type MissionsApiResponse = {
+  missions: Mission[]
+}
+
+type MissionApiResponse = {
+  mission: Mission
+}
+
+type SpecialDaysApiResponse = {
+  specialDays: SpecialDay[]
+}
+
+type SpecialDayApiResponse = {
+  specialDay: SpecialDay
+}
+
+type ClientMissionsApiResponse = {
+  clientMissions: ClientMission[]
+}
+
+type ClientMissionApiResponse = {
+  clientMission: ClientMission
+}
+
 // ============================================
 // CONTEXTE
 // ============================================
@@ -222,7 +246,7 @@ interface LoyaltyContextType {
   transactions: PointsTransaction[]
   addPoints: (clientId: string, points: number, type: TransactionType, description: string, metadata?: any) => void
   redeemPoints: (clientId: string, points: number, description: string) => boolean
-  calculatePointsForPurchase: (amount: number, clientTier: LoyaltyTier) => number
+  calculatePointsForPurchase: (amount: number, clientTier: LoyaltyTier, clientGender?: Gender) => number
 
   rewards: Reward[]
   addReward: (reward: Omit<Reward, "id" | "usageCount" | "createdAt" | "updatedAt">) => void
@@ -402,6 +426,27 @@ function shouldPersistClientUpdate(updates: Partial<LoyaltyClient>) {
   )
 }
 
+function isMissionActive(mission: Mission, now = new Date()) {
+  if (!mission.isActive) return false
+
+  const startsAt = new Date(mission.validFrom)
+  const endsAt = new Date(mission.validUntil)
+
+  return startsAt <= now && endsAt >= now
+}
+
+function isClientBirthdayToday(client?: LoyaltyClient) {
+  if (!client?.birthDate) return false
+
+  const birthDate = new Date(client.birthDate)
+  const today = new Date()
+
+  return (
+    birthDate.getMonth() === today.getMonth() &&
+    birthDate.getDate() === today.getDate()
+  )
+}
+
 export function LoyaltyProvider({ children }: { children: ReactNode }) {
   const [clients, setClients] = useState<LoyaltyClient[]>([])
   const [transactions, setTransactions] = useState<PointsTransaction[]>([])
@@ -496,6 +541,45 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const loadMissionsFromBackend = async () => {
+    const token = localStorage.getItem("authToken")
+    if (!token) return
+
+    try {
+      const response = await apiGet<MissionsApiResponse>("/auth/missions")
+      setMissions(response.missions)
+      return
+    } catch (error) {
+      console.error("Failed to load missions from backend:", error)
+    }
+  }
+
+  const loadSpecialDaysFromBackend = async () => {
+    const token = localStorage.getItem("authToken")
+    if (!token) return
+
+    try {
+      const response = await apiGet<SpecialDaysApiResponse>("/auth/special-days")
+      setSpecialDays(response.specialDays)
+      return
+    } catch (error) {
+      console.error("Failed to load special days from backend:", error)
+    }
+  }
+
+  const loadClientMissionsFromBackend = async () => {
+    const token = localStorage.getItem("authToken")
+    if (!token) return
+
+    try {
+      const response = await apiGet<ClientMissionsApiResponse>("/auth/client-missions")
+      setClientMissions(response.clientMissions)
+      return
+    } catch (error) {
+      console.error("Failed to load client missions from backend:", error)
+    }
+  }
+
   useEffect(() => {
     const storedTransactions = localStorage.getItem("loyalty_transactions")
     const storedRewards = localStorage.getItem("loyalty_rewards")
@@ -522,11 +606,17 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     void loadClientsFromBackend()
     void loadReferralsFromBackend()
     void loadReferralConfigFromBackend()
+    void loadMissionsFromBackend()
+    void loadSpecialDaysFromBackend()
+    void loadClientMissionsFromBackend()
 
     const handleAuthSync = () => {
       void loadClientsFromBackend()
       void loadReferralsFromBackend()
       void loadReferralConfigFromBackend()
+      void loadMissionsFromBackend()
+      void loadSpecialDaysFromBackend()
+      void loadClientMissionsFromBackend()
     }
 
     window.addEventListener(AUTH_STORAGE_SYNC_EVENT, handleAuthSync)
@@ -644,12 +734,72 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     return syncClientsFromCurrentUser(false).find((client) => client.phone === phone)
   }
 
-  const calculatePointsForPurchase = (amount: number, clientTier: LoyaltyTier): number => {
+  const getActiveSpecialDay = (clientGender?: Gender) => {
+    const now = new Date()
+    const today = now.toISOString().split("T")[0]
+    const dayOfWeek = now.getDay()
+
+    for (const day of specialDays) {
+      if (!day.isActive) continue
+
+      const matchesGender = !day.targetGender || !clientGender || day.targetGender === clientGender
+      if (!matchesGender) continue
+
+      const matchesDayOfWeek = day.dayOfWeek !== undefined && day.dayOfWeek === dayOfWeek
+      const matchesSpecificDate = !!day.specificDate && day.specificDate === today
+
+      if (matchesDayOfWeek || matchesSpecificDate) {
+        return day
+      }
+    }
+
+    return null
+  }
+
+  const applyMissionProgressForPurchase = (client: LoyaltyClient, amount: number) => {
+    const now = new Date()
+
+    missions.forEach((mission) => {
+      if (!isMissionActive(mission, now)) return
+
+      switch (mission.type) {
+        case "visit":
+          updateMissionProgress(client.id, mission.id, 1)
+          break
+        case "spend":
+          updateMissionProgress(client.id, mission.id, amount)
+          break
+        case "birthday":
+          if (isClientBirthdayToday(client)) {
+            updateMissionProgress(client.id, mission.id, 1)
+          }
+          break
+        default:
+          break
+      }
+    })
+  }
+
+  const applyMissionProgressForReferral = (clientId: string) => {
+    const now = new Date()
+
+    missions.forEach((mission) => {
+      if (!isMissionActive(mission, now)) return
+      if (mission.type !== "refer") return
+
+      updateMissionProgress(clientId, mission.id, 1)
+    })
+  }
+
+  const calculatePointsForPurchase = (amount: number, clientTier: LoyaltyTier, clientGender?: Gender): number => {
     const basePoints = Math.floor(amount * LOYALTY_CONFIG.pointsPerTND)
     const tierBonus = LOYALTY_CONFIG.tiers[clientTier].bonus
     const bonusPoints = Math.floor(basePoints * (tierBonus / 100))
-    const dayMultiplier = getTodayMultiplier()
-    return Math.floor((basePoints + bonusPoints) * dayMultiplier)
+    const specialDay = getActiveSpecialDay(clientGender)
+    const dayMultiplier = specialDay?.multiplier ?? 1
+    const fixedBonus = specialDay?.bonusPoints ?? 0
+
+    return Math.floor((basePoints + bonusPoints) * dayMultiplier + fixedBonus)
   }
 
   const addPoints = (
@@ -738,6 +888,13 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     }).catch((error) => {
       console.error("Failed to persist loyalty points:", error)
     })
+
+    if (type === "earn") {
+      const purchaseAmount = metadata?.purchaseAmount
+      if (typeof purchaseAmount === "number" && purchaseAmount > 0) {
+        applyMissionProgressForPurchase(client, purchaseAmount)
+      }
+    }
   }
 
   const redeemPoints = (clientId: string, points: number, description: string): boolean => {
@@ -812,19 +969,39 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
       createdAt: new Date().toISOString(),
     }
     setMissions((prev) => [...prev, newMission])
+    void apiPost<MissionApiResponse>("/auth/missions", missionData)
+      .then((response) => {
+        setMissions((prev) => prev.map((mission) => (mission.id === newMission.id ? response.mission : mission)))
+      })
+      .catch((error) => {
+        console.error("Failed to create mission:", error)
+      })
   }
 
   const updateMission = (id: string, updates: Partial<Mission>) => {
     setMissions((prev) => prev.map((m) => (m.id === id ? { ...m, ...updates } : m)))
+    void apiPut<MissionApiResponse>(`/auth/missions/${id}`, updates)
+      .then((response) => {
+        setMissions((prev) => prev.map((mission) => (mission.id === id ? response.mission : mission)))
+      })
+      .catch((error) => {
+        console.error("Failed to update mission:", error)
+      })
   }
 
   const deleteMission = (id: string) => {
     setMissions((prev) => prev.filter((m) => m.id !== id))
+    setClientMissions((prev) => prev.filter((mission) => mission.missionId !== id))
+    void apiDelete(`/auth/missions/${id}`).catch((error) => {
+      console.error("Failed to delete mission:", error)
+    })
   }
 
   const updateMissionProgress = (clientId: string, missionId: string, progress: number) => {
     const mission = missions.find((m) => m.id === missionId)
     if (!mission) return
+
+    const missionReward = mission.reward + (mission.bonusReward || 0)
 
     const existingProgress = clientMissions.find((cm) => cm.clientId === clientId && cm.missionId === missionId)
 
@@ -847,8 +1024,19 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
         ),
       )
 
+      const nextMission = {
+        ...existingProgress,
+        progress: newProgress,
+        status: isCompleted ? "completed" : "active",
+        completedAt: isCompleted ? new Date().toISOString() : undefined,
+      }
+
+      void apiPut<ClientMissionApiResponse>("/auth/client-missions", nextMission).catch((error) => {
+        console.error("Failed to sync client mission:", error)
+      })
+
       if (isCompleted) {
-        addPoints(clientId, mission.reward, "bonus", `Mission completee: ${mission.name}`)
+        addPoints(clientId, missionReward, "bonus", `Mission completee: ${mission.name}`)
       }
     } else {
       const newClientMission: ClientMission = {
@@ -862,8 +1050,12 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
       }
       setClientMissions((prev) => [...prev, newClientMission])
 
+      void apiPut<ClientMissionApiResponse>("/auth/client-missions", newClientMission).catch((error) => {
+        console.error("Failed to create client mission:", error)
+      })
+
       if (progress >= mission.target) {
-        addPoints(clientId, mission.reward, "bonus", `Mission completee: ${mission.name}`)
+        addPoints(clientId, missionReward, "bonus", `Mission completee: ${mission.name}`)
       }
     }
   }
@@ -981,41 +1173,34 @@ setGamePlays((prev) => [...prev, gamePlay])
       createdAt: new Date().toISOString(),
     }
     setSpecialDays((prev) => [...prev, newDay])
+    void apiPost<SpecialDayApiResponse>("/auth/special-days", dayData)
+      .then((response) => {
+        setSpecialDays((prev) => prev.map((day) => (day.id === newDay.id ? response.specialDay : day)))
+      })
+      .catch((error) => {
+        console.error("Failed to create special day:", error)
+      })
   }
 
   const updateSpecialDay = (id: string, updates: Partial<SpecialDay>) => {
     setSpecialDays((prev) => prev.map((d) => (d.id === id ? { ...d, ...updates } : d)))
+    void apiPut<SpecialDayApiResponse>(`/auth/special-days/${id}`, updates)
+      .then((response) => {
+        setSpecialDays((prev) => prev.map((day) => (day.id === id ? response.specialDay : day)))
+      })
+      .catch((error) => {
+        console.error("Failed to update special day:", error)
+      })
   }
 
   const deleteSpecialDay = (id: string) => {
     setSpecialDays((prev) => prev.filter((d) => d.id !== id))
+    void apiDelete(`/auth/special-days/${id}`).catch((error) => {
+      console.error("Failed to delete special day:", error)
+    })
   }
 
-  const getTodayMultiplier = (clientGender?: Gender): number => {
-    const now = new Date()
-    const dayOfWeek = now.getDay()
-
-    for (const day of specialDays) {
-      if (!day.isActive) continue
-
-      if (day.dayOfWeek !== undefined && day.dayOfWeek === dayOfWeek) {
-        if (day.targetGender && clientGender && day.targetGender === clientGender) {
-          return day.multiplier
-        } else if (!day.targetGender) {
-          return day.multiplier
-        }
-      }
-
-      if (day.specificDate) {
-        const today = now.toISOString().split("T")[0]
-        if (day.specificDate === today) {
-          return day.multiplier
-        }
-      }
-    }
-
-    return 1
-  }
+  const getTodayMultiplier = (clientGender?: Gender): number => getActiveSpecialDay(clientGender)?.multiplier ?? 1
 
   const createReferral = (referrerId: string, referredEmail: string): string => {
     const referrer = clients.find((c) => c.id === referrerId)
@@ -1057,6 +1242,8 @@ setGamePlays((prev) => [...prev, gamePlay])
     )
 
     if (referrerClient && referral.referrerReward > 0) {
+      applyMissionProgressForReferral(referrerClient.id)
+
       setClients((prev) => {
         let updatedClient: LoyaltyClient | null = null
 

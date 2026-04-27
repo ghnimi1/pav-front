@@ -703,6 +703,7 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
     if (loyaltyClient) {
       const loyaltyMetadata = {
         orderId: order.id,
+        purchaseAmount: order.total,
         totalSpent: (loyaltyClient.totalSpent || 0) + order.total,
         totalOrdersIncrement: 1,
         lastVisit: new Date().toISOString(),
