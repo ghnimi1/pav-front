@@ -258,6 +258,12 @@ type GamePlaysApiResponse = {
   gamePlays: GamePlay[]
 }
 
+type StockRewardApi = Partial<Reward> & {
+  _id?: string
+  value?: string | number
+  type?: Reward["type"] | "special"
+}
+
 type GamePlayApiResponse = {
   gamePlay: GamePlay
 }
@@ -627,6 +633,40 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const loadRewardsFromBackend = async () => {
+    try {
+      const response = await apiGet<StockRewardApi[]>("/stock/rewards")
+      const now = new Date().toISOString()
+      const nextRewards: Reward[] = response.map((reward) => ({
+        id: reward.id || reward._id || "",
+        name: reward.name || "",
+        description: reward.description || "",
+        pointsCost: typeof reward.pointsCost === "number" ? reward.pointsCost : 0,
+        type: reward.type === "percentage" ? "percentage" : reward.type || "special",
+        value:
+          typeof reward.value === "number"
+            ? reward.value
+            : Number.parseFloat(String(reward.value ?? 0)) || 0,
+        image: reward.image,
+        category: reward.category,
+        minTier: reward.minTier,
+        isActive: reward.isActive !== false,
+        stock: typeof reward.stock === "number" ? reward.stock : undefined,
+        validFrom: reward.validFrom,
+        validUntil: reward.validUntil,
+        usageLimit: reward.usageLimit,
+        usageCount: typeof reward.usageCount === "number" ? reward.usageCount : 0,
+        createdAt: reward.createdAt || now,
+        updatedAt: reward.updatedAt || now,
+      }))
+
+      setRewards(nextRewards)
+      return
+    } catch (error) {
+      console.error("Failed to load loyalty rewards from backend:", error)
+    }
+  }
+
   const loadSpecialDaysFromBackend = async () => {
     const token = localStorage.getItem("authToken")
     if (!token) return
@@ -706,6 +746,7 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     if (storedShareLinks) setShareLinks(JSON.parse(storedShareLinks))
 
     void loadClientsFromBackend()
+    void loadRewardsFromBackend()
     void loadReferralsFromBackend()
     void loadReferralConfigFromBackend()
     void loadMissionsFromBackend()
@@ -716,6 +757,7 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
 
     const handleAuthSync = () => {
       void loadClientsFromBackend()
+      void loadRewardsFromBackend()
       void loadReferralsFromBackend()
       void loadReferralConfigFromBackend()
       void loadMissionsFromBackend()
@@ -798,6 +840,14 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
         updatedClient = { ...c, ...updates, updatedAt: new Date().toISOString() }
         return updatedClient
       })
+
+      if (!updatedClient) {
+        const fallbackClient = syncClientsFromCurrentUser(false).find((client) => client.id === id)
+        if (fallbackClient) {
+          updatedClient = { ...fallbackClient, ...updates, updatedAt: new Date().toISOString() }
+          nextClients.push(updatedClient)
+        }
+      }
 
       if (updatedClient) {
         syncClientToAuthStorage(updatedClient)
@@ -1007,7 +1057,7 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
   }
 
   const redeemPoints = (clientId: string, points: number, description: string): boolean => {
-    const client = clients.find((c) => c.id === clientId)
+    const client = getClientById(clientId)
     if (!client || client.loyaltyPoints < points) return false
 
     const transaction: PointsTransaction = {
@@ -1022,6 +1072,14 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
 
     updateClient(clientId, {
       loyaltyPoints: client.loyaltyPoints - points,
+    })
+
+    void apiPost("/auth/loyalty/points", {
+      userId: clientId,
+      points: -points,
+      description,
+    }).catch((error) => {
+      console.error("Failed to persist redeemed loyalty points:", error)
     })
 
     return true
@@ -1049,7 +1107,7 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
   }
 
   const redeemReward = (clientId: string, rewardId: string): boolean => {
-    const client = clients.find((c) => c.id === clientId)
+    const client = getClientById(clientId)
     const reward = rewards.find((r) => r.id === rewardId)
 
     if (!client || !reward) return false
@@ -1061,7 +1119,8 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
       if (tierOrder.indexOf(client.tier) < tierOrder.indexOf(reward.minTier)) return false
     }
 
-    redeemPoints(clientId, reward.pointsCost, `Echange: ${reward.name}`)
+    const redeemed = redeemPoints(clientId, reward.pointsCost, `Echange: ${reward.name}`)
+    if (!redeemed) return false
 
     updateReward(rewardId, {
       usageCount: reward.usageCount + 1,

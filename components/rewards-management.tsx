@@ -25,6 +25,12 @@ import {
   XCircleIcon,
 } from "lucide-react"
 
+function getRewardImageSrc(image?: string) {
+  if (!image) return "/placeholder.svg"
+  if (image.startsWith("http") || image.startsWith("blob:") || image.startsWith("data:")) return image
+  return `${process.env.NEXT_PUBLIC_API_IMAGE_URL}/menu/${image}`
+}
+
 export function RewardsManagement() {
   const { rewards, addReward, updateReward, deleteReward } = useStock()
   const { addNotification } = useNotification()
@@ -41,6 +47,8 @@ export function RewardsManagement() {
     type: "discount" as "discount" | "free_item" | "special",
     value: "",
     image: "",
+    imageFile: undefined as File | undefined,
+    removeImage: false,
     isActive: true,
   })
 
@@ -62,6 +70,8 @@ export function RewardsManagement() {
         type: reward.type,
         value: reward.value,
         image: reward.image || "",
+        imageFile: undefined,
+        removeImage: false,
         isActive: reward.isActive,
       })
     } else {
@@ -73,6 +83,8 @@ export function RewardsManagement() {
         type: "discount",
         value: "",
         image: "",
+        imageFile: undefined,
+        removeImage: false,
         isActive: true,
       })
     }
@@ -84,7 +96,7 @@ export function RewardsManagement() {
     setEditingReward(null)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!formData.name || !formData.description || formData.pointsCost <= 0 || !formData.value) {
@@ -93,21 +105,52 @@ export function RewardsManagement() {
     }
 
     if (editingReward) {
-      updateReward(editingReward.id, formData)
+      await updateReward(editingReward.id, formData)
       addNotification("Récompense modifiée avec succès", "success")
     } else {
-      addReward(formData)
+      await addReward(formData)
       addNotification("Récompense ajoutée avec succès", "success")
     }
 
     handleCloseDialog()
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Êtes-vous sûr de vouloir supprimer cette récompense ?")) {
-      deleteReward(id)
+      await deleteReward(id)
       addNotification("Récompense supprimée avec succès", "success")
     }
+  }
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith("image/")) {
+      addNotification("Veuillez selectionner une image", "error")
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      addNotification("L'image ne doit pas depasser 5MB", "error")
+      return
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      image: URL.createObjectURL(file),
+      imageFile: file,
+      removeImage: false,
+    }))
+  }
+
+  const handleRemoveImage = () => {
+    setFormData((prev) => ({
+      ...prev,
+      image: "",
+      imageFile: undefined,
+      removeImage: true,
+    }))
   }
 
   const getTypeLabel = (type: string) => {
@@ -225,7 +268,7 @@ export function RewardsManagement() {
           <Card key={reward.id} className="overflow-hidden">
             <div className="relative">
               {reward.image ? (
-                <img src={reward.image || "/placeholder.svg"} alt={reward.name} className="h-48 w-full object-cover" />
+                <img src={getRewardImageSrc(reward.image)} alt={reward.name} className="h-48 w-full object-cover" />
               ) : (
                 <div className="flex h-48 items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100">
                   <GiftIcon className="h-16 w-16 text-amber-300" />
@@ -369,16 +412,31 @@ export function RewardsManagement() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="image">URL de l'image (optionnel)</Label>
+              <Label htmlFor="image">Image (optionnel)</Label>
               <div className="flex gap-2">
-                <ImageIcon className="mt-2 h-5 w-5 text-muted-foreground" />
+              {/*   <ImageIcon className="mt-2 h-5 w-5 text-muted-foreground" />
                 <Input
                   id="image"
                   value={formData.image}
-                  onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                  placeholder="Ex: /golden-croissant.png"
-                />
+                  onChange={(e) =>
+                    setFormData({ ...formData, image: e.target.value, imageFile: undefined, removeImage: false })
+                  }
+                  placeholder="URL image ou laissez vide pour importer un fichier"
+                /> */}
               </div>
+              <Input type="file" accept="image/*" onChange={handleImageUpload} />
+              {formData.image && (
+                <div className="space-y-3 rounded-lg border p-3">
+                  <img
+                    src={getRewardImageSrc(formData.image)}
+                    alt="Aperçu récompense"
+                    className="h-32 w-full rounded-md object-cover"
+                  />
+                  <Button type="button" variant="outline" onClick={handleRemoveImage}>
+                    Supprimer l'image
+                  </Button>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-between rounded-lg border p-4">

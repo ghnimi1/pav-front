@@ -102,6 +102,8 @@ export interface Reward {
   type: "discount" | "free_item" | "special"
   value: string
   image?: string
+  imageFile?: File
+  removeImage?: boolean
   isActive: boolean
   createdAt: string
   updatedAt: string
@@ -290,9 +292,9 @@ interface StockContextType {
   deleteMenuItem: (id: string) => Promise<void>
   toggleMenuItemAvailability: (id: string) => Promise<void>
   rewards: Reward[]
-  addReward: (reward: Omit<Reward, "id" | "createdAt" | "updatedAt">) => void
-  updateReward: (id: string, reward: Partial<Reward>) => void
-  deleteReward: (id: string) => void
+  addReward: (reward: Omit<Reward, "id" | "createdAt" | "updatedAt">) => Promise<void>
+  updateReward: (id: string, reward: Partial<Reward>) => Promise<void>
+  deleteReward: (id: string) => Promise<void>
   getActiveRewards: () => Reward[]
   supplements: Supplement[]
   addSupplement: (supplement: Omit<Supplement, "id" | "createdAt" | "updatedAt">) => Promise<void>
@@ -416,6 +418,65 @@ async function updateOfferAPI(id: string, data: Partial<Offer>): Promise<void> {
 
 async function deleteOfferAPI(id: string): Promise<void> {
   await apiDelete(`/menu/offers/${id}`)
+}
+
+// ============================================
+// API FUNCTIONS FOR REWARDS
+// ============================================
+
+function normalizeReward(reward: Partial<Reward> & { _id?: string }): Reward {
+  const now = new Date().toISOString()
+  return {
+    id: reward._id || reward.id || `reward-${Date.now()}`,
+    name: reward.name || "",
+    description: reward.description || "",
+    pointsCost: typeof reward.pointsCost === "number" ? reward.pointsCost : 0,
+    type: reward.type || "special",
+    value: reward.value || "",
+    image: reward.image,
+    isActive: reward.isActive !== false,
+    createdAt: reward.createdAt || now,
+    updatedAt: reward.updatedAt || now,
+  }
+}
+
+async function fetchRewards(): Promise<Reward[]> {
+  try {
+    const data = await apiGet<Array<Partial<Reward> & { _id?: string }>>('/stock/rewards')
+    return data.map(normalizeReward)
+  } catch (error) {
+    console.error('Failed to fetch rewards:', error)
+    return []
+  }
+}
+
+function buildRewardFormData(reward: Partial<Reward>) {
+  const formData = new FormData()
+
+  if (reward.name !== undefined) formData.append("name", reward.name)
+  if (reward.description !== undefined) formData.append("description", reward.description)
+  if (reward.pointsCost !== undefined) formData.append("pointsCost", String(reward.pointsCost))
+  if (reward.type !== undefined) formData.append("type", reward.type)
+  if (reward.value !== undefined) formData.append("value", reward.value)
+  if (reward.image !== undefined) formData.append("image", reward.image)
+  if (reward.isActive !== undefined) formData.append("isActive", String(reward.isActive))
+  if (reward.removeImage !== undefined) formData.append("removeImage", String(reward.removeImage))
+  if (reward.imageFile) formData.append("imageFile", reward.imageFile)
+
+  return formData
+}
+
+async function createRewardAPI(data: Omit<Reward, 'id' | 'createdAt' | 'updatedAt'>): Promise<Reward> {
+  const result = await apiPost<Partial<Reward> & { _id?: string }>('/stock/rewards', buildRewardFormData(data))
+  return normalizeReward(result)
+}
+
+async function updateRewardAPI(id: string, data: Partial<Reward>): Promise<void> {
+  await apiPut(`/stock/rewards/${id}`, buildRewardFormData(data))
+}
+
+async function deleteRewardAPI(id: string): Promise<void> {
+  await apiDelete(`/stock/rewards/${id}`)
 }
 
 // ============================================
@@ -669,6 +730,15 @@ export function StockProvider({ children }: { children: ReactNode }) {
             setOffers(initialOffers)
           }
 
+          // Load rewards from API
+          const apiRewards = await fetchRewards()
+          if (!cancelled && apiRewards.length > 0) {
+            setRewards(apiRewards)
+          } else if (!cancelled && apiRewards.length === 0) {
+            const storedRewards = localStorage.getItem("pastry-rewards")
+            setRewards(storedRewards ? JSON.parse(storedRewards) : initialRewards)
+          }
+
           // Load supplement categories from API
           const apiSupplementCategories = await fetchSupplementCategories()
           if (!cancelled && apiSupplementCategories.length > 0) {
@@ -716,7 +786,9 @@ export function StockProvider({ children }: { children: ReactNode }) {
           setItems(stored.items ? JSON.parse(stored.items) : initialLegacyItems)
           setCategories(stored.categories ? JSON.parse(stored.categories) : initialLegacyCategories)
           setSuppliers(stored.suppliers ? JSON.parse(stored.suppliers) : initialSuppliers)
-          setRewards(stored.rewards ? JSON.parse(stored.rewards) : initialRewards)
+          if (!hasToken) {
+            setRewards(stored.rewards ? JSON.parse(stored.rewards) : initialRewards)
+          }
         }
       } catch (error) {
         console.error("Failed to load data:", error)
@@ -1123,17 +1195,42 @@ export function StockProvider({ children }: { children: ReactNode }) {
   }
 
   // Rewards CRUD
-  const addReward = (reward: Omit<Reward, "id" | "createdAt" | "updatedAt">) => {
-    const newReward: Reward = { ...reward, id: `r${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
-    setRewards(prev => [...prev, newReward])
+  const addReward = async (reward: Omit<Reward, "id" | "createdAt" | "updatedAt">) => {
+    try {
+      const newReward = await createRewardAPI(reward)
+      setRewards(prev => [newReward, ...prev])
+    } catch (error) {
+      console.error("Failed to create reward:", error)
+      const newReward: Reward = {
+        ...reward,
+        id: `r${Date.now()}`,
+        imageFile: undefined,
+        removeImage: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+      setRewards(prev => [newReward, ...prev])
+    }
   }
 
-  const updateReward = (id: string, updates: Partial<Reward>) => {
-    setRewards(prev => prev.map(r => r.id === id ? { ...r, ...updates, updatedAt: new Date().toISOString() } : r))
+  const updateReward = async (id: string, updates: Partial<Reward>) => {
+    try {
+      await updateRewardAPI(id, updates)
+      setRewards(prev => prev.map(r => r.id === id ? { ...r, ...updates, imageFile: undefined, removeImage: false, updatedAt: new Date().toISOString() } : r))
+    } catch (error) {
+      console.error("Failed to update reward:", error)
+      setRewards(prev => prev.map(r => r.id === id ? { ...r, ...updates, imageFile: undefined, removeImage: false, updatedAt: new Date().toISOString() } : r))
+    }
   }
 
-  const deleteReward = (id: string) => {
-    setRewards(prev => prev.filter(r => r.id !== id))
+  const deleteReward = async (id: string) => {
+    try {
+      await deleteRewardAPI(id)
+      setRewards(prev => prev.filter(r => r.id !== id))
+    } catch (error) {
+      console.error("Failed to delete reward:", error)
+      setRewards(prev => prev.filter(r => r.id !== id))
+    }
   }
 
   const getActiveRewards = () => rewards.filter(r => r.isActive)

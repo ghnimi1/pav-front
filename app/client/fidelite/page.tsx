@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from "@/contexts/auth-context"
 import { NotificationProvider } from "@/contexts/notification-context"
 import { LoyaltyProvider, useLoyalty, LOYALTY_CONFIG, type LoyaltyClient } from "@/contexts/loyalty-context"
 import { StockProvider } from "@/contexts/stock-context"
+import { useStock } from "@/contexts/stock-context"
 import { BreakfastProvider, useBreakfast, type BreakfastOrder } from "@/contexts/breakfast-context"
 import { OrdersProvider, useOrders, type RemoteOrder } from "@/contexts/orders-context"
 import { UnifiedSalesProvider, useUnifiedSales, type UnifiedSale } from "@/contexts/unified-sales-context"
@@ -18,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   ChefHatIcon,
   CoinsIcon,
@@ -58,6 +60,7 @@ function ClientFideliteContent() {
   const { user, isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
   const { addNotification } = useNotification()
+  const { menuItems } = useStock()
   const {
     clients,
     rewards,
@@ -69,7 +72,7 @@ function ClientFideliteContent() {
     getClientStats,
     updateMissionProgress,
   } = useLoyalty()
-  const { orders } = useBreakfast()
+  const { orders, items: breakfastItems } = useBreakfast()
   const { orders: remoteOrders, getOrdersByClient } = useOrders()
   const { sales } = useUnifiedSales()
   
@@ -78,6 +81,8 @@ function ClientFideliteContent() {
     getActiveConfigs, 
     getCustomerCards, 
     playChichBich,
+    claimReward,
+    getPendingRewards,
     getCardConfig,
   } = useLoyaltyCards()
   
@@ -91,6 +96,13 @@ function ClientFideliteContent() {
   const [showQRDialog, setShowQRDialog] = useState(false)
   const [selectedReward, setSelectedReward] = useState<any>(null)
   const [showRewardDialog, setShowRewardDialog] = useState(false)
+  const [selectedCardReward, setSelectedCardReward] = useState<{
+    cardId: string
+    position: number
+    rewardText: string
+    rewardProductIds: string[]
+  } | null>(null)
+  const [selectedCardRewardProductId, setSelectedCardRewardProductId] = useState("")
   
   // Loyalty cards state
   const [showChichBichModal, setShowChichBichModal] = useState(false)
@@ -147,6 +159,7 @@ function ClientFideliteContent() {
   const visitorId = loyaltyClient?.id || user?.id || "guest"
   const activeCardConfigs = getActiveConfigs()
   const customerCards = getCustomerCards(visitorId)
+  const pendingCardRewards = getPendingRewards(visitorId)
   
   // Handle playing Chich Bich game
   const handlePlayChichBich = (cardId: string, position: number) => {
@@ -269,6 +282,50 @@ function ClientFideliteContent() {
     }
   }
 
+  const getProductName = (productId: string) => {
+    return (
+      menuItems.find((item) => item.id === productId)?.name ||
+      breakfastItems.find((item) => item.id === productId)?.name ||
+      productId
+    )
+  }
+
+  const openCardRewardDialog = (cardId: string, position: number) => {
+    const card = customerCards.find((entry) => entry.id === cardId)
+    if (!card) return
+    const config = getCardConfig(card.configId)
+    const rewardPosition = config?.stampPositions.find((entry) => entry.position === position)
+    if (!rewardPosition?.rewardConfig) return
+
+    const rewardProductIds = rewardPosition.rewardConfig.rewardProductIds
+    setSelectedCardReward({
+      cardId,
+      position,
+      rewardText: rewardPosition.rewardConfig.rewardText,
+      rewardProductIds,
+    })
+    setSelectedCardRewardProductId(rewardProductIds[0] || `reward-${cardId}-${position}`)
+  }
+
+  const handleClaimCardReward = async () => {
+    if (!selectedCardReward || !selectedCardRewardProductId) return
+
+    const success = await claimReward(
+      selectedCardReward.cardId,
+      selectedCardReward.position,
+      selectedCardRewardProductId
+    )
+
+    if (success) {
+      addNotification("Recompense de carte reclamee avec succes", "success")
+      setSelectedCardReward(null)
+      setSelectedCardRewardProductId("")
+      return
+    }
+
+    addNotification("Impossible de reclamer cette recompense", "error")
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50/30 to-background">
       {/* Header */}
@@ -380,6 +437,38 @@ function ClientFideliteContent() {
               <h2 className="text-xl font-semibold">Mes Cartes de Fidelite</h2>
               <Badge variant="outline">{customerCards.length} carte{customerCards.length > 1 ? "s" : ""} active{customerCards.length > 1 ? "s" : ""}</Badge>
             </div>
+
+            {pendingCardRewards.length > 0 && (
+              <Card className="border-emerald-200 bg-emerald-50/60 p-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                    <GiftIcon className="h-5 w-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-emerald-900">Recompenses de cartes disponibles</h3>
+                    <p className="text-sm text-emerald-700">Vous pouvez maintenant reclamer vos produits offerts.</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  {pendingCardRewards.map((reward) => {
+                    const config = getCardConfig(reward.card.configId)
+                    return (
+                      <div key={`${reward.card.id}-${reward.position}`} className="flex items-center justify-between rounded-xl bg-white p-3 border border-emerald-100">
+                        <div>
+                          <p className="font-medium text-stone-900">{config?.name || "Carte de fidelite"}</p>
+                          <p className="text-sm text-stone-500">
+                            Position {reward.position} - {reward.config.rewardConfig?.rewardText || "Produit offert"}
+                          </p>
+                        </div>
+                        <Button onClick={() => openCardRewardDialog(reward.card.id, reward.position)} className="bg-emerald-600 hover:bg-emerald-700">
+                          Reclamer
+                        </Button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </Card>
+            )}
             
             {activeCardConfigs.length === 0 ? (
               <Card className="p-8 text-center">
@@ -968,6 +1057,55 @@ function ClientFideliteContent() {
             </Button>
             <Button onClick={handleRedeemReward}>
               Confirmer ({selectedReward?.pointsCost} pts)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!selectedCardReward} onOpenChange={(open) => !open && setSelectedCardReward(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reclamer ma recompense de carte</DialogTitle>
+            <DialogDescription>
+              Selectionnez le produit offert a associer a cette recompense.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedCardReward && (
+            <div className="space-y-4">
+              <Card className="p-4 bg-emerald-50 border-emerald-100">
+                <h3 className="font-semibold text-emerald-900">{selectedCardReward.rewardText || "Produit offert"}</h3>
+                <p className="text-sm text-emerald-700">Cette recompense provient de votre carte a tampons.</p>
+              </Card>
+
+              {selectedCardReward.rewardProductIds.length > 0 ? (
+                <div className="space-y-2">
+                  <Label>Produit offert</Label>
+                  <Select value={selectedCardRewardProductId} onValueChange={setSelectedCardRewardProductId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choisir un produit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {selectedCardReward.rewardProductIds.map((productId) => (
+                        <SelectItem key={productId} value={productId}>
+                          {getProductName(productId)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Aucun produit n&apos;a ete configure. La recompense sera marquee comme reclamee.
+                </p>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedCardReward(null)}>
+              Annuler
+            </Button>
+            <Button onClick={() => void handleClaimCardReward()} className="bg-emerald-600 hover:bg-emerald-700">
+              Confirmer
             </Button>
           </DialogFooter>
         </DialogContent>

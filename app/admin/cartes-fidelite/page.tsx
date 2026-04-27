@@ -39,7 +39,6 @@ import {
   CroissantIcon,
   SparklesIcon,
   EyeIcon,
-  CopyIcon,
 } from "lucide-react"
 import { StockProvider, useStock, type MenuItem } from "@/contexts/stock-context"
 import { BreakfastProvider, useBreakfast, type BreakfastItem } from "@/contexts/breakfast-context"
@@ -260,6 +259,64 @@ function LoyaltyCardsAdminContent() {
       }
       return p
     }))
+  }
+
+  const toggleSpecialRewardProduct = (
+    position: number,
+    kind: "game" | "reward",
+    productId: string
+  ) => {
+    setStampPositions((prev) =>
+      prev.map((entry) => {
+        if (entry.position !== position) return entry
+
+        if (kind === "game" && entry.gameConfig) {
+          const nextIds = entry.gameConfig.rewardProductIds.includes(productId)
+            ? entry.gameConfig.rewardProductIds.filter((id) => id !== productId)
+            : [...entry.gameConfig.rewardProductIds, productId]
+
+          return {
+            ...entry,
+            gameConfig: {
+              ...entry.gameConfig,
+              rewardProductIds: nextIds,
+            },
+          }
+        }
+
+        if (kind === "reward" && entry.rewardConfig) {
+          const nextIds = entry.rewardConfig.rewardProductIds.includes(productId)
+            ? entry.rewardConfig.rewardProductIds.filter((id) => id !== productId)
+            : [...entry.rewardConfig.rewardProductIds, productId]
+
+          return {
+            ...entry,
+            rewardConfig: {
+              ...entry.rewardConfig,
+              rewardProductIds: nextIds,
+            },
+          }
+        }
+
+        return entry
+      })
+    )
+  }
+
+  const updateRewardText = (position: number, rewardText: string) => {
+    setStampPositions((prev) =>
+      prev.map((entry) =>
+        entry.position === position && entry.rewardConfig
+          ? {
+              ...entry,
+              rewardConfig: {
+                ...entry.rewardConfig,
+                rewardText,
+              },
+            }
+          : entry
+      )
+    )
   }
 
   // Save card
@@ -785,6 +842,81 @@ function LoyaltyCardsAdminContent() {
                 ))}
               </div>
             </div>
+
+            {stampPositions.some((pos) => pos.type !== "normal") && (
+              <div className="space-y-4">
+                <Label>Gestion des recompenses</Label>
+                <div className="space-y-4">
+                  {stampPositions
+                    .filter((pos) => pos.type === "game" || pos.type === "reward")
+                    .map((pos) => (
+                      <div key={`special-${pos.position}`} className="rounded-xl border border-stone-200 p-4 space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-stone-900">
+                              Position {pos.position} - {pos.type === "game" ? "Jeu Chich Bich" : "Recompense"}
+                            </p>
+                            <p className="text-sm text-stone-500">
+                              {pos.type === "game"
+                                ? "Choisissez les produits gagnables quand le client remporte le jeu."
+                                : "Choisissez les produits offerts et le texte affiche au client."}
+                            </p>
+                          </div>
+                          <Badge variant="outline">
+                            {pos.type === "game"
+                              ? `${pos.gameConfig?.rewardProductIds.length || 0} produit(s)`
+                              : `${pos.rewardConfig?.rewardProductIds.length || 0} produit(s)`}
+                          </Badge>
+                        </div>
+
+                        {pos.type === "reward" && pos.rewardConfig && (
+                          <div className="space-y-2">
+                            <Label>Texte de recompense</Label>
+                            <Input
+                              value={pos.rewardConfig.rewardText}
+                              onChange={(e) => updateRewardText(pos.position, e.target.value)}
+                              placeholder="Boisson chaude offerte"
+                            />
+                          </div>
+                        )}
+
+                        <div className="space-y-2">
+                          <Label>
+                            {pos.type === "game" ? "Produits gagnables" : "Produits offerts"}
+                          </Label>
+                          <div className="max-h-48 overflow-y-auto rounded-lg border border-stone-200 p-2 space-y-2">
+                            {allProducts.map((product) => {
+                              const checked =
+                                pos.type === "game"
+                                  ? pos.gameConfig?.rewardProductIds.includes(product.id) || false
+                                  : pos.rewardConfig?.rewardProductIds.includes(product.id) || false
+
+                              return (
+                                <label
+                                  key={`${pos.position}-${product.id}`}
+                                  className="flex items-center gap-3 rounded-lg p-2 hover:bg-stone-50 cursor-pointer"
+                                >
+                                  <Checkbox
+                                    checked={checked}
+                                    onCheckedChange={() =>
+                                      toggleSpecialRewardProduct(pos.position, pos.type, product.id)
+                                    }
+                                  />
+                                  <span className="flex-1">{product.name}</span>
+                                  <Badge variant="outline" className="text-xs">
+                                    {product.source === "breakfast" ? "Petit-dej" : product.category}
+                                  </Badge>
+                                  <span className="text-sm text-stone-500">{product.price} DT</span>
+                                </label>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
 
             {/* Eligible products selection */}
             <div className="space-y-3">
