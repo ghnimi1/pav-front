@@ -398,6 +398,37 @@ function normalizeBatch(batch: Partial<Batch> & { _id?: string }): Batch {
   }
 }
 
+function normalizeStorageLocation(location: Partial<StorageLocation> & { _id?: string }): StorageLocation {
+  const now = new Date().toISOString()
+  return {
+    id: location._id || location.id || `loc-${Date.now()}`,
+    name: location.name || "",
+    type: location.type || "other",
+    description: location.description,
+    temperature: location.temperature,
+    capacity: location.capacity,
+    isActive: location.isActive !== false,
+    createdAt: location.createdAt || now,
+    updatedAt: location.updatedAt || now,
+  }
+}
+
+function normalizeSupplier(supplier: Partial<Supplier> & { _id?: string }): Supplier {
+  const now = new Date().toISOString()
+  return {
+    id: supplier._id || supplier.id || `sup-${Date.now()}`,
+    name: supplier.name || "",
+    contactName: supplier.contactName,
+    email: supplier.email,
+    phone: supplier.phone,
+    address: supplier.address,
+    notes: supplier.notes,
+    status: supplier.status || "active",
+    createdAt: supplier.createdAt || now,
+    updatedAt: supplier.updatedAt || now,
+  }
+}
+
 async function fetchStockCategories(): Promise<StockCategory[]> {
   try {
     const data = await apiGet<Array<Partial<StockCategory> & { _id?: string }>>("/stock/categories")
@@ -492,6 +523,52 @@ async function deleteBatchAPI(id: string): Promise<void> {
 
 async function openBatchAPI(id: string, openingDate: string, productShelfLife?: number): Promise<void> {
   await apiPost(`/stock/batches/${id}/open`, { openingDate, productShelfLife })
+}
+
+async function fetchStorageLocations(): Promise<StorageLocation[]> {
+  try {
+    const data = await apiGet<Array<Partial<StorageLocation> & { _id?: string }>>("/stock/storage-locations")
+    return data.map(normalizeStorageLocation)
+  } catch (error) {
+    console.error("Failed to fetch storage locations:", error)
+    return initialStorageLocations
+  }
+}
+
+async function createStorageLocationAPI(data: Omit<StorageLocation, "id" | "createdAt" | "updatedAt">): Promise<StorageLocation> {
+  const result = await apiPost<Partial<StorageLocation> & { _id?: string }>("/stock/storage-locations", data)
+  return normalizeStorageLocation(result)
+}
+
+async function updateStorageLocationAPI(id: string, data: Partial<StorageLocation>): Promise<void> {
+  await apiPut(`/stock/storage-locations/${id}`, data)
+}
+
+async function deleteStorageLocationAPI(id: string): Promise<void> {
+  await apiDelete(`/stock/storage-locations/${id}`)
+}
+
+async function fetchSuppliers(): Promise<Supplier[]> {
+  try {
+    const data = await apiGet<Array<Partial<Supplier> & { _id?: string }>>("/stock/suppliers")
+    return data.map(normalizeSupplier)
+  } catch (error) {
+    console.error("Failed to fetch suppliers:", error)
+    return initialSuppliers
+  }
+}
+
+async function createSupplierAPI(data: Omit<Supplier, "id" | "createdAt" | "updatedAt">): Promise<Supplier> {
+  const result = await apiPost<Partial<Supplier> & { _id?: string }>("/stock/suppliers", data)
+  return normalizeSupplier(result)
+}
+
+async function updateSupplierAPI(id: string, data: Partial<Supplier>): Promise<void> {
+  await apiPut(`/stock/suppliers/${id}`, data)
+}
+
+async function deleteSupplierAPI(id: string): Promise<void> {
+  await apiDelete(`/stock/suppliers/${id}`)
 }
 
 // ============================================
@@ -952,14 +1029,16 @@ export function StockProvider({ children }: { children: ReactNode }) {
           rewards: localStorage.getItem("pastry-rewards"),
         }
 
-        const [fetchedStockCategories, fetchedSubCategories, fetchedProducts, fetchedBatches] = hasToken
+        const [fetchedStockCategories, fetchedSubCategories, fetchedProducts, fetchedBatches, fetchedStorageLocations, fetchedSuppliers] = hasToken
           ? await Promise.all([
               fetchStockCategories(),
               fetchSubCategories(),
               fetchProducts(),
               fetchBatches(),
+              fetchStorageLocations(),
+              fetchSuppliers(),
             ])
-          : [null, null, null, null]
+          : [null, null, null, null, null, null]
 
         if (!cancelled) {
           setStockCategories(
@@ -978,10 +1057,16 @@ export function StockProvider({ children }: { children: ReactNode }) {
             fetchedBatches ||
               (stored.batches ? JSON.parse(stored.batches) : initialBatches)
           )
-          setStorageLocations(stored.storageLocations ? JSON.parse(stored.storageLocations) : initialStorageLocations)
+          setStorageLocations(
+            fetchedStorageLocations ||
+              (stored.storageLocations ? JSON.parse(stored.storageLocations) : initialStorageLocations)
+          )
           setItems(stored.items ? JSON.parse(stored.items) : initialLegacyItems)
           setCategories(stored.categories ? JSON.parse(stored.categories) : initialLegacyCategories)
-          setSuppliers(stored.suppliers ? JSON.parse(stored.suppliers) : initialSuppliers)
+          setSuppliers(
+            fetchedSuppliers ||
+              (stored.suppliers ? JSON.parse(stored.suppliers) : initialSuppliers)
+          )
           if (!hasToken) {
             setRewards(stored.rewards ? JSON.parse(stored.rewards) : initialRewards)
           }
@@ -1133,21 +1218,36 @@ export function StockProvider({ children }: { children: ReactNode }) {
 
   // Storage Location CRUD
   const addStorageLocation = (loc: Omit<StorageLocation, "id" | "createdAt" | "updatedAt">) => {
-    const newLoc: StorageLocation = {
-      ...loc,
-      id: `loc-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-    setStorageLocations(prev => [...prev, newLoc])
+    void (async () => {
+      try {
+        const newLocation = await createStorageLocationAPI(loc)
+        setStorageLocations(prev => [...prev, newLocation])
+      } catch (error) {
+        console.error("Failed to create storage location:", error)
+      }
+    })()
   }
 
   const updateStorageLocation = (id: string, updates: Partial<StorageLocation>) => {
-    setStorageLocations(prev => prev.map(loc => loc.id === id ? { ...loc, ...updates, updatedAt: new Date().toISOString() } : loc))
+    void (async () => {
+      try {
+        await updateStorageLocationAPI(id, updates)
+        setStorageLocations(prev => prev.map(loc => loc.id === id ? { ...loc, ...updates, updatedAt: new Date().toISOString() } : loc))
+      } catch (error) {
+        console.error("Failed to update storage location:", error)
+      }
+    })()
   }
 
   const deleteStorageLocation = (id: string) => {
-    setStorageLocations(prev => prev.filter(loc => loc.id !== id))
+    void (async () => {
+      try {
+        await deleteStorageLocationAPI(id)
+        setStorageLocations(prev => prev.filter(loc => loc.id !== id))
+      } catch (error) {
+        console.error("Failed to delete storage location:", error)
+      }
+    })()
   }
 
   const getActiveStorageLocations = () => {
@@ -1332,16 +1432,36 @@ export function StockProvider({ children }: { children: ReactNode }) {
   }
 
   const addSupplier = (supplier: Omit<Supplier, "id" | "createdAt" | "updatedAt">) => {
-    const newSup: Supplier = { ...supplier, id: Date.now().toString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
-    setSuppliers(prev => [...prev, newSup])
+    void (async () => {
+      try {
+        const newSupplier = await createSupplierAPI(supplier)
+        setSuppliers(prev => [...prev, newSupplier])
+      } catch (error) {
+        console.error("Failed to create supplier:", error)
+      }
+    })()
   }
 
   const updateSupplier = (id: string, updates: Partial<Omit<Supplier, "id" | "createdAt">>) => {
-    setSuppliers(prev => prev.map(sup => sup.id === id ? { ...sup, ...updates, updatedAt: new Date().toISOString() } : sup))
+    void (async () => {
+      try {
+        await updateSupplierAPI(id, updates)
+        setSuppliers(prev => prev.map(sup => sup.id === id ? { ...sup, ...updates, updatedAt: new Date().toISOString() } : sup))
+      } catch (error) {
+        console.error("Failed to update supplier:", error)
+      }
+    })()
   }
 
   const deleteSupplier = (id: string) => {
-    setSuppliers(prev => prev.filter(sup => sup.id !== id))
+    void (async () => {
+      try {
+        await deleteSupplierAPI(id)
+        setSuppliers(prev => prev.filter(sup => sup.id !== id))
+      } catch (error) {
+        console.error("Failed to delete supplier:", error)
+      }
+    })()
   }
 
   const getLowStockItems = () => items.filter(item => item.quantity <= item.minQuantity)
