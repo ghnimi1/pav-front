@@ -63,6 +63,7 @@ export function BatchManagementDialog({ product, open, onOpenChange }: BatchMana
       productId: product.id,
       batchNumber: newBatch.batchNumber,
       quantity: newBatch.quantity,
+      unitCost: product.unitPrice,
       receptionDate: newBatch.receptionDate,
       productionDate: newBatch.productionDate || undefined,
       expirationDate: newBatch.expirationDate,

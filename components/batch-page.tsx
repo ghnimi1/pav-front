@@ -96,6 +96,7 @@ export function BatchPage({ productId, onBack, isUserRole = false }: BatchPagePr
       supplierId: newBatch.supplierId || undefined,
       batchNumber: newBatch.batchNumber,
       quantity: newBatch.quantity,
+      unitCost: product.unitPrice,
       receptionDate: newBatch.receptionDate,
       productionDate: newBatch.productionDate || undefined,
       expirationDate: newBatch.expirationDate,

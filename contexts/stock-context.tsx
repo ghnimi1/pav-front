@@ -319,6 +319,181 @@ const StockContext = createContext<StockContextType | undefined>(undefined)
 
 const AUTH_TOKEN_KEY = "authToken"
 
+function normalizeStockCategory(category: Partial<StockCategory> & { _id?: string }): StockCategory {
+  const now = new Date().toISOString()
+  return {
+    id: category._id || category.id || `cat-${Date.now()}`,
+    name: category.name || "",
+    slug: category.slug || "",
+    description: category.description,
+    icon: category.icon,
+    color: category.color,
+    order: typeof category.order === "number" ? category.order : 0,
+    isActive: category.isActive !== false,
+    createdAt: category.createdAt || now,
+    updatedAt: category.updatedAt || now,
+  }
+}
+
+function normalizeSubCategory(subCategory: Partial<SubCategory> & { _id?: string }): SubCategory {
+  const now = new Date().toISOString()
+  return {
+    id: subCategory._id || subCategory.id || `sub-${Date.now()}`,
+    categoryId: subCategory.categoryId || "",
+    name: subCategory.name || "",
+    slug: subCategory.slug || "",
+    description: subCategory.description,
+    icon: subCategory.icon,
+    order: typeof subCategory.order === "number" ? subCategory.order : 0,
+    isActive: subCategory.isActive !== false,
+    createdAt: subCategory.createdAt || now,
+    updatedAt: subCategory.updatedAt || now,
+  }
+}
+
+function normalizeProduct(product: Partial<Product> & { _id?: string }): Product {
+  const now = new Date().toISOString()
+  return {
+    id: product._id || product.id || `prod-${Date.now()}`,
+    subCategoryId: product.subCategoryId || "",
+    name: product.name || "",
+    description: product.description,
+    unit: product.unit || "kg",
+    minQuantity: typeof product.minQuantity === "number" ? product.minQuantity : 5,
+    unitPrice: typeof product.unitPrice === "number" ? product.unitPrice : 0,
+    shelfLifeAfterOpening: product.shelfLifeAfterOpening,
+    supplierId: product.supplierId,
+    defaultLocationId: product.defaultLocationId,
+    image: product.image,
+    isActive: product.isActive !== false,
+    createdAt: product.createdAt || now,
+    updatedAt: product.updatedAt || now,
+  }
+}
+
+function toDateInput(value?: string): string | undefined {
+  if (!value) return undefined
+  return value.includes("T") ? value.split("T")[0] : value
+}
+
+function normalizeBatch(batch: Partial<Batch> & { _id?: string }): Batch {
+  const now = new Date().toISOString()
+  return {
+    id: batch._id || batch.id || `batch-${Date.now()}`,
+    productId: batch.productId || "",
+    supplierId: batch.supplierId,
+    locationId: batch.locationId,
+    batchNumber: batch.batchNumber || "",
+    quantity: typeof batch.quantity === "number" ? batch.quantity : 0,
+    unitCost: typeof batch.unitCost === "number" ? batch.unitCost : 0,
+    receptionDate: toDateInput(batch.receptionDate) || toDateInput(now) || "",
+    productionDate: toDateInput(batch.productionDate),
+    expirationDate: toDateInput(batch.expirationDate) || toDateInput(now) || "",
+    openingDate: toDateInput(batch.openingDate),
+    expirationAfterOpening: toDateInput(batch.expirationAfterOpening),
+    isOpened: batch.isOpened === true,
+    notes: batch.notes,
+    createdAt: batch.createdAt || now,
+    updatedAt: batch.updatedAt || now,
+  }
+}
+
+async function fetchStockCategories(): Promise<StockCategory[]> {
+  try {
+    const data = await apiGet<Array<Partial<StockCategory> & { _id?: string }>>("/stock/categories")
+    return data.map(normalizeStockCategory)
+  } catch (error) {
+    console.error("Failed to fetch stock categories:", error)
+    return initialStockCategories
+  }
+}
+
+async function createStockCategoryAPI(data: Omit<StockCategory, "id" | "createdAt" | "updatedAt">): Promise<StockCategory> {
+  const result = await apiPost<Partial<StockCategory> & { _id?: string }>("/stock/categories", data)
+  return normalizeStockCategory(result)
+}
+
+async function updateStockCategoryAPI(id: string, data: Partial<StockCategory>): Promise<void> {
+  await apiPut(`/stock/categories/${id}`, data)
+}
+
+async function deleteStockCategoryAPI(id: string): Promise<void> {
+  await apiDelete(`/stock/categories/${id}`)
+}
+
+async function fetchSubCategories(): Promise<SubCategory[]> {
+  try {
+    const data = await apiGet<Array<Partial<SubCategory> & { _id?: string }>>("/stock/subcategories")
+    return data.map(normalizeSubCategory)
+  } catch (error) {
+    console.error("Failed to fetch subcategories:", error)
+    return initialSubCategories
+  }
+}
+
+async function createSubCategoryAPI(data: Omit<SubCategory, "id" | "createdAt" | "updatedAt">): Promise<SubCategory> {
+  const result = await apiPost<Partial<SubCategory> & { _id?: string }>("/stock/subcategories", data)
+  return normalizeSubCategory(result)
+}
+
+async function updateSubCategoryAPI(id: string, data: Partial<SubCategory>): Promise<void> {
+  await apiPut(`/stock/subcategories/${id}`, data)
+}
+
+async function deleteSubCategoryAPI(id: string): Promise<void> {
+  await apiDelete(`/stock/subcategories/${id}`)
+}
+
+async function fetchProducts(): Promise<Product[]> {
+  try {
+    const data = await apiGet<Array<Partial<Product> & { _id?: string }>>("/stock/products")
+    return data.map(normalizeProduct)
+  } catch (error) {
+    console.error("Failed to fetch products:", error)
+    return initialProducts
+  }
+}
+
+async function createProductAPI(data: Omit<Product, "id" | "createdAt" | "updatedAt">): Promise<Product> {
+  const result = await apiPost<Partial<Product> & { _id?: string }>("/stock/products", data)
+  return normalizeProduct(result)
+}
+
+async function updateProductAPI(id: string, data: Partial<Product>): Promise<void> {
+  await apiPut(`/stock/products/${id}`, data)
+}
+
+async function deleteProductAPI(id: string): Promise<void> {
+  await apiDelete(`/stock/products/${id}`)
+}
+
+async function fetchBatches(): Promise<Batch[]> {
+  try {
+    const data = await apiGet<Array<Partial<Batch> & { _id?: string }>>("/stock/batches")
+    return data.map(normalizeBatch)
+  } catch (error) {
+    console.error("Failed to fetch batches:", error)
+    return initialBatches
+  }
+}
+
+async function createBatchAPI(data: Omit<Batch, "id" | "createdAt" | "updatedAt">): Promise<Batch> {
+  const result = await apiPost<Partial<Batch> & { _id?: string }>("/stock/batches", data)
+  return normalizeBatch(result)
+}
+
+async function updateBatchAPI(id: string, data: Partial<Batch>): Promise<void> {
+  await apiPut(`/stock/batches/${id}`, data)
+}
+
+async function deleteBatchAPI(id: string): Promise<void> {
+  await apiDelete(`/stock/batches/${id}`)
+}
+
+async function openBatchAPI(id: string, openingDate: string, productShelfLife?: number): Promise<void> {
+  await apiPost(`/stock/batches/${id}/open`, { openingDate, productShelfLife })
+}
+
 // ============================================
 // API FUNCTIONS FOR MENU CATEGORIES
 // ============================================
@@ -777,11 +952,32 @@ export function StockProvider({ children }: { children: ReactNode }) {
           rewards: localStorage.getItem("pastry-rewards"),
         }
 
+        const [fetchedStockCategories, fetchedSubCategories, fetchedProducts, fetchedBatches] = hasToken
+          ? await Promise.all([
+              fetchStockCategories(),
+              fetchSubCategories(),
+              fetchProducts(),
+              fetchBatches(),
+            ])
+          : [null, null, null, null]
+
         if (!cancelled) {
-          setStockCategories(stored.stockCategories ? JSON.parse(stored.stockCategories) : initialStockCategories)
-          setSubCategories(stored.subCategories ? JSON.parse(stored.subCategories) : initialSubCategories)
-          setProducts(stored.products ? JSON.parse(stored.products) : initialProducts)
-          setBatches(stored.batches ? JSON.parse(stored.batches) : initialBatches)
+          setStockCategories(
+            fetchedStockCategories ||
+              (stored.stockCategories ? JSON.parse(stored.stockCategories) : initialStockCategories)
+          )
+          setSubCategories(
+            fetchedSubCategories ||
+              (stored.subCategories ? JSON.parse(stored.subCategories) : initialSubCategories)
+          )
+          setProducts(
+            fetchedProducts ||
+              (stored.products ? JSON.parse(stored.products) : initialProducts)
+          )
+          setBatches(
+            fetchedBatches ||
+              (stored.batches ? JSON.parse(stored.batches) : initialBatches)
+          )
           setStorageLocations(stored.storageLocations ? JSON.parse(stored.storageLocations) : initialStorageLocations)
           setItems(stored.items ? JSON.parse(stored.items) : initialLegacyItems)
           setCategories(stored.categories ? JSON.parse(stored.categories) : initialLegacyCategories)
@@ -822,44 +1018,70 @@ export function StockProvider({ children }: { children: ReactNode }) {
 
   // Stock Category CRUD
   const addStockCategory = (cat: Omit<StockCategory, "id" | "createdAt" | "updatedAt">) => {
-    const newCat: StockCategory = {
-      ...cat,
-      id: `cat-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-    setStockCategories(prev => [...prev, newCat])
+    void (async () => {
+      try {
+        const newCategory = await createStockCategoryAPI(cat)
+        setStockCategories(prev => [...prev, newCategory])
+      } catch (error) {
+        console.error("Failed to create stock category:", error)
+      }
+    })()
   }
 
   const updateStockCategory = (id: string, updates: Partial<StockCategory>) => {
-    setStockCategories(prev => prev.map(cat => cat.id === id ? { ...cat, ...updates, updatedAt: new Date().toISOString() } : cat))
+    void (async () => {
+      try {
+        await updateStockCategoryAPI(id, updates)
+        setStockCategories(prev => prev.map(cat => cat.id === id ? { ...cat, ...updates, updatedAt: new Date().toISOString() } : cat))
+      } catch (error) {
+        console.error("Failed to update stock category:", error)
+      }
+    })()
   }
 
   const deleteStockCategory = (id: string) => {
-    const subs = subCategories.filter(s => s.categoryId === id)
-    subs.forEach(sub => deleteSubCategory(sub.id))
-    setStockCategories(prev => prev.filter(cat => cat.id !== id))
+    void (async () => {
+      try {
+        await deleteStockCategoryAPI(id)
+        setStockCategories(prev => prev.filter(cat => cat.id !== id))
+      } catch (error) {
+        console.error("Failed to delete stock category:", error)
+      }
+    })()
   }
 
   // SubCategory CRUD
   const addSubCategory = (sub: Omit<SubCategory, "id" | "createdAt" | "updatedAt">) => {
-    const newSub: SubCategory = {
-      ...sub,
-      id: `sub-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-    setSubCategories(prev => [...prev, newSub])
+    void (async () => {
+      try {
+        const newSubCategory = await createSubCategoryAPI(sub)
+        setSubCategories(prev => [...prev, newSubCategory])
+      } catch (error) {
+        console.error("Failed to create subcategory:", error)
+      }
+    })()
   }
 
   const updateSubCategory = (id: string, updates: Partial<SubCategory>) => {
-    setSubCategories(prev => prev.map(sub => sub.id === id ? { ...sub, ...updates, updatedAt: new Date().toISOString() } : sub))
+    void (async () => {
+      try {
+        await updateSubCategoryAPI(id, updates)
+        setSubCategories(prev => prev.map(sub => sub.id === id ? { ...sub, ...updates, updatedAt: new Date().toISOString() } : sub))
+      } catch (error) {
+        console.error("Failed to update subcategory:", error)
+      }
+    })()
   }
 
   const deleteSubCategory = (id: string) => {
-    const prods = products.filter(p => p.subCategoryId === id)
-    prods.forEach(prod => deleteProduct(prod.id))
-    setSubCategories(prev => prev.filter(sub => sub.id !== id))
+    void (async () => {
+      try {
+        await deleteSubCategoryAPI(id)
+        setSubCategories(prev => prev.filter(sub => sub.id !== id))
+      } catch (error) {
+        console.error("Failed to delete subcategory:", error)
+      }
+    })()
   }
 
   const getSubCategoriesByCategoryId = (categoryId: string) => {
@@ -868,22 +1090,37 @@ export function StockProvider({ children }: { children: ReactNode }) {
 
   // Product CRUD
   const addProduct = (product: Omit<Product, "id" | "createdAt" | "updatedAt">) => {
-    const newProduct: Product = {
-      ...product,
-      id: `prod-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-    setProducts(prev => [...prev, newProduct])
+    void (async () => {
+      try {
+        const newProduct = await createProductAPI(product)
+        setProducts(prev => [...prev, newProduct])
+      } catch (error) {
+        console.error("Failed to create product:", error)
+      }
+    })()
   }
 
   const updateProduct = (id: string, updates: Partial<Product>) => {
-    setProducts(prev => prev.map(prod => prod.id === id ? { ...prod, ...updates, updatedAt: new Date().toISOString() } : prod))
+    void (async () => {
+      try {
+        await updateProductAPI(id, updates)
+        setProducts(prev => prev.map(prod => prod.id === id ? { ...prod, ...updates, updatedAt: new Date().toISOString() } : prod))
+      } catch (error) {
+        console.error("Failed to update product:", error)
+      }
+    })()
   }
 
   const deleteProduct = (id: string) => {
-    setBatches(prev => prev.filter(b => b.productId !== id))
-    setProducts(prev => prev.filter(prod => prod.id !== id))
+    void (async () => {
+      try {
+        await deleteProductAPI(id)
+        setBatches(prev => prev.filter(b => b.productId !== id))
+        setProducts(prev => prev.filter(prod => prod.id !== id))
+      } catch (error) {
+        console.error("Failed to delete product:", error)
+      }
+    })()
   }
 
   const getProductsBySubCategoryId = (subCategoryId: string) => {
@@ -919,21 +1156,36 @@ export function StockProvider({ children }: { children: ReactNode }) {
 
   // Batch CRUD
   const addBatch = (batch: Omit<Batch, "id" | "createdAt" | "updatedAt">) => {
-    const newBatch: Batch = {
-      ...batch,
-      id: `batch-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-    setBatches(prev => [...prev, newBatch])
+    void (async () => {
+      try {
+        const newBatch = await createBatchAPI(batch)
+        setBatches(prev => [...prev, newBatch])
+      } catch (error) {
+        console.error("Failed to create batch:", error)
+      }
+    })()
   }
 
   const updateBatch = (id: string, updates: Partial<Batch>) => {
-    setBatches(prev => prev.map(b => b.id === id ? { ...b, ...updates, updatedAt: new Date().toISOString() } : b))
+    void (async () => {
+      try {
+        await updateBatchAPI(id, updates)
+        setBatches(prev => prev.map(b => b.id === id ? { ...b, ...updates, updatedAt: new Date().toISOString() } : b))
+      } catch (error) {
+        console.error("Failed to update batch:", error)
+      }
+    })()
   }
 
   const deleteBatch = (id: string) => {
-    setBatches(prev => prev.filter(b => b.id !== id))
+    void (async () => {
+      try {
+        await deleteBatchAPI(id)
+        setBatches(prev => prev.filter(b => b.id !== id))
+      } catch (error) {
+        console.error("Failed to delete batch:", error)
+      }
+    })()
   }
 
   const openBatch = (id: string, openingDate: string) => {
@@ -941,19 +1193,35 @@ export function StockProvider({ children }: { children: ReactNode }) {
     if (!batch) return
 
     const product = products.find(p => p.id === batch.productId)
-    if (!product?.shelfLifeAfterOpening) {
-      updateBatch(id, { isOpened: true, openingDate })
-      return
-    }
+    void (async () => {
+      try {
+        await openBatchAPI(id, openingDate, product?.shelfLifeAfterOpening)
 
-    const expDate = new Date(openingDate)
-    expDate.setDate(expDate.getDate() + product.shelfLifeAfterOpening)
+        if (!product?.shelfLifeAfterOpening) {
+          setBatches(prev => prev.map(b =>
+            b.id === id ? { ...b, isOpened: true, openingDate, updatedAt: new Date().toISOString() } : b
+          ))
+          return
+        }
 
-    updateBatch(id, {
-      isOpened: true,
-      openingDate,
-      expirationAfterOpening: expDate.toISOString().split("T")[0],
-    })
+        const expDate = new Date(openingDate)
+        expDate.setDate(expDate.getDate() + product.shelfLifeAfterOpening)
+
+        setBatches(prev => prev.map(b =>
+          b.id === id
+            ? {
+                ...b,
+                isOpened: true,
+                openingDate,
+                expirationAfterOpening: expDate.toISOString().split("T")[0],
+                updatedAt: new Date().toISOString(),
+              }
+            : b
+        ))
+      } catch (error) {
+        console.error("Failed to open batch:", error)
+      }
+    })()
   }
 
   const getBatchesByProduct = (productId: string) => {
@@ -971,18 +1239,32 @@ export function StockProvider({ children }: { children: ReactNode }) {
   const consumeFromBatches = (productId: string, quantity: number) => {
     const activeBatches = getActiveBatches(productId)
     let remaining = quantity
+    const now = new Date().toISOString()
+
+    const updates: { id: string; quantity: number }[] = []
 
     for (const batch of activeBatches) {
       if (remaining <= 0) break
 
       if (batch.quantity >= remaining) {
-        updateBatch(batch.id, { quantity: batch.quantity - remaining })
+        updates.push({ id: batch.id, quantity: batch.quantity - remaining })
         remaining = 0
       } else {
         remaining -= batch.quantity
-        updateBatch(batch.id, { quantity: 0 })
+        updates.push({ id: batch.id, quantity: 0 })
       }
     }
+
+    if (updates.length === 0) return
+
+    setBatches(prev => prev.map(batch => {
+      const update = updates.find(item => item.id === batch.id)
+      return update ? { ...batch, quantity: update.quantity, updatedAt: now } : batch
+    }))
+
+    updates.forEach(update => {
+      void updateBatchAPI(update.id, { quantity: update.quantity })
+    })
   }
 
   // Alerts
