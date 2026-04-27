@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { useDiscount } from "@/contexts/discount-context"
 import { useOrders, type OrderItem } from "@/contexts/orders-context"
 import { useNotification } from "@/contexts/notification-context"
+import { useLoyaltyCards } from "@/contexts/loyalty-cards-context"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -72,6 +73,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
   const { user } = useAuth()
   const { addNotification } = useNotification()
   const { getClientByEmail } = useLoyalty()
+  const { addStampsFromItems } = useLoyaltyCards()
   const { addSale } = useUnifiedSales()
   const { createOrderFromItems, deliveryConfig } = useOrders()
   const {
@@ -315,6 +317,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
     const remoteOrderItems: OrderItem[] = [
       ...offerCart.map((offerItem) => ({
         id: `offer-${offerItem.offer.id}`,
+        productId: offerItem.offer.id,
         name: offerItem.offer.name,
         price: offerItem.offer.discountedPrice,
         quantity: offerItem.quantity,
@@ -323,6 +326,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
       })),
       ...cart.map((cartItem) => ({
         id: `${cartItem.item.id}-${cartItem.supplements.map((s) => `${s.supplementId}:${s.quantity}`).join(",")}`,
+        productId: cartItem.item.id,
         name: cartItem.item.name,
         price: cartItem.item.price,
         quantity: cartItem.quantity,
@@ -406,7 +410,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
     const finalPriceAfterDiscount = cartTotal - discountAmount
     
     // Add to unified sales
-    addSale({
+    const newSale = addSale({
       type: "patisserie",
       source: "online",
       items: orderItems,
@@ -418,12 +422,23 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
       paymentMethod: "pending",
       tableNumber: tableNumber || undefined,
       notes: customerNote || undefined,
-      client: loyaltyClient ? {
-        id: loyaltyClient.id,
-        email: loyaltyClient.email,
-        name: `${loyaltyClient.name}`,
-      } : undefined,
     })
+
+    if (loyaltyClient) {
+      void addStampsFromItems(
+        loyaltyClient.id,
+        newSale.id,
+        cart.flatMap((cartItem) =>
+          Array.from({ length: cartItem.quantity }, () => ({
+            productId: cartItem.item.id,
+            productName: cartItem.item.name,
+            quantity: 1,
+          }))
+        )
+      ).catch((error) => {
+        console.error("Failed to add loyalty card stamps:", error)
+      })
+    }
     
     setLastClientOrder(null)
     setShowCartSummary(false)

@@ -113,7 +113,7 @@ function LoyaltyCardsAdminContent() {
     
     breakfastItems.forEach(item => {
       products.push({
-        id: `breakfast-${item.id}`,
+        id: item.id,
         name: item.name,
         price: item.price || 0,
         category: item.category,
@@ -263,7 +263,7 @@ function LoyaltyCardsAdminContent() {
   }
 
   // Save card
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name || !formData.productName) {
       addNotification("Veuillez remplir tous les champs obligatoires", "error")
       return
@@ -275,11 +275,11 @@ function LoyaltyCardsAdminContent() {
     }
 
     if (showEditDialog && selectedCard) {
-      updateCardConfig(selectedCard.id, cardData)
+      await updateCardConfig(selectedCard.id, cardData)
       addNotification("Carte mise a jour avec succes", "success")
       setShowEditDialog(false)
     } else {
-      createCardConfig(cardData)
+      await createCardConfig(cardData)
       addNotification("Carte creee avec succes", "success")
       setShowCreateDialog(false)
     }
@@ -289,9 +289,9 @@ function LoyaltyCardsAdminContent() {
   }
 
   // Delete card
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (selectedCard) {
-      deleteCardConfig(selectedCard.id)
+      await deleteCardConfig(selectedCard.id)
       addNotification("Carte supprimee avec succes", "success")
       setShowDeleteDialog(false)
       setSelectedCard(null)
@@ -370,7 +370,9 @@ function LoyaltyCardsAdminContent() {
             </div>
             <Switch
               checked={isLoyaltyCardsEnabled}
-              onCheckedChange={setLoyaltyCardsEnabled}
+              onCheckedChange={(checked) => {
+                void setLoyaltyCardsEnabled(checked)
+              }}
               className="data-[state=checked]:bg-amber-500"
             />
           </div>
@@ -842,7 +844,7 @@ function LoyaltyCardsAdminContent() {
             >
               Annuler
             </Button>
-            <Button onClick={handleSave} className="bg-amber-500 hover:bg-amber-600">
+            <Button onClick={() => void handleSave()} className="bg-amber-500 hover:bg-amber-600">
               <CheckIcon className="w-4 h-4 mr-2" />
               {showEditDialog ? "Enregistrer" : "Creer"}
             </Button>
@@ -864,7 +866,7 @@ function LoyaltyCardsAdminContent() {
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
               Annuler
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
+            <Button variant="destructive" onClick={() => void handleDelete()}>
               Supprimer
             </Button>
           </DialogFooter>

@@ -76,7 +76,7 @@ function ClientFideliteContent() {
   // Loyalty cards
   const { 
     getActiveConfigs, 
-    getActiveCustomerCards, 
+    getCustomerCards, 
     playChichBich,
     getCardConfig,
   } = useLoyaltyCards()
@@ -146,7 +146,7 @@ function ClientFideliteContent() {
   // Get loyalty cards data
   const visitorId = loyaltyClient?.id || user?.id || "guest"
   const activeCardConfigs = getActiveConfigs()
-  const customerCards = getActiveCustomerCards(visitorId)
+  const customerCards = getCustomerCards(visitorId)
   
   // Handle playing Chich Bich game
   const handlePlayChichBich = (cardId: string, position: number) => {
@@ -1063,10 +1063,7 @@ function ClientFideliteContent() {
             setShowChichBichModal(false)
             setChichBichGameData(null)
           }}
-          onPlay={() => {
-            const result = playChichBich(chichBichGameData.cardId, chichBichGameData.position)
-            return result
-          }}
+          onPlay={() => playChichBich(chichBichGameData.cardId, chichBichGameData.position)}
           chances={chichBichGameData.chances}
           winCondition={chichBichGameData.winCondition}
           rewardName={chichBichGameData.rewardName}

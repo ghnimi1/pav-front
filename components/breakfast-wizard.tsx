@@ -229,6 +229,7 @@ export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
       ...(selectedFormula
         ? [{
             id: `formula-${selectedFormula}`,
+            productId: `formula-${selectedFormula}`,
             name: baseFormulas.find((formula) => formula.type === selectedFormula)?.name || "Formule de base",
             price: formulaPrice,
             quantity: 1,
@@ -238,6 +239,7 @@ export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
         : []),
       ...cart.map((cartItem) => ({
         id: `${cartItem.item.id}-${(cartItem.selectedSupplements || []).map((s) => `${s.supplementId}:${s.quantity}`).join(",")}`,
+        productId: cartItem.item.id,
         name: cartItem.item.name,
         price: cartItem.item.price,
         quantity: cartItem.quantity,

@@ -724,6 +724,18 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
           lastVisit: loyaltyMetadata.lastVisit,
         })
       }
+
+      void apiPost("/auth/loyalty-cards/stamp", {
+        visitorId: loyaltyClient.id,
+        orderId: order.id,
+        items: order.items.map((entry) => ({
+          productId: entry.item.id,
+          productName: entry.item.name,
+          quantity: entry.quantity,
+        })),
+      }).catch((error) => {
+        console.error("Failed to add breakfast loyalty card stamps:", error)
+      })
     }
 
     clearCart()

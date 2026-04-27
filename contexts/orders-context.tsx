@@ -10,6 +10,7 @@ export type PaymentMethod = "cash_on_delivery" | "cash_on_pickup"
 
 export interface OrderItem {
   id: string
+  productId?: string
   name: string
   price: number
   quantity: number
@@ -335,6 +336,20 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
 
       if (pendingReferral) {
         validateReferralFirstPurchase(pendingReferral.id, order.total, "system-order-create")
+      }
+
+      if (clientInfo?.id) {
+        void apiPost("/auth/loyalty-cards/stamp", {
+          visitorId: clientInfo.id,
+          orderId: order.id,
+          items: items.map((item) => ({
+            productId: item.productId || item.id,
+            productName: item.name,
+            quantity: item.quantity,
+          })),
+        }).catch((stampError) => {
+          console.error("Failed to add remote loyalty card stamps:", stampError)
+        })
       }
 
       if (clearProviderCart) {

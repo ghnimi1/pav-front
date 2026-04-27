@@ -28,7 +28,7 @@ function ClientCardsContent() {
   const { user } = useAuth()
   const { 
     getActiveConfigs, 
-    getActiveCustomerCards, 
+    getCustomerCards, 
     playChichBich,
     getCardConfig,
   } = useLoyaltyCards()
@@ -45,7 +45,7 @@ function ClientCardsContent() {
   
   const visitorId = user?.id || "guest"
   const activeConfigs = getActiveConfigs()
-  const customerCards = getActiveCustomerCards(visitorId)
+  const customerCards = getCustomerCards(visitorId)
   
   // Separate cards by status
   const activeCards = customerCards.filter(c => c.status === "active")
@@ -346,10 +346,7 @@ function ClientCardsContent() {
             setShowChichBichModal(false)
             setChichBichGameData(null)
           }}
-          onPlay={() => {
-            const result = playChichBich(chichBichGameData.cardId, chichBichGameData.position)
-            return result
-          }}
+          onPlay={() => playChichBich(chichBichGameData.cardId, chichBichGameData.position)}
           chances={chichBichGameData.chances}
           winCondition={chichBichGameData.winCondition}
           rewardName={chichBichGameData.rewardName}
