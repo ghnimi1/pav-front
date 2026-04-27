@@ -274,11 +274,11 @@ function ClientFideliteContent() {
     if (!selectedReward) return
     const success = redeemReward(loyaltyClient.id, selectedReward.id)
     if (success) {
-      addNotification(`Recompense "${selectedReward.name}" echangee avec succes!`, "success")
+      addNotification("success", `Recompense "${selectedReward.name}" echangee avec succes!`)
       setShowRewardDialog(false)
       setSelectedReward(null)
     } else {
-      addNotification("Points insuffisants pour cette recompense", "error")
+      addNotification("error", "Points insuffisants pour cette recompense")
     }
   }
 
@@ -317,13 +317,13 @@ function ClientFideliteContent() {
     )
 
     if (success) {
-      addNotification("Recompense de carte reclamee avec succes", "success")
+      addNotification("success", "Recompense de carte reclamee avec succes")
       setSelectedCardReward(null)
       setSelectedCardRewardProductId("")
       return
     }
 
-    addNotification("Impossible de reclamer cette recompense", "error")
+    addNotification("error", "Impossible de reclamer cette recompense")
   }
 
   return (
@@ -1141,7 +1141,7 @@ function ClientFideliteContent() {
                   size="sm"
                   onClick={() => {
                     navigator.clipboard.writeText(getReferralShareUrl())
-                    addNotification("Lien copie!", "success")
+                    addNotification("success", "Lien copie!")
                   }}
                 >
                   <CopyIcon className="h-4 w-4" />
