@@ -296,37 +296,9 @@ function MenuContent() {
     .filter(cat => cat.isActive)
     .sort((a, b) => a.order - b.order)
 
-  // Main content - each mode has its own complete component
-  if (menuMode === "patisserie") {
-    return (
-      <div className="min-h-screen">
-        {/* Mode toggle at top */}
-        <div className="bg-white border-b px-4 py-2">
-          <div className="max-w-7xl mx-auto flex gap-2">
-            <button
-              onClick={() => setMenuMode("patisserie")}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold bg-stone-900 text-white"
-            >
-              <ChefHatIcon className="h-4 w-4" />
-              Patisserie
-            </button>
-            <button
-              onClick={() => setMenuMode("petit-dejeuner")}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all"
-            >
-              <CoffeeIcon className="h-4 w-4" />
-              Petit Dejeuner
-            </button>
-          </div>
-        </div>
-        <PatisserieMenu />
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-stone-50">
-      {/* Header - Only shown for Petit Dejeuner mode */}
+      {/* Header - Affiché pour les deux modes */}
       <header className="sticky top-0 z-50 bg-white border-b border-stone-200">
         <div className="container mx-auto px-4">
           {/* Top bar */}
@@ -422,7 +394,7 @@ function MenuContent() {
               onClick={() => setMenuMode("patisserie")}
               className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold transition-all ${
                 menuMode === "patisserie"
-                  ? "bg-amber-500 text-white"
+                  ? "bg-amber-500 text-white shadow-lg shadow-amber-500/20"
                   : "bg-stone-100 text-stone-600 hover:bg-stone-200"
               }`}
             >
@@ -433,7 +405,7 @@ function MenuContent() {
               onClick={() => setMenuMode("petit-dejeuner")}
               className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold transition-all ${
                 menuMode === "petit-dejeuner"
-                  ? "bg-amber-500 text-white"
+                  ? "bg-amber-500 text-white shadow-lg shadow-amber-500/20"
                   : "bg-stone-100 text-stone-600 hover:bg-stone-200"
               }`}
             >
@@ -444,8 +416,6 @@ function MenuContent() {
         </div>
       </header>
       
-      
-
       {/* Main content */}
       <main>
         {/* Patisserie Mode Content - Uses PatisserieMenu component */}
