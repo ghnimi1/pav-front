@@ -88,7 +88,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
   // Cart state
   const [cart, setCart] = useState<CartItem[]>([])
   const [offerCart, setOfferCart] = useState<OfferCartItem[]>([])
-  
+
   // UI state
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [categoryStepIndex, setCategoryStepIndex] = useState(0)
@@ -101,18 +101,18 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
   const [tableNumber, setTableNumber] = useState("")
   const [supplementsModalOpen, setSupplementsModalOpen] = useState(false)
   const [selectedItemForSupplements, setSelectedItemForSupplements] = useState<MenuItem | null>(null)
-  
+
   // Get client loyalty data
   const loyaltyClient = user?.role === "client" && user?.email ? getClientByEmail(user.email) : null
   const clientPoints = loyaltyClient?.loyaltyPoints ?? 0
   const canCreateRemoteClientOrder = !!user?.id && !!user?.email && user.role !== "admin"
-  
+
   // Use discount context
   const discountContext = useDiscount()
-  
+
   // Current offers (based on day/time)
   const currentOffers = useMemo(() => getCurrentOffers(), [getCurrentOffers])
-  
+
   // Active categories
   const activeCategories = useMemo(() => {
     return menuCategories.filter(cat => cat.isActive).sort((a, b) => a.order - b.order)
@@ -121,22 +121,20 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
   // Navigation steps: Offers (if any) + All categories
   const navigationSteps = useMemo(() => {
     const steps: { id: string; name: string; type: "offers" | "category" }[] = []
-    
-    // Add offers step if there are current offers
+
     if (currentOffers.length > 0) {
       steps.push({ id: "all", name: "Offres", type: "offers" })
     }
-    
-    // Add all active categories - use category id for filtering
+
     activeCategories.forEach(cat => {
       steps.push({ id: cat.id, name: cat.name, type: "category" })
     })
-    
+
     return steps
   }, [currentOffers, activeCategories])
-  
+
   const isLastStep = categoryStepIndex >= navigationSteps.length - 1
-  
+
   // Sync categoryStepIndex with selectedCategory when clicking tabs
   useEffect(() => {
     const currentStepIndex = navigationSteps.findIndex(step => step.id === selectedCategory)
@@ -144,11 +142,10 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
       setCategoryStepIndex(currentStepIndex)
     }
   }, [selectedCategory, navigationSteps, categoryStepIndex])
-  
+
   // Navigation functions
   const goToNextStep = () => {
     if (isLastStep) {
-      // Go to recap
       setShowRecap(true)
     } else {
       const nextIndex = categoryStepIndex + 1
@@ -157,19 +154,19 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
       setSelectedCategory(nextStep.id)
     }
   }
-  
+
   const skipCurrentStep = () => {
     goToNextStep()
   }
-  
+
   // Filtered products
   const filteredProducts = useMemo(() => {
     let products = menuItems.filter(item => item.isAvailable)
-    
+
     if (selectedCategory !== "all") {
       products = products.filter(item => item.category === selectedCategory)
     }
-    
+
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       products = products.filter(item =>
@@ -177,116 +174,111 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
         item.description?.toLowerCase().includes(query)
       )
     }
-    
+
     return products
   }, [menuItems, selectedCategory, searchQuery])
-  
+
   // Cart calculations
   const cartItemsCount = useMemo(() => {
     const productCount = cart.reduce((sum, item) => sum + item.quantity, 0)
     const offerCount = offerCart.reduce((sum, item) => sum + item.quantity, 0)
     return productCount + offerCount
   }, [cart, offerCart])
-  
+
   const cartTotal = useMemo(() => {
     const productTotal = cart.reduce((sum, item) => {
-      const supplements = Array.isArray(item.supplements) ? item.supplements : []
-      const supplementsTotal = supplements.reduce((s, sup) => s + sup.price * sup.quantity, 0)
+      const supps = Array.isArray(item.supplements) ? item.supplements : []
+      const supplementsTotal = supps.reduce((s, sup) => s + sup.price * sup.quantity, 0)
       return sum + (item.item.price + supplementsTotal) * item.quantity
     }, 0)
     const offerTotal = offerCart.reduce((sum, item) => sum + item.offer.discountedPrice * item.quantity, 0)
     return productTotal + offerTotal
   }, [cart, offerCart])
-  
+
   const cartTotalPoints = useMemo(() => {
     const productPoints = cart.reduce((sum, item) => {
-      const supplements = Array.isArray(item.supplements) ? item.supplements : []
-      const supplementsPoints = supplements.reduce((s, sup) => s + (sup.points || 0) * sup.quantity, 0)
+      const supps = Array.isArray(item.supplements) ? item.supplements : []
+      const supplementsPoints = supps.reduce((s, sup) => s + (sup.points || 0) * sup.quantity, 0)
       return sum + ((item.item.points || 0) + supplementsPoints) * item.quantity
     }, 0)
     const offerPoints = offerCart.reduce((sum, item) => sum + item.offer.points * item.quantity, 0)
     return productPoints + offerPoints
   }, [cart, offerCart])
-  
+
   // Smart discount calculation
   const calculateSmartDiscount = useMemo(() => {
     return discountContext.calculateDiscount(cartTotal, cartItemsCount)
   }, [cartTotal, cartItemsCount, discountContext])
-  
+
   const finalTotal = useMemo(() => {
     return Math.round((cartTotal - calculateSmartDiscount.discountAmount) * 100) / 100
   }, [cartTotal, calculateSmartDiscount.discountAmount])
-  
+
   // ============================================
   // CART FUNCTIONS
   // ============================================
-  
+
   const addToCart = (item: MenuItem, supplements: { supplementId: string; name: string; price: number; points?: number; quantity: number }[] = []) => {
     setCart(prev => {
-      // Check if same item with same supplements exists
       const existingIndex = prev.findIndex(
-        cartItem => 
+        cartItem =>
           cartItem.item.id === item.id &&
           JSON.stringify(cartItem.supplements) === JSON.stringify(supplements)
       )
-      
+
       if (existingIndex >= 0) {
         const updated = [...prev]
-        updated[existingIndex].quantity += 1
+        updated[existingIndex] = { ...updated[existingIndex], quantity: updated[existingIndex].quantity + 1 }
         return updated
       }
-      
+
       return [...prev, { item, quantity: 1, supplements }]
     })
   }
-  
+
   const removeFromCart = (index: number) => {
     setCart(prev => prev.filter((_, i) => i !== index))
   }
-  
+
   const updateCartQuantity = (index: number, delta: number) => {
     setCart(prev => {
-      const updated = [...prev]
-      updated[index].quantity += delta
-      if (updated[index].quantity <= 0) {
-        return prev.filter((_, i) => i !== index)
-      }
-      return updated
+      const updated = prev.map((item, i) =>
+        i === index ? { ...item, quantity: item.quantity + delta } : item
+      )
+      return updated.filter(item => item.quantity > 0)
     })
   }
-  
+
   const addOfferToCart = (offer: Offer) => {
     setOfferCart(prev => {
       const existingIndex = prev.findIndex(item => item.offer.id === offer.id)
       if (existingIndex >= 0) {
         const updated = [...prev]
-        updated[existingIndex].quantity += 1
+        updated[existingIndex] = { ...updated[existingIndex], quantity: updated[existingIndex].quantity + 1 }
         return updated
       }
       return [...prev, { offer, quantity: 1 }]
     })
   }
-  
+
   const removeOfferFromCart = (index: number) => {
     setOfferCart(prev => prev.filter((_, i) => i !== index))
   }
-  
+
   const updateOfferQuantity = (index: number, delta: number) => {
     setOfferCart(prev => {
-      const updated = [...prev]
-      updated[index].quantity += delta
-      if (updated[index].quantity <= 0) {
-        return prev.filter((_, i) => i !== index)
-      }
-      return updated
+      const updated = prev.map((item, i) =>
+        i === index ? { ...item, quantity: item.quantity + delta } : item
+      )
+      return updated.filter(item => item.quantity > 0)
     })
   }
-  
+
   const clearCart = () => {
     setCart([])
     setOfferCart([])
   }
-  
+
   // Handle add item (check for supplements)
   const handleAddItem = (item: MenuItem) => {
     if (item.availableSupplements && item.availableSupplements.length > 0) {
@@ -296,11 +288,37 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
       addToCart(item, [])
     }
   }
-  
+
+  // FIX: Increment item in grid (no supplements) — finds existing entry and increments it
+  const handleIncrementItem = (item: MenuItem) => {
+    setCart(prev => {
+      const idx = prev.findIndex(c => c.item.id === item.id && c.supplements.length === 0)
+      if (idx >= 0) {
+        const updated = [...prev]
+        updated[idx] = { ...updated[idx], quantity: updated[idx].quantity + 1 }
+        return updated
+      }
+      // Fallback: create new entry without supplements
+      return [...prev, { item, quantity: 1, supplements: [] }]
+    })
+  }
+
+  // FIX: Decrement item in grid (no supplements) — finds existing entry and decrements it
+  const handleDecrementItem = (item: MenuItem) => {
+    setCart(prev => {
+      const idx = prev.findIndex(c => c.item.id === item.id && c.supplements.length === 0)
+      if (idx < 0) return prev
+      const updated = prev.map((c, i) =>
+        i === idx ? { ...c, quantity: c.quantity - 1 } : c
+      )
+      return updated.filter(c => c.quantity > 0)
+    })
+  }
+
   const handleAddItemWithSupplements = (item: MenuItem, supplements: { supplementId: string; name: string; price: number; points?: number; quantity: number }[]) => {
     addToCart(item, supplements)
   }
-  
+
   // Handle order submission
   const handleSubmitOrder = async () => {
     if (cartItemsCount === 0) return
@@ -376,10 +394,8 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
       })
       return
     }
-    
-    // Build items array
+
     const orderItems = [
-      // Add offers
       ...offerCart.flatMap(offerItem =>
         Array(offerItem.quantity).fill(null).map((_, i) => ({
           id: `offer-${Date.now()}-${offerItem.offer.id}-${i}`,
@@ -392,7 +408,6 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
           categoryId: "offres",
         }))
       ),
-      // Add products
       ...cart.map(cartItem => ({
         id: `item-${Date.now()}-${cartItem.item.id}`,
         productId: cartItem.item.id,
@@ -404,12 +419,10 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
         categoryId: cartItem.item.category,
       })),
     ]
-    
-    // Calculate final price with smart discount
+
     const discountAmount = calculateSmartDiscount.discountAmount
     const finalPriceAfterDiscount = cartTotal - discountAmount
-    
-    // Add to unified sales
+
     const newSale = addSale({
       type: "patisserie",
       source: "online",
@@ -439,26 +452,32 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
         console.error("Failed to add loyalty card stamps:", error)
       })
     }
-    
+
     setLastClientOrder(null)
     setShowCartSummary(false)
     setShowOrderSuccess(true)
-    
-    // Clear cart
+
     clearCart()
     setCustomerNote("")
     setTableNumber("")
   }
-  
-  // Get item quantity in cart
+
+  // Get item quantity in cart (total across all supplement variants)
   const getItemQuantityInCart = (itemId: string) => {
     return cart.filter(c => c.item.id === itemId).reduce((sum, c) => sum + c.quantity, 0)
   }
-  
+
+  // Get item quantity without supplements (for grid +/- controls)
+  const getItemQuantityNoSupplements = (itemId: string) => {
+    return cart
+      .filter(c => c.item.id === itemId && c.supplements.length === 0)
+      .reduce((sum, c) => sum + c.quantity, 0)
+  }
+
   const getOfferQuantityInCart = (offerId: string) => {
     return offerCart.find(c => c.offer.id === offerId)?.quantity || 0
   }
-  
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50/50 to-white">
       {/* Header */}
@@ -474,7 +493,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                 <p className="text-xs text-stone-500">Patisserie Artisanale</p>
               </div>
             </div>
-            
+
             {/* Cart Button */}
             <Button
               onClick={() => setShowCartSummary(true)}
@@ -489,7 +508,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
           </div>
         </div>
       </div>
-      
+
       {/* Search and Categories Header */}
       <div className="sticky top-[72px] z-30 bg-white/95 backdrop-blur-sm border-b border-stone-100">
         <div className="max-w-7xl mx-auto px-4 py-3">
@@ -503,7 +522,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
               className="pl-10 bg-stone-50 border-stone-200"
             />
           </div>
-          
+
           {/* Categories */}
           <div className="flex gap-2 mt-3 overflow-x-auto pb-2 -mx-4 px-4">
             <Button
@@ -517,24 +536,24 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
             >
               Tout voir
             </Button>
-           {activeCategories.map(cat => (
-  <Button
-    key={cat.id}
-    variant={selectedCategory === cat.id ? "default" : "outline"}  // Use cat.id, not cat.slug
-    size="sm"
-    onClick={() => setSelectedCategory(cat.id)}  // Use cat.id
-    className={cn(
-      "shrink-0",
-      selectedCategory === cat.id && "bg-stone-900 text-white"
-    )}
-  >
-    {cat.icon} {cat.name}
-  </Button>
-))}
+            {activeCategories.map(cat => (
+              <Button
+                key={cat.id}
+                variant={selectedCategory === cat.id ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedCategory(cat.id)}
+                className={cn(
+                  "shrink-0",
+                  selectedCategory === cat.id && "bg-stone-900 text-white"
+                )}
+              >
+                {cat.icon} {cat.name}
+              </Button>
+            ))}
           </div>
         </div>
       </div>
-      
+
       {/* Current Offers Section */}
       {currentOffers.length > 0 && selectedCategory === "all" && !searchQuery && (
         <div className="max-w-7xl mx-auto px-4 py-6">
@@ -548,13 +567,13 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
               Disponible maintenant
             </Badge>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {currentOffers.map(offer => {
               const savings = offer.originalPrice - offer.discountedPrice
               const savingsPercent = Math.round((savings / offer.originalPrice) * 100)
               const inCart = getOfferQuantityInCart(offer.id)
-              
+
               return (
                 <motion.div
                   key={offer.id}
@@ -569,7 +588,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                         -{savingsPercent}%
                       </Badge>
                     </div>
-                    
+
                     {/* Image */}
                     <div className="h-32 bg-gradient-to-br from-rose-100 to-amber-100 flex items-center justify-center">
                       {offer.image ? (
@@ -578,18 +597,18 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                         <GiftIcon className="h-12 w-12 text-rose-300" />
                       )}
                     </div>
-                    
+
                     {/* Content */}
                     <div className="p-4">
                       <h3 className="font-bold text-stone-900">{offer.name}</h3>
                       <p className="text-sm text-stone-500 line-clamp-2 mt-1">{offer.description}</p>
-                      
+
                       {/* Schedule */}
                       <div className="flex items-center gap-1 mt-2 text-xs text-rose-600">
                         <ClockIcon className="h-3 w-3" />
                         <span>{offer.schedule.startTime} - {offer.schedule.endTime}</span>
                       </div>
-                      
+
                       {/* Price */}
                       <div className="flex items-center justify-between mt-3">
                         <div>
@@ -601,7 +620,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                           <span>+{offer.points} pts</span>
                         </div>
                       </div>
-                      
+
                       {/* Add Button */}
                       <div className="mt-3">
                         {inCart > 0 ? (
@@ -610,6 +629,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                               size="sm"
                               variant="ghost"
                               onClick={() => {
+                                // FIX: find exact index in offerCart
                                 const idx = offerCart.findIndex(c => c.offer.id === offer.id)
                                 if (idx >= 0) updateOfferQuantity(idx, -1)
                               }}
@@ -645,16 +665,18 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
           </div>
         </div>
       )}
-      
+
       {/* Products Section */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-stone-900">
-            {selectedCategory === "all" ? "Tous nos produits" : activeCategories.find(c => c.slug === selectedCategory)?.name || "Produits"}
+            {selectedCategory === "all"
+              ? "Tous nos produits"
+              : activeCategories.find(c => c.id === selectedCategory)?.name || "Produits"}
           </h2>
           <span className="text-sm text-stone-500">{filteredProducts.length} produits</span>
         </div>
-        
+
         {filteredProducts.length === 0 ? (
           <div className="text-center py-12">
             <SearchIcon className="h-12 w-12 text-stone-300 mx-auto mb-4" />
@@ -664,9 +686,10 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {filteredProducts.map(item => {
-              const inCart = getItemQuantityInCart(item.id)
+              const inCartTotal = getItemQuantityInCart(item.id)
+              const inCartNoSupp = getItemQuantityNoSupplements(item.id)
               const hasSupplements = item.availableSupplements && item.availableSupplements.length > 0
-              
+
               return (
                 <motion.div
                   key={item.id}
@@ -684,16 +707,16 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                         </Badge>
                       </div>
                     )}
-                    
+
                     {/* Quantity in cart */}
-                    {inCart > 0 && (
+                    {inCartTotal > 0 && (
                       <div className="absolute top-2 right-2 z-10">
                         <div className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs font-bold">
-                          {inCart}
+                          {inCartTotal}
                         </div>
                       </div>
                     )}
-                    
+
                     {/* Image */}
                     <div className="h-28 bg-stone-100 relative">
                       {item.image ? (
@@ -704,14 +727,14 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                         </div>
                       )}
                     </div>
-                    
+
                     {/* Content */}
                     <div className="p-3 flex-1 flex flex-col">
                       <h3 className="font-medium text-stone-900 text-sm line-clamp-1">{item.name}</h3>
                       {item.description && (
                         <p className="text-xs text-stone-500 line-clamp-2 mt-1">{item.description}</p>
                       )}
-                      
+
                       {/* Supplements indicator */}
                       {hasSupplements && (
                         <div className="flex items-center gap-1 mt-2 text-xs text-amber-600">
@@ -719,32 +742,35 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                           <span>Supplements disponibles</span>
                         </div>
                       )}
-                      
+
                       <div className="mt-auto pt-2">
                         {/* Price */}
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-bold text-amber-600">{item.price.toFixed(2)} TND</span>
                         </div>
-                        
+
                         {/* Add Button */}
-                        {inCart > 0 && !hasSupplements ? (
+                        {/*
+                          FIX: For items WITHOUT supplements, show inline +/- controls.
+                          For items WITH supplements, always show "Ajouter" to open the modal
+                          (since each tap may have different supplement selections).
+                          The badge above still shows total count across all variants.
+                        */}
+                        {inCartNoSupp > 0 && !hasSupplements ? (
                           <div className="flex items-center justify-between bg-amber-100 rounded-lg p-1">
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => {
-                                const idx = cart.findIndex(c => c.item.id === item.id)
-                                if (idx >= 0) updateCartQuantity(idx, -1)
-                              }}
+                              onClick={() => handleDecrementItem(item)}
                               className="h-7 w-7 p-0"
                             >
                               <MinusIcon className="h-4 w-4" />
                             </Button>
-                            <span className="font-bold">{inCart}</span>
+                            <span className="font-bold">{inCartNoSupp}</span>
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => handleAddItem(item)}
+                              onClick={() => handleIncrementItem(item)}
                               className="h-7 w-7 p-0"
                             >
                               <PlusIcon className="h-4 w-4" />
@@ -769,7 +795,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
           </div>
         )}
       </div>
-      
+
       {/* Cart Summary Dialog */}
       <Dialog open={showCartSummary} onOpenChange={setShowCartSummary}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
@@ -779,7 +805,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
               Votre Panier
             </DialogTitle>
           </DialogHeader>
-          
+
           {cartItemsCount === 0 ? (
             <div className="text-center py-8">
               <ShoppingCartIcon className="h-12 w-12 text-stone-300 mx-auto mb-4" />
@@ -829,7 +855,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                   </Button>
                 </div>
               ))}
-              
+
               {/* Products in cart */}
               {cart.map((item, idx) => (
                 <div key={`item-${idx}`} className="flex items-center gap-3 p-3 bg-stone-50 rounded-lg">
@@ -847,6 +873,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
+                    {/* FIX: use updateCartQuantity with exact idx from cart.map — correct */}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -880,7 +907,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                   </Button>
                 </div>
               ))}
-              
+
               {/* Order notes */}
               <div className="space-y-3 pt-4 border-t">
                 <div>
@@ -903,14 +930,14 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                   />
                 </div>
               </div>
-              
+
               {/* Totals */}
               <div className="space-y-2 pt-4 border-t">
                 <div className="flex justify-between text-sm">
                   <span className="text-stone-600">Sous-total</span>
                   <span>{cartTotal.toFixed(2)} TND</span>
                 </div>
-                
+
                 {calculateSmartDiscount.discountAmount > 0 && (
                   <div className="flex justify-between text-sm text-green-600">
                     <span className="flex items-center gap-1">
@@ -920,8 +947,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                     <span>-{calculateSmartDiscount.discountAmount.toFixed(2)} TND</span>
                   </div>
                 )}
-                
-                {/* Encouragement to next discount tier */}
+
                 {calculateSmartDiscount.nextTier && cartTotal > 0 && (
                   <div className="flex items-center gap-2 text-xs bg-emerald-50 text-emerald-700 px-3 py-2 rounded-lg border border-emerald-200">
                     <GiftIcon className="h-4 w-4 shrink-0 text-emerald-600" />
@@ -930,12 +956,12 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                     </span>
                   </div>
                 )}
-                
+
                 <div className="flex justify-between text-lg font-bold pt-2 border-t">
                   <span>Total</span>
                   <span className="text-amber-600">{finalTotal.toFixed(2)} TND</span>
                 </div>
-                
+
                 <div className="flex justify-between text-sm text-emerald-600">
                   <span className="flex items-center gap-1">
                     <CoinsIcon className="h-4 w-4" />
@@ -946,7 +972,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
               </div>
             </div>
           )}
-          
+
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setShowCartSummary(false)}>
               Continuer
@@ -956,35 +982,35 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                 <Button variant="ghost" onClick={clearCart} className="text-red-500">
                   Vider
                 </Button>
-                  <Button onClick={() => void handleSubmitOrder()} className="bg-amber-500 hover:bg-amber-600 text-white">
-                    <SendIcon className="h-4 w-4 mr-2" />
-                    Commander
-                  </Button>
+                <Button onClick={() => void handleSubmitOrder()} className="bg-amber-500 hover:bg-amber-600 text-white">
+                  <SendIcon className="h-4 w-4 mr-2" />
+                  Commander
+                </Button>
               </>
             )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
+
       {/* Order Success Dialog */}
       <Dialog open={showOrderSuccess} onOpenChange={setShowOrderSuccess}>
         <DialogContent className="max-w-sm text-center">
-            <div className="py-6">
-              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-                <CheckCircle2Icon className="h-8 w-8 text-green-600" />
-              </div>
-              <h2 className="text-xl font-bold text-stone-900 mb-2">Commande envoyee!</h2>
-              <p className="text-stone-600">
-                {lastClientOrder
-                  ? `Votre commande ${lastClientOrder.orderNumber} a ete enregistree.`
-                  : "Votre commande a ete transmise avec succes."}
-              </p>
-              {lastClientOrder && (
-                <p className="text-sm text-amber-600 mt-2">Retrait estime: ~{lastClientOrder.estimatedTime} min</p>
-              )}
-              {cartTotalPoints > 0 && (
-                <div className="mt-4 p-3 bg-emerald-50 rounded-lg">
-                  <div className="flex items-center justify-center gap-2 text-emerald-600">
+          <div className="py-6">
+            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2Icon className="h-8 w-8 text-green-600" />
+            </div>
+            <h2 className="text-xl font-bold text-stone-900 mb-2">Commande envoyee!</h2>
+            <p className="text-stone-600">
+              {lastClientOrder
+                ? `Votre commande ${lastClientOrder.orderNumber} a ete enregistree.`
+                : "Votre commande a ete transmise avec succes."}
+            </p>
+            {lastClientOrder && (
+              <p className="text-sm text-amber-600 mt-2">Retrait estime: ~{lastClientOrder.estimatedTime} min</p>
+            )}
+            {cartTotalPoints > 0 && (
+              <div className="mt-4 p-3 bg-emerald-50 rounded-lg">
+                <div className="flex items-center justify-center gap-2 text-emerald-600">
                   <CoinsIcon className="h-5 w-5" />
                   <span className="font-medium">+{cartTotalPoints} points fidelite gagnes!</span>
                 </div>
@@ -996,7 +1022,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
           </Button>
         </DialogContent>
       </Dialog>
-      
+
       {/* Supplements Modal */}
       {selectedItemForSupplements && (
         <SupplementsModal
@@ -1006,14 +1032,14 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
             setSelectedItemForSupplements(null)
           }}
           item={selectedItemForSupplements}
-          onConfirm={(_,supplements) => {
+          onConfirm={(_, supplements) => {
             handleAddItemWithSupplements(selectedItemForSupplements, supplements)
             setSupplementsModalOpen(false)
             setSelectedItemForSupplements(null)
           }}
         />
       )}
-      
+
       {/* Recap Screen - Full page overlay */}
       <AnimatePresence>
         {showRecap && (
@@ -1035,10 +1061,10 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                   <span className="text-sm font-medium">Retour</span>
                 </button>
                 <h1 className="flex-1 text-center text-lg font-bold text-stone-900">Recapitulatif</h1>
-                <div className="w-20" /> {/* Spacer for centering */}
+                <div className="w-20" />
               </div>
             </div>
-            
+
             {/* Recap Content */}
             <div className="max-w-2xl mx-auto px-4 py-6 pb-48">
               {/* Offers Section */}
@@ -1086,7 +1112,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                   </div>
                 </div>
               )}
-              
+
               {/* Products Section */}
               {cart.length > 0 && (
                 <div className="mb-6">
@@ -1102,11 +1128,10 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                       const supplementsTotal = itemSupplements.reduce((s, sup) => s + sup.price * sup.quantity, 0)
                       const itemTotal = (cartItem.item.price + supplementsTotal) * cartItem.quantity
                       const itemPoints = ((cartItem.item.points || 0) + itemSupplements.reduce((s, sup) => s + (sup.points || 0) * sup.quantity, 0)) * cartItem.quantity
-                      
+
                       return (
                         <div key={idx} className="bg-white rounded-2xl border border-stone-200 p-4">
                           <div className="flex items-center gap-4">
-                            {/* Product image */}
                             <div className="h-14 w-14 rounded-xl overflow-hidden bg-stone-100 relative shrink-0">
                               {cartItem.item.image ? (
                                 <Image
@@ -1121,7 +1146,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                                 </div>
                               )}
                             </div>
-                            
+
                             <div className="flex-1 min-w-0">
                               <h3 className="font-semibold text-stone-900">{cartItem.item.name}</h3>
                               <div className="flex items-center gap-2 mt-1">
@@ -1131,7 +1156,8 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                                 )}
                               </div>
                             </div>
-                            
+
+                            {/* FIX: updateCartQuantity(idx, ...) is correct here since idx comes from cart.map */}
                             <div className="flex items-center gap-2 bg-stone-100 rounded-xl p-1">
                               <button
                                 onClick={() => updateCartQuantity(idx, -1)}
@@ -1148,7 +1174,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                               </button>
                             </div>
                           </div>
-                          
+
                           {/* Supplements */}
                           {itemSupplements.length > 0 && (
                             <div className="mt-3 pt-3 border-t border-stone-100">
@@ -1168,7 +1194,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                   </div>
                 </div>
               )}
-              
+
               {/* Table Number & Notes */}
               <div className="space-y-4 mb-6">
                 <div>
@@ -1195,7 +1221,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                   />
                 </div>
               </div>
-              
+
               {/* Summary Card */}
               <div className="bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 rounded-3xl p-5 text-white shadow-xl">
                 {/* Line items */}
@@ -1222,7 +1248,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                     <span className="font-medium">{cartTotal.toFixed(2)} TND</span>
                   </div>
                 </div>
-                
+
                 {/* Discount applied */}
                 {calculateSmartDiscount.discountAmount > 0 && calculateSmartDiscount.tier && (
                   <div className="flex items-center justify-between bg-white/20 rounded-xl px-3 py-2 mb-3">
@@ -1238,7 +1264,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                     <span className="font-bold text-emerald-200">-{calculateSmartDiscount.discountAmount.toFixed(2)} TND</span>
                   </div>
                 )}
-                
+
                 {/* Next tier encouragement */}
                 {calculateSmartDiscount.nextTier && (
                   <div className="flex items-center gap-2 text-xs text-white/80 mb-3">
@@ -1246,7 +1272,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                     <span>+{calculateSmartDiscount.nextTier.amountNeeded} TND = -{calculateSmartDiscount.nextTier.discount}% ({calculateSmartDiscount.nextTier.name})</span>
                   </div>
                 )}
-                
+
                 {/* Points */}
                 {cartTotalPoints > 0 && (
                   <div className="flex justify-between text-white/90 mb-4">
@@ -1254,7 +1280,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                     <span className="font-bold text-emerald-200">+{cartTotalPoints} pts</span>
                   </div>
                 )}
-                
+
                 {/* Total */}
                 <div className="flex items-baseline justify-between pt-3 border-t border-white/30">
                   <span className="text-lg font-semibold">Total</span>
@@ -1265,7 +1291,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                     <span className="text-2xl font-bold">{finalTotal.toFixed(2)} TND</span>
                   </div>
                 </div>
-                
+
                 {/* Savings badge */}
                 {calculateSmartDiscount.discountAmount > 0 && (
                   <div className="mt-3 text-center">
@@ -1275,13 +1301,13 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                     </span>
                   </div>
                 )}
-                
+
                 {/* Submit button */}
-                  <Button
-                    onClick={() => {
+                <Button
+                  onClick={() => {
                     void handleSubmitOrder()
-                      setShowRecap(false)
-                    }}
+                    setShowRecap(false)
+                  }}
                   className="w-full mt-4 h-14 rounded-2xl bg-white text-amber-600 hover:bg-white/90 font-bold text-lg shadow-lg"
                 >
                   <SendIcon className="h-5 w-5 mr-2" />
@@ -1292,60 +1318,54 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
           </motion.div>
         )}
       </AnimatePresence>
-      
-      {/* Fixed Bottom Bar - Always visible for navigation (hidden when recap is shown) */}
+
+      {/* Fixed Bottom Bar */}
       {!showRecap && (
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-stone-200 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
           {/* Summary Row - Only when cart has items */}
           {cartItemsCount > 0 && (
-          <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-stone-100">
-            <div className="max-w-6xl mx-auto">
-              {/* Mobile: Stacked layout */}
-              <div className="flex items-center justify-between gap-2">
-                {/* Left: Subtotal */}
-                <div className="flex flex-col">
-                  <span className="text-xs text-stone-500">Sous-total</span>
-                  <span className="font-semibold text-stone-900 text-sm">{cartTotal.toFixed(2)} TND</span>
+            <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-stone-100">
+              <div className="max-w-6xl mx-auto">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-col">
+                    <span className="text-xs text-stone-500">Sous-total</span>
+                    <span className="font-semibold text-stone-900 text-sm">{cartTotal.toFixed(2)} TND</span>
+                  </div>
+
+                  {calculateSmartDiscount.discountAmount > 0 && calculateSmartDiscount.tier && (
+                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200">
+                      <span className="text-emerald-700 font-medium text-xs">
+                        -{calculateSmartDiscount.discountPercent}%
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    {cartTotalPoints > 0 && (
+                      <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200">
+                        <CoinsIcon className="h-3 w-3 text-amber-600" />
+                        <span className="font-semibold text-amber-700 text-xs">+{cartTotalPoints}</span>
+                      </div>
+                    )}
+                    <span className="text-base sm:text-lg font-bold text-stone-900">{finalTotal.toFixed(2)} TND</span>
+                  </div>
                 </div>
-                
-                {/* Center: Discount badge (if any) */}
-                {calculateSmartDiscount.discountAmount > 0 && calculateSmartDiscount.tier && (
-                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200">
-                    <span className="text-emerald-700 font-medium text-xs">
-                      -{calculateSmartDiscount.discountPercent}%
+
+                {calculateSmartDiscount.nextTier && cartTotal > 0 && (
+                  <div className="mt-1.5 flex items-center gap-1.5 text-[10px] sm:text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
+                    <GiftIcon className="h-3 w-3 shrink-0" />
+                    <span className="truncate">
+                      +<strong>{calculateSmartDiscount.nextTier.amountNeeded} TND</strong> = -{calculateSmartDiscount.nextTier.discount}%
                     </span>
                   </div>
                 )}
-                
-                {/* Right: Points + Total */}
-                <div className="flex items-center gap-2">
-                  {cartTotalPoints > 0 && (
-                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200">
-                      <CoinsIcon className="h-3 w-3 text-amber-600" />
-                      <span className="font-semibold text-amber-700 text-xs">+{cartTotalPoints}</span>
-                    </div>
-                  )}
-                  <span className="text-base sm:text-lg font-bold text-stone-900">{finalTotal.toFixed(2)} TND</span>
-                </div>
               </div>
-              
-              {/* Encouragement message for next tier - smaller on mobile */}
-              {calculateSmartDiscount.nextTier && cartTotal > 0 && (
-                <div className="mt-1.5 flex items-center gap-1.5 text-[10px] sm:text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-                  <GiftIcon className="h-3 w-3 shrink-0" />
-                  <span className="truncate">
-                    +<strong>{calculateSmartDiscount.nextTier.amountNeeded} TND</strong> = -{calculateSmartDiscount.nextTier.discount}%
-                  </span>
-                </div>
-              )}
             </div>
-          </div>
           )}
-          
-          {/* Navigation Row - Compact on mobile */}
+
+          {/* Navigation Row */}
           <div className="px-3 sm:px-4 py-2 sm:py-3 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
             <div className="max-w-6xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
-              {/* Skip/Passer Button */}
               <Button
                 variant="outline"
                 onClick={skipCurrentStep}
@@ -1355,8 +1375,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                 <SkipForwardIcon className="h-4 w-4 sm:h-5 sm:w-5" />
                 <span className="hidden sm:inline ml-2">Passer</span>
               </Button>
-              
-              {/* Progress Indicators */}
+
               <div className="flex-1 flex items-center justify-center gap-1">
                 {navigationSteps.map((step, index) => (
                   <button
@@ -1377,8 +1396,7 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
                   />
                 ))}
               </div>
-              
-              {/* Next/Suivant Button */}
+
               <Button
                 onClick={goToNextStep}
                 className="rounded-xl px-3 sm:px-6 py-3 sm:py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg"
@@ -1400,8 +1418,8 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
           </div>
         </div>
       )}
-      
-      {/* Spacer to prevent content from being hidden behind fixed bottom bar */}
+
+      {/* Spacer */}
       {!showRecap && <div className={cn(cartItemsCount > 0 ? "h-44 sm:h-36" : "h-20 sm:h-16")} />}
     </div>
   )

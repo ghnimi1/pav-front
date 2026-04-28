@@ -199,7 +199,7 @@ export function Sidebar({ currentView, onViewChange, isOpen, onClose, isAdmin }:
       permission: "articles",
       section: "stock",
     },
-    {
+   /*  {
       id: "articles",
       label: "Articles (Legacy)",
       icon: PackageIcon,
@@ -207,7 +207,7 @@ export function Sidebar({ currentView, onViewChange, isOpen, onClose, isAdmin }:
       permission: "articles",
       section: "stock",
     },
-    /* {
+    {
       id: "categories",
       label: "Categories Menu",
       icon: TagIcon,
