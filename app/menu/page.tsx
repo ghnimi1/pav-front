@@ -420,14 +420,22 @@ function MenuContent() {
           <div className="flex gap-2 pb-3">
             <button
               onClick={() => setMenuMode("patisserie")}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold transition-all bg-stone-100 text-stone-600 hover:bg-stone-200"
+              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold transition-all ${
+                menuMode === "patisserie"
+                  ? "bg-amber-500 text-white"
+                  : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+              }`}
             >
               <ChefHatIcon className="h-4 w-4" />
               Patisserie
             </button>
             <button
               onClick={() => setMenuMode("petit-dejeuner")}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold transition-all bg-amber-500 text-white"
+              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold transition-all ${
+                menuMode === "petit-dejeuner"
+                  ? "bg-amber-500 text-white"
+                  : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+              }`}
             >
               <CoffeeIcon className="h-4 w-4" />
               Petit Dejeuner

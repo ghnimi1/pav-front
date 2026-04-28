@@ -308,7 +308,7 @@ function OrderPageContent() {
                     )}
                   </Button>
                 </SheetTrigger>
-                <SheetContent className="w-full sm:max-w-lg flex flex-col">
+                <SheetContent className="w-full sm:max-w-lg flex flex-col overflow-auto p-2">
                   <SheetHeader>
                     <SheetTitle className="flex items-center gap-2">
                       <ShoppingCartIcon className="h-5 w-5" />
@@ -378,7 +378,7 @@ function OrderPageContent() {
                           </div>
 
                           {/* Cart Summary */}
-                          <div className="border-t pt-4 space-y-3">
+                          <div className="border-t pt-4 space-y-3 px-3">
                             <div className="flex justify-between text-sm">
                               <span className="text-stone-500">Sous-total</span>
                               <span className="font-medium">{cartTotal.toFixed(2)} TND</span>
@@ -727,7 +727,7 @@ function OrderPageContent() {
                         <div className="flex gap-3">
                           <Button
                             variant="outline"
-                            className="flex-1"
+                            className="flex-1 h-12"
                             onClick={() => setCheckoutStep("info")}
                           >
                             Retour
