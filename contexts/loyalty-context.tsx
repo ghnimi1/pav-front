@@ -594,6 +594,13 @@ function normalizeGameConfig(config: any): GameConfig {
   }
 }
 
+function isReplayPrize(prize?: GamePlay["prize"]) {
+  if (!prize) return false
+
+  const description = prize.description?.toLowerCase?.() || ""
+  return description.includes("rejou")
+}
+
 export function LoyaltyProvider({ children }: { children: ReactNode }) {
   const [clients, setClients] = useState<LoyaltyClient[]>([])
   const [transactions, setTransactions] = useState<PointsTransaction[]>([])
@@ -1322,7 +1329,11 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
 
     const today = now.toISOString().split("T")[0]
     const playedTodayCount = gamePlays.filter(
-      (gp) => gp.clientId === clientId && gp.gameType === gameType && gp.playedAt.startsWith(today),
+      (gp) =>
+        gp.clientId === clientId &&
+        gp.gameType === gameType &&
+        gp.playedAt.startsWith(today) &&
+        !isReplayPrize(gp.prize),
     ).length
 
     return playedTodayCount < gameConfig.maxPlaysPerDay

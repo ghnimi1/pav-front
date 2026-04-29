@@ -147,6 +147,11 @@ function getChichbichDiceForReward(reward: GameReward | null) {
   return highPresets[Math.floor(Math.random() * highPresets.length)]
 }
 
+function isReplayResult(result: any) {
+  const description = result?.prize?.description?.toLowerCase?.() || ""
+  return description.includes("rejou")
+}
+
 // Styles CSS pour les animations premium
 const gameStyles = `
   @keyframes wheelSpin {
@@ -1152,6 +1157,21 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
                 </Button>
               )}
 
+              {rouletteResult && isReplayResult(rouletteResult) && (
+                <Button
+                  size="lg"
+                  onClick={() => {
+                    setRouletteResult(null)
+                    setShowConfetti(false)
+                    handleSpinRoulette()
+                  }}
+                  disabled={isSpinning}
+                  className="bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white px-8 py-6"
+                >
+                  Rejouer maintenant
+                </Button>
+              )}
+
               {rouletteResult && (
                 <Button
                   variant="outline"
@@ -1160,6 +1180,7 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
                   onClick={() => {
                     setShowRouletteDialog(false)
                     setRouletteResult(null)
+                    setShowConfetti(false)
                   }}
                 >
                   Fermer
