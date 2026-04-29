@@ -276,6 +276,8 @@ function normalizeShowcaseItem(item: Partial<ShowcaseItem> & { _id?: string }): 
 
 async function fetchRecipeCategories(): Promise<RecipeCategory[]> {
   try {
+     const token = localStorage.getItem("authToken")
+    if (!token) return initialRecipeCategories
     const data = await apiGet<Array<Partial<RecipeCategory> & { _id?: string }>>("/production/recipe-categories")
     return data.map(normalizeRecipeCategory)
   } catch (error) {
@@ -322,6 +324,11 @@ async function deleteRecipeAPI(id: string): Promise<void> {
 
 async function fetchShowcases(): Promise<Showcase[]> {
   try {
+     const token = localStorage.getItem("authToken")
+    if (!token) {
+      console.warn("No auth token, using local showcase data")
+      return initialShowcases
+    }
     const data = await apiGet<Array<Partial<Showcase> & { _id?: string }>>("/production/showcases")
     return data.map(normalizeShowcase)
   } catch (error) {
@@ -345,6 +352,8 @@ async function deleteShowcaseAPI(id: string): Promise<void> {
 
 async function fetchProductionOrders(): Promise<ProductionOrder[]> {
   try {
+      const token = localStorage.getItem("authToken")
+    if (!token) return []
     const data = await apiGet<Array<Partial<ProductionOrder> & { _id?: string }>>("/production/orders")
     return data.map(normalizeProductionOrder)
   } catch (error) {
@@ -381,6 +390,8 @@ async function cancelProductionAPI(id: string): Promise<void> {
 
 async function fetchShowcaseItems(): Promise<ShowcaseItem[]> {
   try {
+     const token = localStorage.getItem("authToken")
+    if (!token) return getInitialShowcaseItems()
     const data = await apiGet<Array<Partial<ShowcaseItem> & { _id?: string }>>("/production/items")
     return data.map(normalizeShowcaseItem)
   } catch (error) {
