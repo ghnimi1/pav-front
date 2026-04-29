@@ -594,9 +594,11 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
     
     // Calculer la rotation pour s'arreter sur ce segment
     const segmentAngle = 360 / rouletteSegments.length
-    const targetAngle = 360 - (safeIndex * segmentAngle) - (segmentAngle / 2)
+    const targetAngle = (360 - (safeIndex * segmentAngle) - (segmentAngle / 2)) % 360
+    const currentRotation = ((wheelRotation % 360) + 360) % 360
+    const deltaToTarget = ((targetAngle - currentRotation) + 360) % 360
     const fullSpins = 5 // Nombre de tours complets
-    const newRotation = wheelRotation + (fullSpins * 360) + targetAngle
+    const newRotation = wheelRotation + (fullSpins * 360) + deltaToTarget
     
     setWheelRotation(newRotation)
 
