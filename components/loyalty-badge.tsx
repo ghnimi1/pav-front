@@ -82,11 +82,11 @@ export function LoyaltyBadge({ open, onClose }: LoyaltyBadgeProps) {
   const loyaltyClient = getClientByEmail(user.email)
   const tier = loyaltyClient?.tier || user.loyaltyTier || "bronze"
   const config = tierConfig[tier]
-  const Icon = config.icon
+  const Icon = config?.icon
   const points = loyaltyClient?.loyaltyPoints ?? user.loyaltyPoints ?? 0
   const totalSpent = loyaltyClient?.totalSpent ?? user.totalSpent ?? 0
 
-  const nextTierConfig = config.nextTier ? tierConfig[config.nextTier] : null
+  const nextTierConfig = config?.nextTier ? tierConfig[config.nextTier] : null
   const progressToNextTier = nextTierConfig
     ? ((totalSpent - config.minSpent) / (nextTierConfig.minSpent - config.minSpent)) * 100
     : 100
@@ -126,14 +126,14 @@ export function LoyaltyBadge({ open, onClose }: LoyaltyBadgeProps) {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6 mt-6">
-            <Card className={`${config.bgColor} border-2 p-6`}>
+            <Card className={`${config?.bgColor} border-2 p-6`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className={`rounded-full ${config.bgColor} p-4`}>
-                    <Icon className={`h-10 w-10 ${config.color}`} />
+                  <div className={`rounded-full ${config?.bgColor} p-4`}>
+                    <Icon className={`h-10 w-10 ${config?.color}`} />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold">{config.name}</h3>
+                    <h3 className="text-2xl font-bold">{config?.name}</h3>
                     <p className="text-sm text-muted-foreground">Votre niveau actuel</p>
                   </div>
                 </div>
@@ -160,9 +160,9 @@ export function LoyaltyBadge({ open, onClose }: LoyaltyBadgeProps) {
             )}
 
             <div>
-              <h4 className="mb-3 font-semibold">Vos avantages {config.name}</h4>
+              <h4 className="mb-3 font-semibold">Vos avantages {config?.name}</h4>
               <div className="space-y-2">
-                {config.benefits.map((benefit, index) => (
+                {config?.benefits?.map((benefit, index) => (
                   <div key={index} className="flex items-start gap-2">
                     <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-green-100">
                       <svg className="h-3 w-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
