@@ -634,6 +634,11 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
   }
 
   const loadRewardsFromBackend = async () => {
+      const token = localStorage.getItem("authToken")
+  if (!token) {
+    syncClientsFromCurrentUser()
+    return
+  }
     try {
       const response = await apiGet<StockRewardApi[]>("/stock/rewards")
       const now = new Date().toISOString()
