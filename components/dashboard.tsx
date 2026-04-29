@@ -34,6 +34,8 @@ import { useAuth } from "@/contexts/auth-context"
 import { ShieldAlertIcon } from "lucide-react"
 import { MenuAdminContent } from "./menu-admin"
 import LoyaltyCardsAdminPage from "./cartes-fidelite"
+import DiscountSettingsPage from "./remises"
+import NotificationsHistoryPage from "@/app/admin/notifications/page"
 
 type NavItem =
   | "dashboard"
@@ -64,6 +66,8 @@ type NavItem =
   | "menu-client"
   | "menu-admin"
   | "loyalty-cards"
+  | "discount-settings"
+  | "notifications-history"
 
 export function Dashboard() {
   const [currentView, setCurrentView] = useState<NavItem>("dashboard")
@@ -205,6 +209,10 @@ export function Dashboard() {
 
           {currentView === "employees" && canAccess("employees") && <EmployeesManagement />}
 
+          {currentView === "discount-settings" && canAccess("dashboard") && <DiscountSettingsPage />}
+
+          {currentView === "notifications-history" && canAccess("dashboard") && <NotificationsHistoryPage />}
+
           {/* Access Denied Message */}
           {((currentView === "dashboard" && !canAccess("dashboard")) ||
             (currentView === "recipes" && !canAccess("articles")) ||
@@ -228,7 +236,9 @@ export function Dashboard() {
             (currentView === "games" && !canAccess("games")) ||
             (currentView === "referrals" && !canAccess("referrals")) ||
             (currentView === "staff-pos" && !canAccess("pos")) ||
-            (currentView === "employees" && !canAccess("employees"))) && (
+            (currentView === "employees" && !canAccess("employees")) ||
+            (currentView === "discount-settings" && !canAccess("dashboard")) ||
+            (currentView === "notifications-history" && !canAccess("dashboard"))) && (
             <div className="flex min-h-[400px] items-center justify-center">
               <div className="text-center">
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100">

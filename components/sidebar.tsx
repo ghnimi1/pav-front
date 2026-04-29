@@ -69,6 +69,8 @@ type NavItem =
   | "loyalty-cards"
   | "staff-pos"
   | "employees"
+  | "discount-settings"
+  | "notifications-history"
 
 interface SidebarProps {
   currentView: NavItem
@@ -448,18 +450,28 @@ export function Sidebar({ currentView, onViewChange, isOpen, onClose, isAdmin }:
           {isAdmin && (
             <div className="border-t border-border p-4 space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Parametres</p>
-              <Link href="/admin/parametres/remises" className="block">
-                <Button variant="ghost" className="w-full justify-start gap-3 text-sm">
+              <Button
+                variant={currentView === "discount-settings" ? "secondary" : "ghost"}
+                className="w-full justify-start gap-3 text-sm"
+                onClick={() => {
+                  onViewChange("discount-settings")
+                  onClose()
+                }}
+              >
                   <PercentIcon className="h-4 w-4" />
                   Remises Progressives
-                </Button>
-              </Link>
-              <Link href="/admin/notifications" className="block">
-                <Button variant="ghost" className="w-full justify-start gap-3 text-sm">
+              </Button>
+              <Button
+                variant={currentView === "notifications-history" ? "secondary" : "ghost"}
+                className="w-full justify-start gap-3 text-sm"
+                onClick={() => {
+                  onViewChange("notifications-history")
+                  onClose()
+                }}
+              >
                   <BellIcon className="h-4 w-4" />
                   Historique Notifications
-                </Button>
-              </Link>
+              </Button>
             </div>
           )}
 
