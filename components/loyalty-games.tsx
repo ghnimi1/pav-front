@@ -21,7 +21,7 @@ import {
   ImageIcon,
   XIcon,
 } from "lucide-react"
-import { useLoyalty, type GameConfig, type LoyaltyClient } from "@/contexts/loyalty-context"
+import { useLoyalty, type GameConfig, type GameReward, type LoyaltyClient } from "@/contexts/loyalty-context"
 import { useNotification } from "@/contexts/notification-context"
 import { useStock } from "@/contexts/stock-context"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog"
@@ -29,7 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { ScrollArea } from "./ui/scroll-area"
 
 // Configuration des segments de la roulette avec design premium
-const WHEEL_SEGMENTS = [
+const DEFAULT_WHEEL_SEGMENTS = [
   { label: "10 pts", color: "#dc2626", textColor: "#ffffff", prize: { type: "points", value: 10 } },
   { label: "50 pts", color: "#fef3c7", textColor: "#b45309", prize: { type: "points", value: 50 } },
   { label: "5 TND", color: "#dc2626", textColor: "#ffffff", prize: { type: "discount", value: 5 } },
@@ -43,6 +43,109 @@ const WHEEL_SEGMENTS = [
   { label: "15 pts", color: "#fef3c7", textColor: "#b45309", prize: { type: "points", value: 15 } },
   { label: "JACKPOT", color: "#fbbf24", textColor: "#7c2d12", prize: { type: "jackpot", value: 200 } },
 ]
+
+type WheelSegment = {
+  label: string
+  color: string
+  textColor: string
+  prize: {
+    type: "points" | "discount" | "free_item" | "gift" | "jackpot"
+    value: number | string
+  } | null
+  reward?: GameReward
+}
+
+function parseRewardProbability(reward: GameReward) {
+  return Math.max(
+    typeof reward.probability === "number"
+      ? reward.probability
+      : Number.parseFloat(String((reward as any).pourcentage ?? (reward as any).percentage ?? 0)) || 0,
+    0
+  )
+}
+
+function normalizeRewardPrize(reward: GameReward) {
+  const rewardType =
+    reward.type || (reward.name.toLowerCase().includes("tnd") ? "discount" : "points")
+  const rewardValue =
+    typeof reward.value === "number"
+      ? reward.value
+      : rewardType === "discount"
+        ? Number.parseFloat(reward.name) || reward.points
+        : reward.points
+
+  return {
+    type: rewardType,
+    value: rewardValue,
+    description: reward.name,
+  }
+}
+
+function getWheelSegmentsFromConfig(config?: GameConfig): WheelSegment[] {
+  const rewards = Array.isArray(config?.rewards) ? [...config.rewards] : []
+  if (rewards.length === 0) return DEFAULT_WHEEL_SEGMENTS
+
+  const hasWheelSegment = rewards.some((reward) => typeof reward.wheelSegment === "number" && reward.wheelSegment > 0)
+  const orderedRewards = hasWheelSegment
+    ? rewards.sort((a, b) => (a.wheelSegment ?? Number.MAX_SAFE_INTEGER) - (b.wheelSegment ?? Number.MAX_SAFE_INTEGER))
+    : rewards
+
+  return orderedRewards.map((reward, index) => {
+    const prize = normalizeRewardPrize(reward)
+    const isWin = prize.type === "discount" || prize.type === "free_item" || (typeof prize.value === "number" && prize.value > 0)
+    const isHighlight = /jackpot|chichbich|triple/i.test(reward.name)
+    const baseColor = reward.color || (index % 2 === 0 ? "#dc2626" : "#fef3c7")
+    const isLightSegment = ["#fef3c7", "#fde68a", "#fbbf24"].includes(baseColor.toLowerCase())
+
+    return {
+      label: reward.name || `${reward.points} pts`,
+      color: baseColor,
+      textColor: isLightSegment ? "#7c2d12" : "#ffffff",
+      prize: isWin
+        ? {
+            type: isHighlight && prize.type === "points" ? "jackpot" : prize.type,
+            value: prize.value,
+          }
+        : null,
+      reward,
+    }
+  })
+}
+
+function pickRewardByProbability(config?: GameConfig) {
+  const rewards = Array.isArray(config?.rewards) ? config.rewards : []
+  const normalizedRewards = rewards
+    .map((reward) => ({ reward, probability: parseRewardProbability(reward) }))
+    .filter((entry) => entry.probability > 0)
+
+  const totalProbability = normalizedRewards.reduce((sum, entry) => sum + entry.probability, 0)
+  if (totalProbability <= 0) return null
+
+  const random = Math.random() * totalProbability
+  let cursor = 0
+
+  for (const entry of normalizedRewards) {
+    cursor += entry.probability
+    if (random <= cursor) return entry.reward
+  }
+
+  return normalizedRewards.at(-1)?.reward ?? null
+}
+
+function getChichbichDiceForReward(reward: GameReward | null) {
+  if (!reward) {
+    const presets: Array<[number, number]> = [[1, 2], [1, 3], [2, 4], [2, 3], [3, 4]]
+    return presets[Math.floor(Math.random() * presets.length)]
+  }
+
+  const rewardName = reward.name.toLowerCase()
+  if (rewardName.includes("chichbich")) return [6, 6] as const
+  if (rewardName.includes("triple")) return [5, 5] as const
+  if (rewardName.includes("double")) return [4, 4] as const
+
+  const highPresets: Array<[number, number]> = [[6, 4], [6, 5], [5, 4], [4, 3]]
+  return highPresets[Math.floor(Math.random() * highPresets.length)]
+}
 
 // Styles CSS pour les animations premium
 const gameStyles = `
@@ -102,11 +205,10 @@ const gameStyles = `
 `
 
 // Composant Roue de Fortune Premium
-function FortuneWheel({ isSpinning, rotation, segments, onSpinEnd }: { 
+function FortuneWheel({ isSpinning, rotation, segments }: { 
   isSpinning: boolean
   rotation: number
-  segments: typeof WHEEL_SEGMENTS
-  onSpinEnd?: () => void 
+  segments: WheelSegment[]
 }) {
   const segmentAngle = 360 / segments.length
   const [lightIndex, setLightIndex] = useState(0)
@@ -426,8 +528,8 @@ interface LoyaltyGamesProps {
 }
 
 const defaultGamesConfig = [
-  { id: "roulette", name: "Roulette de la Chance", enabled: true, startHour: 10, endHour: 14, maxPlaysPerDay: 3, minPointsRequired: 50 },
-  { id: "chichbich", name: "Chichbich", enabled: true, startHour: 18, endHour: 22, maxPlaysPerDay: 2, minPointsRequired: 100 },
+  { id: "roulette", name: "Roulette de la Chance", enabled: true, startHour: 10, endHour: 14, maxPlaysPerDay: 3, minPointsRequired: 50, rewards: [] },
+  { id: "chichbich", name: "Chichbich", enabled: true, startHour: 18, endHour: 22, maxPlaysPerDay: 2, minPointsRequired: 100, rewards: [] },
 ]
 
 export function LoyaltyGames({ client }: LoyaltyGamesProps) {
@@ -439,7 +541,6 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
   const [chichbichResult, setChichbichResult] = useState<{ dice1: number; dice2: number; reward: any } | null>(null)
   const [currentTime, setCurrentTime] = useState(new Date())
   const [wheelRotation, setWheelRotation] = useState(0)
-  const [winningSegmentIndex, setWinningSegmentIndex] = useState<number | null>(null)
   const [dice1Value, setDice1Value] = useState(1)
   const [dice2Value, setDice2Value] = useState(1)
   const [showConfetti, setShowConfetti] = useState(false)
@@ -456,7 +557,7 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { canPlayGame, playGame, createShareLink, getClientShareLink, hasValidShareToday, gamesConfig } = useLoyalty()
-  const { menuItems, menuCategories } = useStock()
+  const { menuItems } = useStock()
   const { addNotification } = useNotification()
 
   useEffect(() => {
@@ -471,6 +572,7 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
   const currentHour = currentTime.getHours()
   const rouletteConfig = gamesConfig.find(g => g.id === "roulette") || defaultGamesConfig[0]
   const chichbichConfig = gamesConfig.find(g => g.id === "chichbich") || defaultGamesConfig[1]
+  const rouletteSegments = getWheelSegmentsFromConfig(rouletteConfig)
 
   // Verifier si les jeux sont disponibles selon la plage horaire configuree par l'admin
   const isRouletteTime = rouletteConfig.enabled && currentHour >= rouletteConfig.startHour && currentHour < rouletteConfig.endHour
@@ -486,13 +588,13 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
     setRouletteResult(null)
     setShowConfetti(false)
 
-    // Choisir un segment aleatoire
-    const randomIndex = Math.floor(Math.random() * WHEEL_SEGMENTS.length)
-    setWinningSegmentIndex(randomIndex)
+    const selectedReward = pickRewardByProbability(rouletteConfig)
+    const randomIndex = rouletteSegments.findIndex((segment) => segment.reward?.id === selectedReward?.id)
+    const safeIndex = randomIndex >= 0 ? randomIndex : Math.floor(Math.random() * rouletteSegments.length)
     
     // Calculer la rotation pour s'arreter sur ce segment
-    const segmentAngle = 360 / WHEEL_SEGMENTS.length
-    const targetAngle = 360 - (randomIndex * segmentAngle) - (segmentAngle / 2)
+    const segmentAngle = 360 / rouletteSegments.length
+    const targetAngle = 360 - (safeIndex * segmentAngle) - (segmentAngle / 2)
     const fullSpins = 5 // Nombre de tours complets
     const newRotation = wheelRotation + (fullSpins * 360) + targetAngle
     
@@ -500,8 +602,8 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
 
     // Attendre la fin de l'animation
     setTimeout(() => {
-      const segment = WHEEL_SEGMENTS[randomIndex]
-      const prize = segment.prize
+      const segment = rouletteSegments[safeIndex]
+      const fallbackPrize = segment.prize
         ? {
             type:
               segment.prize.type === "gift"
@@ -513,6 +615,7 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
             description: segment.label,
           }
         : undefined
+      const prize = selectedReward ? normalizeRewardPrize(selectedReward) : fallbackPrize
       playGame(client.id, "roulette", prize)
       
       if (prize) {
@@ -682,24 +785,13 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
     // Resultat final apres 2 secondes
     setTimeout(() => {
       clearInterval(rollInterval)
-      
-      const finalDice1 = Math.floor(Math.random() * 6) + 1
-      const finalDice2 = Math.floor(Math.random() * 6) + 1
-      const total = finalDice1 + finalDice2
+      const selectedReward = pickRewardByProbability(chichbichConfig)
+      const [finalDice1, finalDice2] = getChichbichDiceForReward(selectedReward)
       
       setDice1Value(finalDice1)
       setDice2Value(finalDice2)
-      
-      let reward = null
-      if (finalDice1 === finalDice2) {
-        reward = { description: `Double ${finalDice1}! +${finalDice1 * 20} points`, type: "points", value: finalDice1 * 20 }
-        setShowConfetti(true)
-      } else if (total >= 10) {
-        reward = { description: `${total} points bonus!`, type: "points", value: total * 5 }
-        setShowConfetti(true)
-      } else if (total >= 7) {
-        reward = { description: `${total * 2} points`, type: "points", value: total * 2 }
-      }
+      const reward = selectedReward ? normalizeRewardPrize(selectedReward) : null
+      if (reward) setShowConfetti(true)
       
       setChichbichResult({
         dice1: finalDice1,
@@ -1006,7 +1098,7 @@ export function LoyaltyGames({ client }: LoyaltyGamesProps) {
             <FortuneWheel 
               isSpinning={isSpinning} 
               rotation={wheelRotation} 
-              segments={WHEEL_SEGMENTS} 
+              segments={rouletteSegments} 
             />
 
             {/* Resultat */}

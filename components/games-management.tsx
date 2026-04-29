@@ -101,6 +101,9 @@ export function GamesManagement() {
       points: 0,
       probability: 10,
       color: "#3b82f6",
+      type: "points",
+      value: 0,
+      wheelSegment: selectedGame?.rewards.length ? selectedGame.rewards.length + 1 : 1,
     })
     setShowRewardDialog(true)
   }
@@ -421,7 +424,7 @@ export function GamesManagement() {
                         <div>
                           <p className="font-medium">{reward.name}</p>
                           <p className="text-sm text-muted-foreground">
-                            {reward.points} pts - {reward.probability}% de chance
+                            {reward.type || "points"} - {reward.value ?? reward.points} - {reward.probability}% de chance
                           </p>
                         </div>
                       </div>
@@ -516,6 +519,54 @@ export function GamesManagement() {
                     }
                   />
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Type</Label>
+                  <Select
+                    value={editingReward.type || "points"}
+                    onValueChange={(value: "points" | "discount" | "free_item") =>
+                      setEditingReward({ ...editingReward, type: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="points">Points</SelectItem>
+                      <SelectItem value="discount">Remise</SelectItem>
+                      <SelectItem value="free_item">Produit offert</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Valeur</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={editingReward.value ?? editingReward.points}
+                    onChange={(e) =>
+                      setEditingReward({
+                        ...editingReward,
+                        value: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Wheel segment</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={editingReward.wheelSegment ?? 1}
+                  onChange={(e) =>
+                    setEditingReward({
+                      ...editingReward,
+                      wheelSegment: parseInt(e.target.value) || 1,
+                    })
+                  }
+                />
               </div>
               <div className="space-y-2">
                 <Label>Couleur</Label>

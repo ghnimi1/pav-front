@@ -158,6 +158,9 @@ export interface GameReward {
   points: number
   probability: number
   color: string
+  type?: "points" | "discount" | "free_item"
+  value?: number
+  wheelSegment?: number
 }
 
 export interface GameConfig {
@@ -525,6 +528,72 @@ function getInitialGamesConfig(): GameConfig[] {
   ]
 }
 
+function normalizeGameReward(reward: any): GameReward {
+  const probabilityValue =
+    typeof reward?.probability === "number"
+      ? reward.probability
+      : typeof reward?.pourcentage === "number"
+        ? reward.pourcentage
+        : typeof reward?.percentage === "number"
+          ? reward.percentage
+          : Number.parseFloat(String(reward?.probability ?? reward?.pourcentage ?? reward?.percentage ?? 0)) || 0
+
+  const pointsValue =
+    typeof reward?.points === "number"
+      ? reward.points
+      : Number.parseFloat(String(reward?.points ?? 0)) || 0
+
+  const explicitValue =
+    typeof reward?.value === "number"
+      ? reward.value
+      : Number.parseFloat(String(reward?.value ?? pointsValue)) || pointsValue
+
+  const type =
+    reward?.type === "discount" || reward?.type === "free_item" || reward?.type === "points"
+      ? reward.type
+      : reward?.name?.toLowerCase?.().includes("tnd")
+        ? "discount"
+        : "points"
+
+  const wheelSegmentValue =
+    typeof reward?.wheelSegment === "number"
+      ? reward.wheelSegment
+      : typeof reward?.wheel_segment === "number"
+        ? reward.wheel_segment
+        : Number.parseInt(String(reward?.wheelSegment ?? reward?.wheel_segment ?? 0), 10) || 0
+
+  return {
+    id: String(reward?.id || reward?._id || `reward-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`),
+    name: reward?.name || "",
+    points: pointsValue,
+    probability: Math.max(probabilityValue, 0),
+    color: reward?.color || "#64748b",
+    type,
+    value: explicitValue,
+    wheelSegment: wheelSegmentValue,
+  }
+}
+
+function normalizeGameConfig(config: any): GameConfig {
+  return {
+    id: String(config?.id || config?._id || ""),
+    name: config?.name || "",
+    icon: config?.icon === "chichbich" ? "chichbich" : "roulette",
+    enabled: config?.enabled ?? true,
+    startHour: typeof config?.startHour === "number" ? config.startHour : Number.parseInt(String(config?.startHour ?? 0), 10) || 0,
+    endHour: typeof config?.endHour === "number" ? config.endHour : Number.parseInt(String(config?.endHour ?? 23), 10) || 23,
+    maxPlaysPerDay:
+      typeof config?.maxPlaysPerDay === "number"
+        ? config.maxPlaysPerDay
+        : Number.parseInt(String(config?.maxPlaysPerDay ?? 1), 10) || 1,
+    minPointsRequired:
+      typeof config?.minPointsRequired === "number"
+        ? config.minPointsRequired
+        : Number.parseInt(String(config?.minPointsRequired ?? 0), 10) || 0,
+    rewards: Array.isArray(config?.rewards) ? config.rewards.map(normalizeGameReward) : [],
+  }
+}
+
 export function LoyaltyProvider({ children }: { children: ReactNode }) {
   const [clients, setClients] = useState<LoyaltyClient[]>([])
   const [transactions, setTransactions] = useState<PointsTransaction[]>([])
@@ -704,7 +773,7 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
 
     try {
       const response = await apiGet<GamesConfigApiResponse>("/auth/games-config")
-      setGamesConfig(response.gamesConfig)
+      setGamesConfig(response.gamesConfig.map(normalizeGameConfig))
       return
     } catch (error) {
       console.error("Failed to load games config from backend:", error)
@@ -1264,7 +1333,7 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
 
     if (!wonPrize) {
       const gameConfig = gamesConfig.find((game) => game.id === gameType)
-      const rewards = gameConfig?.rewards || []
+      const rewards = (gameConfig?.rewards || []).map(normalizeGameReward)
       const normalizedRewards = rewards.map((reward) => ({
         reward,
         probability: Math.max(reward.probability, 0),
@@ -1278,8 +1347,14 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
         if (random <= cursor) {
           if (item.reward.points > 0) {
             wonPrize = {
-              type: "points",
-              value: item.reward.points,
+              type: item.reward.type || "points",
+              value: item.reward.value ?? item.reward.points,
+              description: item.reward.name,
+            }
+          } else if (item.reward.type === "discount" || item.reward.type === "free_item") {
+            wonPrize = {
+              type: item.reward.type,
+              value: item.reward.value ?? 0,
               description: item.reward.name,
             }
           }
@@ -1334,10 +1409,11 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
   }
 
   const saveGamesConfig = (configs: GameConfig[]) => {
-    setGamesConfig(configs)
-    void apiPut<GamesConfigApiResponse>("/auth/games-config", { gamesConfig: configs })
+    const normalizedConfigs = configs.map(normalizeGameConfig)
+    setGamesConfig(normalizedConfigs)
+    void apiPut<GamesConfigApiResponse>("/auth/games-config", { gamesConfig: normalizedConfigs })
       .then((response) => {
-        setGamesConfig(response.gamesConfig)
+        setGamesConfig(response.gamesConfig.map(normalizeGameConfig))
       })
       .catch((error) => {
         console.error("Failed to save games config:", error)
