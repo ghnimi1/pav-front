@@ -15,13 +15,13 @@ import { AwardIcon, TrophyIcon, CrownIcon, StarIcon, GiftIcon, SparklesIcon } fr
 const tierConfig: Record<
   LoyaltyTier,
   {
-    name: string
-    icon: typeof AwardIcon
-    color: string
-    bgColor: string
+    name?: string
+    icon?: typeof AwardIcon
+    color?: string
+    bgColor?: string
     nextTier?: LoyaltyTier
-    benefits: string[]
-    minSpent: number
+    benefits?: string[]
+    minSpent?: number
     maxSpent?: number
   }
 > = {
@@ -93,18 +93,18 @@ export function LoyaltyBadge({ open, onClose }: LoyaltyBadgeProps) {
 
   const handleRedeemReward = (reward: any) => {
     if (points < reward.pointsCost) {
-      addNotification("Vous n'avez pas assez de points pour cette recompense", "error")
+      addNotification("error", "Vous n'avez pas assez de points pour cette recompense")
       return
     }
 
     const success = redeemReward(loyaltyClient?.id || user.id, reward.id)
     if (!success) {
-      addNotification("Impossible d'echanger cette recompense", "error")
+      addNotification("error", "Impossible d'echanger cette recompense")
       return
     }
 
     const remainingPoints = points - reward.pointsCost
-    addNotification(`Recompense echangee avec succes! "${reward.name}" - Il vous reste ${remainingPoints} points`, "success")
+    addNotification("success", `Recompense echangee avec succes! "${reward.name}" - Il vous reste ${remainingPoints} points`)
   }
 
   const rewards = getActiveRewards()
@@ -162,7 +162,7 @@ export function LoyaltyBadge({ open, onClose }: LoyaltyBadgeProps) {
             <div>
               <h4 className="mb-3 font-semibold">Vos avantages {config?.name}</h4>
               <div className="space-y-2">
-                {config?.benefits?.map((benefit, index) => (
+                {config?.benefits?.map((benefit : string, index : number) => (
                   <div key={index} className="flex items-start gap-2">
                     <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-green-100">
                       <svg className="h-3 w-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
