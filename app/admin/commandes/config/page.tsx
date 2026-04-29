@@ -107,7 +107,7 @@ function DeliveryConfigContent() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => router.push("/admin/commandes")}
+                onClick={() => router.back()}
               >
                 <ArrowLeftIcon className="h-5 w-5" />
               </Button>

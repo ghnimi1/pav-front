@@ -19,6 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { SalesDashboard } from "./sales-dashboard"
+import { AdminOrdersContent } from "./commande-admin" // Import the kanban component
 import { 
   SearchIcon, 
   PlusIcon,
@@ -44,6 +45,7 @@ import {
   TrendingUpIcon,
   BarChart3Icon,
   ListIcon,
+  KanbanIcon,
   EyeIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -147,6 +149,7 @@ export function UnifiedSalesManagement() {
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedOrder, setSelectedOrder] = useState<ManagedOrder | null>(null)
   const [orderDetailOpen, setOrderDetailOpen] = useState(false)
+  const [orderViewMode, setOrderViewMode] = useState<"list" | "kanban">("list") // Add view mode state
 
   // Available products from all sources
   const availableProducts = useMemo(() => {
@@ -1025,168 +1028,196 @@ export function UnifiedSalesManagement() {
         {/* Orders Tab */}
         <TabsContent value="orders" className="flex-1 mt-0">
           {/* Filters */}
-          <div className="flex items-center gap-3 mb-4">
-            <div className="relative flex-1 max-w-md">
-              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher par numero, client, article..."
-                value={orderSearchQuery}
-                onChange={(e) => setOrderSearchQuery(e.target.value)}
-                className="pl-9"
-              />
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3 flex-1">
+              <div className="relative flex-1 max-w-md">
+                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher par numero, client, article..."
+                  value={orderSearchQuery}
+                  onChange={(e) => setOrderSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Select value={orderStatusFilter} onValueChange={(v) => setOrderStatusFilter(v as typeof orderStatusFilter)}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les statuts</SelectItem>
+                  <SelectItem value="active">En cours</SelectItem>
+                  <SelectItem value="completed">Terminees</SelectItem>
+                  <SelectItem value="cancelled">Annulees</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={dateFilter} onValueChange={(v) => setDateFilter(v as typeof dateFilter)}>
+                <SelectTrigger className="w-40">
+                  <CalendarIcon className="h-4 w-4 mr-2" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">Aujourd&apos;hui</SelectItem>
+                  <SelectItem value="week">Cette semaine</SelectItem>
+                  <SelectItem value="month">Ce mois</SelectItem>
+                  <SelectItem value="all">Tout</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={orderStatusFilter} onValueChange={(v) => setOrderStatusFilter(v as typeof orderStatusFilter)}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                <SelectItem value="active">En cours</SelectItem>
-                <SelectItem value="completed">Terminees</SelectItem>
-                <SelectItem value="cancelled">Annulees</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={dateFilter} onValueChange={(v) => setDateFilter(v as typeof dateFilter)}>
-              <SelectTrigger className="w-40">
-                <CalendarIcon className="h-4 w-4 mr-2" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">Aujourd&apos;hui</SelectItem>
-                <SelectItem value="week">Cette semaine</SelectItem>
-                <SelectItem value="month">Ce mois</SelectItem>
-                <SelectItem value="all">Tout</SelectItem>
-              </SelectContent>
-            </Select>
+            
+            {/* View Mode Toggle */}
+            <div className="flex gap-1 border rounded-md p-1 bg-muted/30">
+              <Button
+                variant={orderViewMode === "list" ? "default" : "ghost"}
+                size="sm"
+                className="h-9 w-9 p-0"
+                onClick={() => setOrderViewMode("list")}
+              >
+                <ListIcon className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={orderViewMode === "kanban" ? "default" : "ghost"}
+                size="sm"
+                className="h-9 w-9 p-0"
+                onClick={() => setOrderViewMode("kanban")}
+              >
+                <KanbanIcon className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
-          {/* Orders List */}
-          <Card>
-            <CardContent className="p-0">
-              {filteredOrders.length === 0 ? (
-                <div className="text-center py-12">
-                  <ReceiptIcon className="h-12 w-12 mx-auto text-stone-300 mb-3" />
-                  <p className="font-medium text-stone-600">Aucune commande trouvee</p>
-                  <p className="text-sm text-muted-foreground">Modifiez vos filtres pour voir plus de resultats</p>
-                </div>
-              ) : (
-                <div className="divide-y">
-                  {paginatedOrders.map(sale => (
-                    <div
-                      key={sale.id}
-                      className="p-4 hover:bg-stone-50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-4">
-                          <div className="h-10 w-10 rounded-lg bg-stone-100 flex items-center justify-center">
-                            <HashIcon className="h-5 w-5 text-stone-500" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-semibold">{sale.orderNumber}</span>
-                              {getTypeBadge(sale.type)}
-                              {getStatusBadge(sale.status)}
-                              {sale.sourceType === "remote" && (
-                                <Badge variant="outline" className="border-blue-200 text-blue-700 bg-blue-50">Client</Badge>
-                              )}
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              {new Date(sale.createdAt).toLocaleDateString("fr-TN", {
-                                day: "numeric",
-                                month: "short",
-                                hour: "2-digit",
-                                minute: "2-digit"
-                              })}
-                              {sale.clientName && ` - ${sale.clientName}`}
-                              {sale.tableNumber && ` - Table ${sale.tableNumber}`}
-                            </p>
-                            <p className="text-sm text-stone-600 mt-1">
-                              {sale.items.map(i => `${i.quantity}x ${i.name}`).join(", ")}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right flex items-start gap-3">
-                          <div>
-                            <p className="text-xl font-bold text-amber-600">{sale.total.toFixed(2)} TND</p>
-                            <p className="text-xs text-muted-foreground">
-                              {sale.paymentMethod === "cash" ? "Especes" : sale.paymentMethod === "card" ? "Carte" : sale.paymentMethod === "mobile" ? "Mobile" : "Wallet"}
-                            </p>
-                          </div>
-                          <div className="flex gap-1">
-                            {sale.status === "pending" && (
-                              <>
-                                <Button size="sm" variant="outline" className="h-8 px-2 text-emerald-600 border-emerald-200 hover:bg-emerald-50" onClick={() => void handleOrderAction(sale, "confirm")}>
-                                  <CheckIcon className="h-4 w-4" />
-                                </Button>
-                                <Button size="sm" variant="outline" className="h-8 px-2 text-red-600 border-red-200 hover:bg-red-50" onClick={() => void handleOrderAction(sale, "cancel")}>
-                                  <XIcon className="h-4 w-4" />
-                                </Button>
-                              </>
-                            )}
-                            {sale.status === "confirmed" && (
-                              <Button size="sm" variant="outline" className="h-8 px-2 text-purple-600 border-purple-200 hover:bg-purple-50" onClick={() => void handleOrderAction(sale, "prepare")}>
-                                <PlayIcon className="h-4 w-4 mr-1" />
-                                Preparer
-                              </Button>
-                            )}
-                            {sale.status === "preparing" && (
-                              <Button size="sm" variant="outline" className="h-8 px-2 text-emerald-600 border-emerald-200 hover:bg-emerald-50" onClick={() => void handleOrderAction(sale, "ready")}>
-                                <CheckCircleIcon className="h-4 w-4 mr-1" />
-                                Prete
-                              </Button>
-                            )}
-                            {sale.status === "ready" && (
-                              <Button size="sm" className="h-8 px-2 bg-emerald-500 hover:bg-emerald-600" onClick={() => void handleOrderAction(sale, "complete")}>
-                                <CheckCircleIcon className="h-4 w-4 mr-1" />
-                                Terminer
-                              </Button>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 px-2"
-                              onClick={() => { setSelectedOrder(sale); setOrderDetailOpen(true) }}
-                            >
-                              <EyeIcon className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
+          {/* Orders List or Kanban View */}
+          {orderViewMode === "list" ? (
+            <>
+              <Card>
+                <CardContent className="p-0">
+                  {filteredOrders.length === 0 ? (
+                    <div className="text-center py-12">
+                      <ReceiptIcon className="h-12 w-12 mx-auto text-stone-300 mb-3" />
+                      <p className="font-medium text-stone-600">Aucune commande trouvee</p>
+                      <p className="text-sm text-muted-foreground">Modifiez vos filtres pour voir plus de resultats</p>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="divide-y">
+                      {paginatedOrders.map(sale => (
+                        <div
+                          key={sale.id}
+                          className="p-4 hover:bg-stone-50 transition-colors"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-4">
+                              <div className="h-10 w-10 rounded-lg bg-stone-100 flex items-center justify-center">
+                                <HashIcon className="h-5 w-5 text-stone-500" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-semibold">{sale.orderNumber}</span>
+                                  {getTypeBadge(sale.type)}
+                                  {getStatusBadge(sale.status)}
+                                  {sale.sourceType === "remote" && (
+                                    <Badge variant="outline" className="border-blue-200 text-blue-700 bg-blue-50">Client</Badge>
+                                  )}
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                  {new Date(sale.createdAt).toLocaleDateString("fr-TN", {
+                                    day: "numeric",
+                                    month: "short",
+                                    hour: "2-digit",
+                                    minute: "2-digit"
+                                  })}
+                                  {sale.clientName && ` - ${sale.clientName}`}
+                                  {sale.tableNumber && ` - Table ${sale.tableNumber}`}
+                                </p>
+                                <p className="text-sm text-stone-600 mt-1">
+                                  {sale.items.map(i => `${i.quantity}x ${i.name}`).join(", ")}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right flex items-start gap-3">
+                              <div>
+                                <p className="text-xl font-bold text-amber-600">{sale.total.toFixed(2)} TND</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {sale.paymentMethod === "cash" ? "Especes" : sale.paymentMethod === "card" ? "Carte" : sale.paymentMethod === "mobile" ? "Mobile" : "Wallet"}
+                                </p>
+                              </div>
+                              <div className="flex gap-1">
+                                {sale.status === "pending" && (
+                                  <>
+                                    <Button size="sm" variant="outline" className="h-8 px-2 text-emerald-600 border-emerald-200 hover:bg-emerald-50" onClick={() => void handleOrderAction(sale, "confirm")}>
+                                      <CheckIcon className="h-4 w-4" />
+                                    </Button>
+                                    <Button size="sm" variant="outline" className="h-8 px-2 text-red-600 border-red-200 hover:bg-red-50" onClick={() => void handleOrderAction(sale, "cancel")}>
+                                      <XIcon className="h-4 w-4" />
+                                    </Button>
+                                  </>
+                                )}
+                                {sale.status === "confirmed" && (
+                                  <Button size="sm" variant="outline" className="h-8 px-2 text-purple-600 border-purple-200 hover:bg-purple-50" onClick={() => void handleOrderAction(sale, "prepare")}>
+                                    <PlayIcon className="h-4 w-4 mr-1" />
+                                    Preparer
+                                  </Button>
+                                )}
+                                {sale.status === "preparing" && (
+                                  <Button size="sm" variant="outline" className="h-8 px-2 text-emerald-600 border-emerald-200 hover:bg-emerald-50" onClick={() => void handleOrderAction(sale, "ready")}>
+                                    <CheckCircleIcon className="h-4 w-4 mr-1" />
+                                    Prete
+                                  </Button>
+                                )}
+                                {sale.status === "ready" && (
+                                  <Button size="sm" className="h-8 px-2 bg-emerald-500 hover:bg-emerald-600" onClick={() => void handleOrderAction(sale, "complete")}>
+                                    <CheckCircleIcon className="h-4 w-4 mr-1" />
+                                    Terminer
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 px-2"
+                                  onClick={() => { setSelectedOrder(sale); setOrderDetailOpen(true) }}
+                                >
+                                  <EyeIcon className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <p className="text-sm text-muted-foreground">
+                    {filteredOrders.length} commande(s) au total
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeftIcon className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm">
+                      Page {currentPage} sur {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRightIcon className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
-              <p className="text-sm text-muted-foreground">
-                {filteredOrders.length} commande(s) au total
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                >
-                  <ChevronLeftIcon className="h-4 w-4" />
-                </Button>
-                <span className="text-sm">
-                  Page {currentPage} sur {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  <ChevronRightIcon className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+            </>
+          ) : (
+            <AdminOrdersContent />
           )}
         </TabsContent>
 
