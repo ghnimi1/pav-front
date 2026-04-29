@@ -294,7 +294,7 @@ export function Sidebar({ currentView, onViewChange, isOpen, onClose, isAdmin }:
       adminOnly: true,
       permission: "rewards",
       section: "loyalty",
-      href: "/admin/cartes-fidelite",
+      //href: "/admin/cartes-fidelite",
     },
     {
       id: "staff-pos",

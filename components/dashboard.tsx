@@ -33,6 +33,7 @@ import { UnifiedSalesManagement } from "./unified-sales-management"
 import { useAuth } from "@/contexts/auth-context"
 import { ShieldAlertIcon } from "lucide-react"
 import { MenuAdminContent } from "./menu-admin"
+import LoyaltyCardsAdminPage from "./cartes-fidelite"
 
 type NavItem =
   | "dashboard"
@@ -62,6 +63,7 @@ type NavItem =
   | "employees"
   | "menu-client"
   | "menu-admin"
+  | "loyalty-cards"
 
 export function Dashboard() {
   const [currentView, setCurrentView] = useState<NavItem>("dashboard")
@@ -196,6 +198,8 @@ export function Dashboard() {
           {currentView === "games" && canAccess("games") && <GamesManagement />}
 
           {currentView === "referrals" && canAccess("referrals") && <ReferralsManagement />}
+          
+          {currentView === "loyalty-cards" && canAccess("loyalty-cards") && <LoyaltyCardsAdminPage />}
 
           {currentView === "staff-pos" && canAccess("pos") && <StaffPOS />}
 
