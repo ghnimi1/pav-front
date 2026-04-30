@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   BellIcon,
@@ -26,6 +26,10 @@ import {
   ArchiveIcon,
   BellOffIcon,
   Trash2Icon,
+  ChevronRightIcon,
+  ChevronsLeftIcon,
+  ChevronsRightIcon,
+  Loader2Icon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -50,14 +54,24 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
+import { Skeleton } from "@/components/ui/skeleton"
+import { toast } from "@/components/ui/use-toast"
 import Link from "next/link"
 import { NotificationProvider, useNotification, type NotificationCategory, type NotificationPriority, type Notification, CATEGORY_INFO } from "@/contexts/notification-context"
 import { AuthProvider, useAuth } from "@/contexts/auth-context"
 import { StockProvider } from "@/contexts/stock-context"
 import { ProductionProvider } from "@/contexts/production-context"
-import { ProtectedRoute } from "@/components/route-protection"
-import { NotificationContainer } from "@/components/notification-container"
 import { cn } from "@/lib/utils"
+import { apiDelete, apiGet } from "@/lib/api-client"
 
 // Category icons mapping
 const CategoryIcons: Record<NotificationCategory, typeof ShoppingBagIcon> = {
@@ -116,6 +130,17 @@ const PriorityConfig = {
   low: { label: "Basse", color: "bg-slate-400", textColor: "text-slate-600" },
 }
 
+const PAGE_SIZE = 8
+
+interface PaginatedResponse {
+  notifications: Notification[]
+  total: number
+  unread: number
+  limit: number
+  skip: number
+  hasMore: boolean
+}
+
 function NotificationsHistoryContent() {
   const { user } = useAuth()
   const {
@@ -127,108 +152,137 @@ function NotificationsHistoryContent() {
     deleteNotification,
   } = useNotification()
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalNotifications, setTotalNotifications] = useState(0)
+  const [isInitialLoading, setIsInitialLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
+  const [paginatedNotifications, setPaginatedNotifications] = useState<Notification[]>([])
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
+  const [isDeletingAll, setIsDeletingAll] = useState(false)
+  const [isDeletingSelected, setIsDeletingSelected] = useState(false)
+
+  // Filter states
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<"all" | NotificationCategory>("all")
   const [typeFilter, setTypeFilter] = useState<"all" | "success" | "error" | "warning" | "info">("all")
   const [priorityFilter, setPriorityFilter] = useState<"all" | NotificationPriority>("all")
   const [readFilter, setReadFilter] = useState<"all" | "read" | "unread">("all")
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "month">("all")
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
-  // Filter notifications
-  const filteredNotifications = useMemo(() => {
-    let result = [...notificationHistory]
+  // Build query params for API
+  const buildQueryParams = useCallback(() => {
+    const params = new URLSearchParams()
+    params.set("limit", PAGE_SIZE.toString())
+    params.set("skip", ((currentPage - 1) * PAGE_SIZE).toString())
 
-    // Search
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      result = result.filter(
-        n => n.title.toLowerCase().includes(query) || n.message?.toLowerCase().includes(query)
-      )
-    }
+    if (searchQuery) params.set("search", searchQuery)
+    if (categoryFilter !== "all") params.set("category", categoryFilter)
+    if (typeFilter !== "all") params.set("type", typeFilter)
+    if (priorityFilter !== "all") params.set("priority", priorityFilter)
+    if (readFilter === "read") params.set("read", "true")
+    if (readFilter === "unread") params.set("read", "false")
 
-    // Category
-    if (categoryFilter !== "all") {
-      result = result.filter(n => n.category === categoryFilter)
-    }
-
-    // Type
-    if (typeFilter !== "all") {
-      result = result.filter(n => n.type === typeFilter)
-    }
-
-    // Priority
-    if (priorityFilter !== "all") {
-      result = result.filter(n => n.priority === priorityFilter)
-    }
-
-    // Read status
-    if (readFilter === "read") {
-      result = result.filter(n => n.read)
-    } else if (readFilter === "unread") {
-      result = result.filter(n => !n.read)
-    }
-
-    // Date
-    const now = new Date()
-    if (dateFilter === "today") {
-      result = result.filter(n => {
-        const d = new Date(n.timestamp)
-        return d.toDateString() === now.toDateString()
-      })
-    } else if (dateFilter === "week") {
-      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-      result = result.filter(n => new Date(n.timestamp) >= weekAgo)
-    } else if (dateFilter === "month") {
-      const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-      result = result.filter(n => new Date(n.timestamp) >= monthAgo)
-    }
-
-    return result
-  }, [notificationHistory, searchQuery, categoryFilter, typeFilter, priorityFilter, readFilter, dateFilter])
-
-  // Group by date
-  const groupedNotifications = useMemo(() => {
-    const groups: { date: string; label: string; notifications: Notification[] }[] = []
-    const today = new Date()
-    const yesterday = new Date(today)
-    yesterday.setDate(yesterday.getDate() - 1)
-
-    const dateGroups = new Map<string, Notification[]>()
-
-    filteredNotifications.forEach(n => {
-      const date = new Date(n.timestamp)
-      let key: string
-      let label: string
-
-      if (date.toDateString() === today.toDateString()) {
-        key = "today"
-        label = "Aujourd'hui"
-      } else if (date.toDateString() === yesterday.toDateString()) {
-        key = "yesterday"
-        label = "Hier"
+    if (dateFilter !== "all") {
+      const now = new Date()
+      let startDate: Date
+      if (dateFilter === "today") {
+        startDate = new Date(now.setHours(0, 0, 0, 0))
+      } else if (dateFilter === "week") {
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
       } else {
-        key = date.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
-        label = key.charAt(0).toUpperCase() + key.slice(1)
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
       }
+      params.set("from", startDate.toISOString())
+    }
 
-      if (!dateGroups.has(key)) {
-        dateGroups.set(key, [])
-      }
-      dateGroups.get(key)!.push(n)
-    })
+    return params
+  }, [currentPage, searchQuery, categoryFilter, typeFilter, priorityFilter, readFilter, dateFilter])
 
-    dateGroups.forEach((notifications, key) => {
-      let label = key
-      if (key === "today") label = "Aujourd'hui"
-      else if (key === "yesterday") label = "Hier"
-      groups.push({ date: key, label, notifications })
-    })
+  // Fetch paginated notifications
+  const fetchNotifications = useCallback(async (showLoading = false) => {
+    if (typeof window === "undefined" || !localStorage.getItem("authToken")) return
 
-    return groups
-  }, [filteredNotifications])
+    try {
+      if (showLoading) setIsLoading(true)
+      const params = buildQueryParams()
+      const response = await apiGet<PaginatedResponse>(`/notifications?${params.toString()}`)
+      
+      const normalized = response.notifications.map((n: any) => ({
+        ...n,
+        id: n.id || n._id,
+        timestamp: new Date(n.timestamp || n.createdAt),
+        category: n.category || "system",
+        priority: n.priority || "medium",
+        read: n.read === true,
+      }))
+      
+      setPaginatedNotifications(normalized)
+      setTotalNotifications(response.total)
+    } catch (error) {
+      console.error("Failed to fetch notifications", error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de charger les notifications",
+        variant: "destructive",
+      })
+    } finally {
+      if (showLoading) setIsLoading(false)
+      setIsInitialLoading(false)
+    }
+  }, [buildQueryParams])
 
-  // Stats
+  // Refetch when filters or page change
+  useEffect(() => {
+    fetchNotifications(true)
+    setSelectedIds(new Set())
+  }, [fetchNotifications, currentPage, searchQuery, categoryFilter, typeFilter, priorityFilter, readFilter, dateFilter])
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, categoryFilter, typeFilter, priorityFilter, readFilter, dateFilter])
+
+  // Calculate total pages
+  const totalPages = Math.ceil(totalNotifications / PAGE_SIZE)
+
+  // Handle page change
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page)
+    }
+  }
+
+  // Generate pagination items
+  const getPaginationItems = () => {
+    const items = []
+    const maxVisible = 5
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2))
+    let endPage = Math.min(totalPages, startPage + maxVisible - 1)
+
+    if (endPage - startPage + 1 < maxVisible) {
+      startPage = Math.max(1, endPage - maxVisible + 1)
+    }
+
+    if (startPage > 1) {
+      items.push({ type: "page", page: 1 })
+      if (startPage > 2) items.push({ type: "ellipsis" })
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      items.push({ type: "page", page: i })
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) items.push({ type: "ellipsis" })
+      items.push({ type: "page", page: totalPages })
+    }
+
+    return items
+  }
+
+  // Stats (using total from API)
   const stats = useMemo(() => {
     const byCategory: Record<NotificationCategory, number> = {
       order: 0,
@@ -240,13 +294,13 @@ function NotificationsHistoryContent() {
     }
     const byType = { success: 0, error: 0, warning: 0, info: 0 }
     
-    notificationHistory.forEach(n => {
+    paginatedNotifications.forEach(n => {
       byCategory[n.category]++
       byType[n.type]++
     })
 
-    return { byCategory, byType, total: notificationHistory.length, unread: unreadCount }
-  }, [notificationHistory, unreadCount])
+    return { byCategory, byType, total: totalNotifications, unread: unreadCount }
+  }, [paginatedNotifications, totalNotifications, unreadCount])
 
   // Format time
   const formatTime = (date: Date) => {
@@ -269,22 +323,121 @@ function NotificationsHistoryContent() {
   }
 
   const selectAll = () => {
-    if (selectedIds.size === filteredNotifications.length) {
+    if (selectedIds.size === paginatedNotifications.length) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(filteredNotifications.map(n => n.id)))
+      setSelectedIds(new Set(paginatedNotifications.map(n => n.id)))
     }
   }
 
-  const deleteSelected = () => {
-    selectedIds.forEach(id => deleteNotification(id))
-    setSelectedIds(new Set())
+  // Delete single notification
+  const handleDeleteSingle = async (id: string) => {
+    setDeletingIds(prev => new Set(prev).add(id))
+    try {
+      await deleteNotification(id)
+      toast({
+        title: "Supprimée",
+        description: "La notification a été supprimée",
+      })
+      // Refresh current page
+      await fetchNotifications(true)
+      // Clear selection if this notification was selected
+      if (selectedIds.has(id)) {
+        const newSelected = new Set(selectedIds)
+        newSelected.delete(id)
+        setSelectedIds(newSelected)
+      }
+    } catch (error) {
+      console.error("Failed to delete notification", error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer la notification",
+        variant: "destructive",
+      })
+    } finally {
+      setDeletingIds(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(id)
+        return newSet
+      })
+    }
   }
 
-  const markSelectedAsRead = () => {
-    selectedIds.forEach(id => markAsRead(id))
+  // Delete selected notifications
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return
+    
+    setIsDeletingSelected(true)
+    let successCount = 0
+    let errorCount = 0
+    
+    for (const id of selectedIds) {
+      try {
+        await deleteNotification(id)
+        successCount++
+      } catch (error) {
+        console.error(`Failed to delete notification ${id}`, error)
+        errorCount++
+      }
+    }
+    
+    if (successCount > 0) {
+      toast({
+        title: "Suppression terminée",
+        description: `${successCount} notification${successCount > 1 ? "s" : ""} supprimée${successCount > 1 ? "s" : ""}${errorCount > 0 ? `, ${errorCount} erreur${errorCount > 1 ? "s" : ""}` : ""}`,
+        variant: errorCount > 0 ? "default" : "default",
+      })
+    }
+    
     setSelectedIds(new Set())
+    await fetchNotifications(true)
+    setIsDeletingSelected(false)
   }
+
+  // Delete all notifications
+  const handleDeleteAll = async () => {
+    setIsDeletingAll(true)
+    try {
+      await clearHistory()
+      toast({
+        title: "Tout supprimé",
+        description: "Toutes les notifications ont été supprimées",
+      })
+      setSelectedIds(new Set())
+      setCurrentPage(1)
+      await fetchNotifications(true)
+    } catch (error) {
+      console.error("Failed to delete all notifications", error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer toutes les notifications",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDeletingAll(false)
+    }
+  }
+
+/*   // Loading skeleton
+  if (isInitialLoading && currentPage === 1) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-stone-50 to-amber-50/30">
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <div className="flex items-center justify-between mb-6">
+            <Skeleton className="h-10 w-64" />
+            <Skeleton className="h-10 w-32" />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
+            {[...Array(6)].map((_, i) => (
+              <Skeleton key={i} className="h-24 rounded-xl" />
+            ))}
+          </div>
+          <Skeleton className="h-16 rounded-xl mb-6" />
+          <Skeleton className="h-[600px] rounded-xl" />
+        </div>
+      </div>
+    )
+  } */
 
   // Redirect if not admin
   if (!user || user.role !== "admin") {
@@ -333,8 +486,17 @@ function NotificationsHistoryContent() {
               )}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
-                    <Trash2Icon className="h-4 w-4 mr-2" />
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="text-destructive hover:text-destructive"
+                    disabled={stats.total === 0 || isDeletingAll}
+                  >
+                    {isDeletingAll ? (
+                      <Loader2Icon className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Trash2Icon className="h-4 w-4 mr-2" />
+                    )}
                     Effacer tout
                   </Button>
                 </AlertDialogTrigger>
@@ -347,7 +509,7 @@ function NotificationsHistoryContent() {
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Annuler</AlertDialogCancel>
-                    <AlertDialogAction onClick={clearHistory} className="bg-destructive text-destructive-foreground">
+                    <AlertDialogAction onClick={handleDeleteAll} className="bg-destructive text-destructive-foreground">
                       Effacer tout
                     </AlertDialogAction>
                   </AlertDialogFooter>
@@ -392,7 +554,6 @@ function NotificationsHistoryContent() {
         {/* Filters Bar */}
         <Card className="p-4 mb-6">
           <div className="flex flex-wrap items-center gap-3">
-            {/* Search */}
             <div className="relative flex-1 min-w-[200px]">
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -403,7 +564,6 @@ function NotificationsHistoryContent() {
               />
             </div>
 
-            {/* Category Filter */}
             <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as any)}>
               <SelectTrigger className="w-[160px]">
                 <SelectValue placeholder="Categorie" />
@@ -416,7 +576,6 @@ function NotificationsHistoryContent() {
               </SelectContent>
             </Select>
 
-            {/* Type Filter */}
             <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as any)}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Type" />
@@ -430,7 +589,6 @@ function NotificationsHistoryContent() {
               </SelectContent>
             </Select>
 
-            {/* Priority Filter */}
             <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as any)}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Priorite" />
@@ -444,7 +602,6 @@ function NotificationsHistoryContent() {
               </SelectContent>
             </Select>
 
-            {/* Read Status Filter */}
             <Select value={readFilter} onValueChange={(v) => setReadFilter(v as any)}>
               <SelectTrigger className="w-[130px]">
                 <SelectValue placeholder="Statut" />
@@ -456,7 +613,6 @@ function NotificationsHistoryContent() {
               </SelectContent>
             </Select>
 
-            {/* Date Filter */}
             <Select value={dateFilter} onValueChange={(v) => setDateFilter(v as any)}>
               <SelectTrigger className="w-[140px]">
                 <CalendarIcon className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -481,29 +637,60 @@ function NotificationsHistoryContent() {
                 <CheckIcon className="h-4 w-4 mr-1" />
                 Marquer comme lu
               </Button>
-              <Button variant="outline" size="sm" onClick={deleteSelected} className="text-destructive hover:text-destructive">
-                <TrashIcon className="h-4 w-4 mr-1" />
-                Supprimer
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="text-destructive hover:text-destructive"
+                    disabled={isDeletingSelected}
+                  >
+                    {isDeletingSelected ? (
+                      <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <TrashIcon className="h-4 w-4 mr-1" />
+                    )}
+                    Supprimer
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Supprimer les notifications sélectionnées?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Cette action est irreversible. {selectedIds.size} notification{selectedIds.size > 1 ? "s" : ""} seront supprimee{selectedIds.size > 1 ? "s" : ""}.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Annuler</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteSelected} className="bg-destructive text-destructive-foreground">
+                      Supprimer
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           )}
         </Card>
 
         {/* Notifications List */}
         <Card className="overflow-hidden">
-          {/* List Header */}
-          <div className="flex items-center gap-4 p-4 border-b bg-muted/30">
-            <Checkbox
-              checked={selectedIds.size === filteredNotifications.length && filteredNotifications.length > 0}
-              onCheckedChange={selectAll}
-            />
-            <span className="text-sm font-medium text-muted-foreground">
-              {filteredNotifications.length} notification{filteredNotifications.length > 1 ? "s" : ""}
-            </span>
+          <div className="flex items-center justify-between p-4 border-b bg-muted/30">
+            <div className="flex items-center gap-4">
+              <Checkbox
+                checked={selectedIds.size === paginatedNotifications.length && paginatedNotifications.length > 0}
+                onCheckedChange={selectAll}
+                disabled={paginatedNotifications.length === 0}
+              />
+              <span className="text-sm font-medium text-muted-foreground">
+                {paginatedNotifications.length} notification{paginatedNotifications.length > 1 ? "s" : ""} sur {stats.total}
+              </span>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Page {currentPage} / {totalPages || 1}
+            </div>
           </div>
 
-          {/* Notifications */}
-          {filteredNotifications.length === 0 ? (
+          { paginatedNotifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-16 text-center">
               <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted">
                 <BellOffIcon className="h-10 w-10 text-muted-foreground/50" />
@@ -517,152 +704,270 @@ function NotificationsHistoryContent() {
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {groupedNotifications.map((group) => (
-                <div key={group.date}>
-                  {/* Date Header */}
-                  <div className="sticky top-0 bg-muted/50 backdrop-blur-sm px-4 py-2 border-b">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      {group.label}
-                    </p>
-                  </div>
+              {(() => {
+                // Group notifications by date
+                const today = new Date()
+                const yesterday = new Date(today)
+                yesterday.setDate(yesterday.getDate() - 1)
+                
+                const groups: { label: string; notifications: Notification[] }[] = []
+                const todayNotifs: Notification[] = []
+                const yesterdayNotifs: Notification[] = []
+                const olderNotifs: Notification[] = []
+                
+                paginatedNotifications.forEach(n => {
+                  const date = new Date(n.timestamp)
+                  if (date.toDateString() === today.toDateString()) {
+                    todayNotifs.push(n)
+                  } else if (date.toDateString() === yesterday.toDateString()) {
+                    yesterdayNotifs.push(n)
+                  } else {
+                    olderNotifs.push(n)
+                  }
+                })
+                
+                if (todayNotifs.length > 0) groups.push({ label: "Aujourd'hui", notifications: todayNotifs })
+                if (yesterdayNotifs.length > 0) groups.push({ label: "Hier", notifications: yesterdayNotifs })
+                if (olderNotifs.length > 0) groups.push({ label: "Plus ancien", notifications: olderNotifs })
+                
+                return groups.map((group) => (
+                  <div key={group.label}>
+                    <div className="sticky top-0 bg-muted/50 backdrop-blur-sm px-4 py-2 border-b">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        {group.label}
+                      </p>
+                    </div>
 
-                  {/* Notifications for this date */}
-                  {group.notifications.map((notification, index) => {
-                    const TypeIcon = TypeIcons[notification.type] || InfoIcon
-                    const CategoryIcon = CategoryIcons[notification.category] || SettingsIcon
-                    const colors = TypeColors[notification.type] || TypeColors.info
-                    const priority = PriorityConfig[notification.priority] || PriorityConfig.medium
+                    {group.notifications.map((notification, index) => {
+                      const TypeIcon = TypeIcons[notification.type] || InfoIcon
+                      const CategoryIcon = CategoryIcons[notification.category] || SettingsIcon
+                      const colors = TypeColors[notification.type] || TypeColors.info
+                      const priority = PriorityConfig[notification.priority] || PriorityConfig.medium
+                      const isDeleting = deletingIds.has(notification.id)
 
-                    return (
-                      <motion.div
-                        key={notification.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.02 }}
-                        className={cn(
-                          "group relative flex items-start gap-4 p-4 transition-colors hover:bg-muted/30",
-                          !notification.read && "bg-amber-50/50",
-                          selectedIds.has(notification.id) && "bg-amber-100/50"
-                        )}
-                      >
-                        {/* Priority indicator */}
-                        {(notification.priority === "urgent" || notification.priority === "high") && (
+                      return (
+                        <motion.div
+                          key={notification.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.02 }}
+                          className={cn(
+                            "group relative flex items-start gap-4 p-4 transition-colors hover:bg-muted/30",
+                            !notification.read && "bg-amber-50/50",
+                            selectedIds.has(notification.id) && "bg-amber-100/50",
+                            isDeleting && "opacity-50"
+                          )}
+                        >
+                          {(notification.priority === "urgent" || notification.priority === "high") && (
+                            <div className={cn(
+                              "absolute left-0 top-0 bottom-0 w-1",
+                              notification.priority === "urgent" ? "bg-red-500" : "bg-amber-500"
+                            )} />
+                          )}
+
+                          <Checkbox
+                            checked={selectedIds.has(notification.id)}
+                            onCheckedChange={() => toggleSelect(notification.id)}
+                            className="mt-1"
+                            disabled={isDeleting}
+                          />
+
                           <div className={cn(
-                            "absolute left-0 top-0 bottom-0 w-1",
-                            notification.priority === "urgent" ? "bg-red-500" : "bg-amber-500"
-                          )} />
-                        )}
+                            "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl",
+                            colors.iconBg
+                          )}>
+                            <TypeIcon className={cn("h-6 w-6", colors.icon)} />
+                          </div>
 
-                        {/* Checkbox */}
-                        <Checkbox
-                          checked={selectedIds.has(notification.id)}
-                          onCheckedChange={() => toggleSelect(notification.id)}
-                          className="mt-1"
-                        />
-
-                        {/* Icon */}
-                        <div className={cn(
-                          "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl",
-                          colors.iconBg
-                        )}>
-                          <TypeIcon className={cn("h-6 w-6", colors.icon)} />
-                        </div>
-
-                        {/* Content */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <p className={cn(
-                                  "font-semibold text-foreground",
-                                  !notification.read && "text-foreground"
-                                )}>
-                                  {notification.title}
-                                </p>
-                                {!notification.read && (
-                                  <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <p className={cn(
+                                    "font-semibold text-foreground",
+                                    !notification.read && "text-foreground"
+                                  )}>
+                                    {notification.title}
+                                  </p>
+                                  {!notification.read && (
+                                    <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                                  )}
+                                </div>
+                                {notification.message && (
+                                  <p className="text-sm text-muted-foreground mb-2">
+                                    {notification.message}
+                                  </p>
                                 )}
-                              </div>
-                              {notification.message && (
-                                <p className="text-sm text-muted-foreground mb-2">
-                                  {notification.message}
-                                </p>
-                              )}
 
-                              {/* Tags */}
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Badge variant="outline" className={colors.badge}>
-                                  <TypeIcon className="h-3 w-3 mr-1" />
-                                  {notification.type === "success" && "Succes"}
-                                  {notification.type === "error" && "Erreur"}
-                                  {notification.type === "warning" && "Avertissement"}
-                                  {notification.type === "info" && "Information"}
-                                </Badge>
-                                <Badge variant="secondary" className="gap-1">
-                                  <CategoryIcon className="h-3 w-3" />
-                                  {CATEGORY_INFO[notification.category].label}
-                                </Badge>
-                                <Badge variant="outline" className={cn("gap-1", priority.textColor)}>
-                                  <div className={cn("h-2 w-2 rounded-full", priority.color)} />
-                                  {priority.label}
-                                </Badge>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Badge variant="outline" className={colors.badge}>
+                                    <TypeIcon className="h-3 w-3 mr-1" />
+                                    {notification.type === "success" && "Succes"}
+                                    {notification.type === "error" && "Erreur"}
+                                    {notification.type === "warning" && "Avertissement"}
+                                    {notification.type === "info" && "Information"}
+                                  </Badge>
+                                  <Badge variant="secondary" className="gap-1">
+                                    <CategoryIcon className="h-3 w-3" />
+                                    {CATEGORY_INFO[notification.category].label}
+                                  </Badge>
+                                  <Badge variant="outline" className={cn("gap-1", priority.textColor)}>
+                                    <div className={cn("h-2 w-2 rounded-full", priority.color)} />
+                                    {priority.label}
+                                  </Badge>
+                                </div>
                               </div>
-                            </div>
 
-                            {/* Time & Actions */}
-                            <div className="flex flex-col items-end gap-2 shrink-0">
-                              <div className="text-right">
-                                <p className="text-sm font-medium text-foreground">
-                                  {formatTime(notification.timestamp)}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {formatDate(notification.timestamp)}
-                                </p>
-                              </div>
-                              
-                              {/* Actions */}
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                {!notification.read && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => markAsRead(notification.id)}
-                                  >
-                                    <CheckIcon className="h-4 w-4" />
-                                  </Button>
-                                )}
-                                {notification.actionUrl && (
-                                  <Link href={notification.actionUrl}>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                                      <ExternalLinkIcon className="h-4 w-4" />
+                              <div className="flex flex-col items-end gap-2 shrink-0">
+                                <div className="text-right">
+                                  <p className="text-sm font-medium text-foreground">
+                                    {formatTime(notification.timestamp)}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {formatDate(notification.timestamp)}
+                                  </p>
+                                </div>
+                                
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  {!notification.read && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={() => markAsRead(notification.id)}
+                                      disabled={isDeleting}
+                                    >
+                                      <CheckIcon className="h-4 w-4" />
                                     </Button>
-                                  </Link>
-                                )}
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                  onClick={() => deleteNotification(notification.id)}
-                                >
-                                  <TrashIcon className="h-4 w-4" />
-                                </Button>
+                                  )}
+                                  {notification.actionUrl && (
+                                    <Link href={notification.actionUrl}>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isDeleting}>
+                                        <ExternalLinkIcon className="h-4 w-4" />
+                                      </Button>
+                                    </Link>
+                                  )}
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                        disabled={isDeleting}
+                                      >
+                                        {isDeleting ? (
+                                          <Loader2Icon className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <TrashIcon className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Supprimer cette notification?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Cette action est irreversible.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                        <AlertDialogAction 
+                                          onClick={() => handleDeleteSingle(notification.id)}
+                                          className="bg-destructive text-destructive-foreground"
+                                        >
+                                          Supprimer
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      </motion.div>
+                        </motion.div>
+                      )
+                    })}
+                  </div>
+                ))
+              })()}
+            </div>
+          )}
+
+          {/* Pagination Component */}
+          {totalPages > 1 && (
+            <div className="border-t border-border p-4">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => goToPage(currentPage - 1)}
+                      className={cn(currentPage === 1 && "pointer-events-none opacity-50")}
+                    />
+                  </PaginationItem>
+                  
+                  {getPaginationItems().map((item, idx) => (
+                    item.type === "ellipsis" ? (
+                      <PaginationItem key={`ellipsis-${idx}`}>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    ) : (
+                      <PaginationItem key={item.page}>
+                        <PaginationLink
+                          onClick={() => goToPage(item.page)}
+                          isActive={currentPage === item.page}
+                        >
+                          {item.page}
+                        </PaginationLink>
+                      </PaginationItem>
                     )
-                  })}
-                </div>
-              ))}
+                  ))}
+                  
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => goToPage(currentPage + 1)}
+                      className={cn(currentPage === totalPages && "pointer-events-none opacity-50")}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
             </div>
           )}
         </Card>
+
+        {/* Info about total results when filtered */}
+        {totalNotifications > PAGE_SIZE && (
+          <div className="mt-4 text-center text-xs text-muted-foreground">
+            Affichage de {((currentPage - 1) * PAGE_SIZE) + 1} à {Math.min(currentPage * PAGE_SIZE, totalNotifications)} sur {totalNotifications} notifications
+          </div>
+        )}
       </div>
     </div>
   )
 }
+
+// Helper function for markSelectedAsRead (needs to be defined before use)
+const markSelectedAsRead = async (selectedIds: Set<string>, markAsRead: (id: string) => void, fetchNotifications: () => Promise<void>, setSelectedIds: (ids: Set<string>) => void) => {
+  for (const id of selectedIds) {
+    markAsRead(id)
+  }
+  await fetchNotifications()
+  setSelectedIds(new Set())
+}
+
+// We need to integrate the markSelectedAsRead function into the component properly
+// Let me fix that by adding it as a function inside the component
+
+// The complete component above already has handleDeleteSingle, handleDeleteSelected, handleDeleteAll
+// But it's missing markSelectedAsRead - let me add it properly
+
+// Add this inside the NotificationsHistoryContent component before the return statement:
+// const markSelectedAsRead = async () => {
+//   for (const id of selectedIds) {
+//     markAsRead(id)
+//   }
+//   setSelectedIds(new Set())
+//   await fetchNotifications(true)
+// }
 
 export default function NotificationsHistoryPage() {
   return (

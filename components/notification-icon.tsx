@@ -25,6 +25,7 @@ import { Button } from "./ui/button"
 import { Badge } from "./ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs"
 import { useNotification, type NotificationCategory, type Notification, CATEGORY_INFO } from "@/contexts/notification-context"
+import { useAuth } from "@/contexts/auth-context"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
@@ -87,6 +88,7 @@ const CategoryColors: Record<NotificationCategory, string> = {
 export function NotificationIcon() {
   const [isOpen, setIsOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<"all" | NotificationCategory>("all")
+  const { user } = useAuth()
   const { 
     notificationHistory, 
     unreadCount, 
@@ -96,6 +98,9 @@ export function NotificationIcon() {
     markCategoryAsRead, 
     clearHistory,
     deleteNotification,
+    hasMoreNotifications,
+    isLoadingNotifications,
+    loadMoreNotifications,
   } = useNotification()
 
   // Filter notifications based on active tab
@@ -185,21 +190,19 @@ export function NotificationIcon() {
         {isOpen && (
           <>
             {/* Overlay */}
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" 
-              onClick={() => setIsOpen(false)} 
+            <button
+              aria-label="Fermer les notifications"
+              className="fixed inset-0 z-40 cursor-default bg-transparent"
+              onClick={() => setIsOpen(false)}
             />
 
             {/* Panel */}
             <motion.div 
-              initial={{ opacity: 0, y: -10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.95 }}
-              transition={{ duration: 0.2 }}
-              className="absolute right-0 top-12 z-50 w-[420px] max-w-[calc(100vw-2rem)] rounded-2xl border border-border bg-card shadow-2xl"
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.12 }}
+              className="absolute right-0 top-12 z-50 w-[420px] max-w-[calc(100vw-2rem)] rounded-xl border border-stone-200 bg-white shadow-xl"
             >
               {/* Header */}
               <div className="flex items-center justify-between border-b border-border p-4">
@@ -305,7 +308,7 @@ export function NotificationIcon() {
                   <div className="divide-y divide-border/50">
                     {groupedNotifications.map((group) => (
                       <div key={group.label}>
-                        <div className="sticky top-0 bg-muted/50 backdrop-blur-sm px-4 py-2">
+                        <div className="sticky top-0 bg-stone-50 px-4 py-2">
                           <p className="text-xs font-medium text-muted-foreground">{group.label}</p>
                         </div>
                         {group.notifications.map((notification) => {
@@ -316,8 +319,9 @@ export function NotificationIcon() {
                           return (
                             <motion.div
                               key={notification.id}
-                              initial={{ opacity: 0, x: -10 }}
-                              animate={{ opacity: 1, x: 0 }}
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ duration: 0.08 }}
                               className={cn(
                                 "group relative p-4 transition-colors hover:bg-muted/50",
                                 !notification.read && "bg-amber-50/50"
@@ -418,18 +422,38 @@ export function NotificationIcon() {
                     ))}
                   </div>
                 )}
+                {hasMoreNotifications && activeTab === "all" && (
+                  <div className="border-t border-border p-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      disabled={isLoadingNotifications}
+                      onClick={() => void loadMoreNotifications()}
+                    >
+                      {isLoadingNotifications ? "Chargement..." : "Charger plus"}
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {/* Footer */}
               <div className="border-t border-border p-3 flex items-center justify-between">
-                <Link
-                  href="/admin/notifications"
-                  onClick={() => setIsOpen(false)}
-                  className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <HistoryIcon className="h-4 w-4" />
-                  Voir tout l&apos;historique
-                </Link>
+                {user?.role === "admin" ? (
+                  <Link
+                    href="/admin/notifications"
+                    onClick={() => setIsOpen(false)}
+                    className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <HistoryIcon className="h-4 w-4" />
+                    Voir tout l&apos;historique
+                  </Link>
+                ) : (
+                  <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                    <HistoryIcon className="h-4 w-4" />
+                    Historique recent
+                  </span>
+                )}
                 {notificationHistory.length > 0 && (
                   <Button
                     variant="ghost"

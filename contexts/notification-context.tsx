@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react"
+import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api-client"
 
 // Notification categories for grouping
 export type NotificationCategory = 
@@ -15,6 +16,7 @@ export type NotificationPriority = "low" | "medium" | "high" | "urgent"
 
 export interface Notification {
   id: string
+  _id?: string
   type: "success" | "error" | "warning" | "info"
   category: NotificationCategory
   priority: NotificationPriority
@@ -59,11 +61,16 @@ interface NotificationContextType {
   notificationHistory: Notification[]
   unreadCount: number
   unreadByCategory: Record<NotificationCategory, number>
+  hasMoreNotifications: boolean
+  isLoadingNotifications: boolean
+  loadMoreNotifications: () => Promise<void>
   addNotification: {
     // Signature 1: Object format
     (notification: CreateNotificationInput): void
     // Signature 2: Simple format (type, title, message?)
     (type: "success" | "error" | "warning" | "info", title: string, message?: string): void
+    // Signature 3: Legacy format used in older screens (title, type, message?)
+    (title: string, type: "success" | "error" | "warning" | "info", message?: string): void
   }
   removeNotification: (id: string) => void
   markAsRead: (id: string) => void
@@ -86,8 +93,29 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined)
 
-const STORAGE_KEY = "notification_history_v2"
 const MAX_HISTORY = 200
+const PAGE_SIZE = 8
+const NOTIFICATION_TYPES = ["success", "error", "warning", "info"] as const
+
+type PaginatedNotificationsResponse = {
+  notifications: Notification[]
+  total: number
+  unread: number
+  limit: number
+  skip: number
+  hasMore: boolean
+}
+
+function normalizeNotification(n: any): Notification {
+  return {
+    ...n,
+    id: n.id || n._id,
+    timestamp: new Date(n.timestamp || n.createdAt),
+    category: n.category || "system",
+    priority: n.priority || "medium",
+    read: n.read === true,
+  }
+}
 
 // Category display info
 export const CATEGORY_INFO: Record<NotificationCategory, { label: string; icon: string; color: string }> = {
@@ -102,36 +130,59 @@ export const CATEGORY_INFO: Record<NotificationCategory, { label: string; icon: 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [notificationHistory, setNotificationHistory] = useState<Notification[]>([])
+  const [remoteUnreadCount, setRemoteUnreadCount] = useState<number | null>(null)
+  const [hasMoreNotifications, setHasMoreNotifications] = useState(false)
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false)
+  const [nextNotificationSkip, setNextNotificationSkip] = useState(0)
 
-  // Load from localStorage on mount
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
+    if (typeof window === "undefined" || !localStorage.getItem("authToken")) return
+
+    const loadRemoteNotifications = async () => {
       try {
-        const parsed = JSON.parse(stored)
-        setNotificationHistory(
-          parsed.map((n: any) => ({
-            ...n,
-            timestamp: new Date(n.timestamp),
-            category: n.category || "system",
-            priority: n.priority || "medium",
-          })),
-        )
-      } catch (e) {
-        console.error("Failed to load notification history", e)
+        setIsLoadingNotifications(true)
+        const response = await apiGet<PaginatedNotificationsResponse>(`/notifications?limit=${PAGE_SIZE}&skip=0`)
+        const normalized = response.notifications.map(normalizeNotification)
+        setNotificationHistory(normalized)
+        setRemoteUnreadCount(response.unread)
+        setHasMoreNotifications(response.hasMore)
+        setNextNotificationSkip(normalized.length)
+      } catch (error) {
+        console.error("Failed to load remote notifications", error)
+      } finally {
+        setIsLoadingNotifications(false)
       }
     }
+
+    void loadRemoteNotifications()
   }, [])
 
-  // Save to localStorage when history changes
-  useEffect(() => {
-    if (notificationHistory.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(notificationHistory))
+  const loadMoreNotifications = useCallback(async () => {
+    if (isLoadingNotifications || !hasMoreNotifications) return
+    if (typeof window === "undefined" || !localStorage.getItem("authToken")) return
+
+    try {
+      setIsLoadingNotifications(true)
+      const response = await apiGet<PaginatedNotificationsResponse>(
+        `/notifications?limit=${PAGE_SIZE}&skip=${nextNotificationSkip}`
+      )
+      const normalized = response.notifications.map(normalizeNotification)
+      setNotificationHistory((prev) => {
+        const existingIds = new Set(prev.map((notification) => notification.id))
+        return [...prev, ...normalized.filter((notification) => !existingIds.has(notification.id))]
+      })
+      setRemoteUnreadCount(response.unread)
+      setHasMoreNotifications(response.hasMore)
+      setNextNotificationSkip((prev) => prev + normalized.length)
+    } catch (error) {
+      console.error("Failed to load more notifications", error)
+    } finally {
+      setIsLoadingNotifications(false)
     }
-  }, [notificationHistory])
+  }, [hasMoreNotifications, isLoadingNotifications, nextNotificationSkip])
 
   // Calculate unread counts
-  const unreadCount = notificationHistory.filter((n) => !n.read).length
+  const unreadCount = remoteUnreadCount ?? notificationHistory.filter((n) => !n.read).length
   
   const unreadByCategory = notificationHistory.reduce((acc, n) => {
     if (!n.read) {
@@ -141,7 +192,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, {} as Record<NotificationCategory, number>)
 
   // Core add notification function (internal)
-  const addNotificationCore = useCallback((input: CreateNotificationInput) => {
+  const addNotificationCore = useCallback((input: CreateNotificationInput, syncRemote = true) => {
     const id = Date.now().toString() + Math.random().toString(36).substring(2, 9)
     const newNotification: Notification = {
       id,
@@ -160,11 +211,31 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     setNotifications((prev) => [...prev, newNotification])
     setNotificationHistory((prev) => [newNotification, ...prev].slice(0, MAX_HISTORY))
+    setRemoteUnreadCount((prev) => (prev === null ? null : prev + 1))
 
     if (newNotification.duration && newNotification.duration > 0) {
       setTimeout(() => {
         removeNotification(id)
       }, newNotification.duration)
+    }
+
+    if (syncRemote && typeof window !== "undefined" && localStorage.getItem("authToken")) {
+      void apiPost<Notification>("/notifications", {
+        ...input,
+        read: false,
+      }).then((remoteNotification: any) => {
+        setNotificationHistory((prev) => {
+          const withoutLocal = prev.filter((n) => n.id !== id)
+          return [{
+            ...newNotification,
+            ...remoteNotification,
+            id: remoteNotification.id || remoteNotification._id || id,
+            timestamp: new Date(remoteNotification.timestamp || remoteNotification.createdAt || newNotification.timestamp),
+          }, ...withoutLocal].slice(0, MAX_HISTORY)
+        })
+      }).catch((error) => {
+        console.error("Failed to sync notification", error)
+      })
     }
   }, [])
 
@@ -174,12 +245,20 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     arg2?: string,
     arg3?: string
   ) => {
-    // Check if first argument is an object (object format)
     if (typeof arg1 === 'object' && arg1 !== null && 'type' in arg1 && 'title' in arg1) {
-      // Object format
       addNotificationCore(arg1 as CreateNotificationInput)
+    } else if (
+      typeof arg1 === "string" &&
+      typeof arg2 === "string" &&
+      NOTIFICATION_TYPES.includes(arg2 as any) &&
+      !NOTIFICATION_TYPES.includes(arg1 as any)
+    ) {
+      addNotificationCore({
+        type: arg2 as "success" | "error" | "warning" | "info",
+        title: arg1,
+        message: arg3,
+      })
     } else {
-      // Simple format: (type, title, message?)
       addNotificationCore({
         type: arg1 as "success" | "error" | "warning" | "info",
         title: arg2 || "",
@@ -195,12 +274,27 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   // Mark as read
   const markAsRead = useCallback((id: string) => {
-    setNotificationHistory((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)))
+    setNotificationHistory((prev) => {
+      const wasUnread = prev.some((n) => n.id === id && !n.read)
+      if (wasUnread) setRemoteUnreadCount((count) => count === null ? null : Math.max(0, count - 1))
+      return prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    })
+    if (typeof window !== "undefined" && localStorage.getItem("authToken")) {
+      void apiPatch(`/notifications/${id}/read`).catch((error) => {
+        console.error("Failed to mark notification as read", error)
+      })
+    }
   }, [])
 
   // Mark all as read
   const markAllAsRead = useCallback(() => {
     setNotificationHistory((prev) => prev.map((n) => ({ ...n, read: true })))
+    setRemoteUnreadCount(0)
+    if (typeof window !== "undefined" && localStorage.getItem("authToken")) {
+      void apiPatch("/notifications/read-all").catch((error) => {
+        console.error("Failed to mark notifications as read", error)
+      })
+    }
   }, [])
 
   // Mark category as read
@@ -208,17 +302,36 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setNotificationHistory((prev) => 
       prev.map((n) => (n.category === category ? { ...n, read: true } : n))
     )
+    setRemoteUnreadCount(null)
+    if (typeof window !== "undefined" && localStorage.getItem("authToken")) {
+      void apiPatch("/notifications/read-all", { category }).catch((error) => {
+        console.error("Failed to mark category notifications as read", error)
+      })
+    }
   }, [])
 
   // Clear all history
   const clearHistory = useCallback(() => {
     setNotificationHistory([])
-    localStorage.removeItem(STORAGE_KEY)
+    setRemoteUnreadCount(0)
+    setHasMoreNotifications(false)
+    setNextNotificationSkip(0)
+    if (typeof window !== "undefined" && localStorage.getItem("authToken")) {
+      void apiDelete("/notifications").catch((error) => {
+        console.error("Failed to clear notifications", error)
+      })
+    }
   }, [])
 
   // Delete single notification from history
   const deleteNotification = useCallback((id: string) => {
     setNotificationHistory((prev) => prev.filter((n) => n.id !== id))
+    setRemoteUnreadCount(null)
+    if (typeof window !== "undefined" && localStorage.getItem("authToken")) {
+      void apiDelete(`/notifications/${id}`).catch((error) => {
+        console.error("Failed to delete notification", error)
+      })
+    }
   }, [])
 
   // Get notifications by category
@@ -338,6 +451,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         notificationHistory,
         unreadCount,
         unreadByCategory,
+        hasMoreNotifications,
+        isLoadingNotifications,
+        loadMoreNotifications,
         addNotification,
         removeNotification,
         markAsRead,

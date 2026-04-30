@@ -13,6 +13,7 @@ import { ProductionProvider, useProduction } from "@/contexts/production-context
 import { DiscountProvider, useDiscount } from "@/contexts/discount-context"
 import { OrdersProvider } from "@/contexts/orders-context"
 import { NotificationContainer } from "@/components/notification-container"
+import { NotificationIcon } from "@/components/notification-icon"
 import { Button } from "@/components/ui/button"
 import { 
   ChefHatIcon, 
@@ -340,6 +341,8 @@ function MenuContent() {
                   <span className="font-bold text-amber-700 text-sm sm:text-base">{clientPoints}</span>
                 </button>
               )}
+
+              {isAuthenticated && <NotificationIcon />}
 
               {menuMode === "patisserie" && (
                 <Button
