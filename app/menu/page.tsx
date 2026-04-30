@@ -375,7 +375,7 @@ function MenuContent() {
               )}
               
               {/* Commander a distance button */}
-              <Button
+              {isAuthenticated && ( <Button
                 size="sm"
                 onClick={() => router.push("/commander")}
                 className="h-8 sm:h-10 px-2 sm:px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl shadow-lg shadow-amber-500/20 text-xs sm:text-sm"
@@ -383,6 +383,7 @@ function MenuContent() {
                 <ShoppingBagIcon className="h-3.5 sm:h-4 w-3.5 sm:w-4 sm:mr-2" />
                 <span className="hidden sm:inline">Commander</span>
               </Button>
+            )}
               
               {isAdmin ? (
                 <>

@@ -1,6 +1,7 @@
 "use client"
 
 import { forwardRef, useImperativeHandle, useState, useMemo, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { useStock, type MenuItem, type Offer, type MenuCategory } from "@/contexts/stock-context"
 import { SupplementsModal } from "@/components/supplements-modal-menu"
@@ -45,6 +46,7 @@ import {
   ChevronRightIcon,
   SkipForwardIcon,
   CheckIcon,
+  UserIcon,
 } from "lucide-react"
 
 // Icon mapping for categories
@@ -78,11 +80,14 @@ interface PatisserieMenuProps {
   onCartSummaryChange?: (summary: { cartItemsCount: number; finalTotal: number }) => void
 }
 
+const PENDING_PATISSERIE_ORDER_KEY = "pendingPatisserieOrder"
+
 export const PatisserieMenu = forwardRef<PatisserieMenuHandle, PatisserieMenuProps>(function PatisserieMenu(
   { onClose, onCartSummaryChange },
   ref
 ) {
   const { user } = useAuth()
+  const router = useRouter()
   const { addNotification } = useNotification()
   const { getClientByEmail } = useLoyalty()
   const { addStampsFromItems } = useLoyaltyCards()
@@ -107,6 +112,7 @@ export const PatisserieMenu = forwardRef<PatisserieMenuHandle, PatisserieMenuPro
   const [searchQuery, setSearchQuery] = useState("")
   const [showCartSummary, setShowCartSummary] = useState(false)
   const [showOrderSuccess, setShowOrderSuccess] = useState(false)
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false)
   const [lastClientOrder, setLastClientOrder] = useState<{ orderNumber: string; estimatedTime: number } | null>(null)
   const [showRecap, setShowRecap] = useState(false)
   const [customerNote, setCustomerNote] = useState("")
@@ -121,6 +127,21 @@ export const PatisserieMenu = forwardRef<PatisserieMenuHandle, PatisserieMenuPro
 
   // Use discount context
   const discountContext = useDiscount()
+
+  const savePendingOrder = () => {
+    if (typeof window === "undefined") return
+
+    localStorage.setItem(
+      PENDING_PATISSERIE_ORDER_KEY,
+      JSON.stringify({
+        cart,
+        offerCart,
+        customerNote,
+        tableNumber,
+        savedAt: new Date().toISOString(),
+      })
+    )
+  }
 
   // Current offers (based on day/time)
   const currentOffers = useMemo(() => getCurrentOffers(), [getCurrentOffers])
@@ -234,6 +255,32 @@ export const PatisserieMenu = forwardRef<PatisserieMenuHandle, PatisserieMenuPro
     onCartSummaryChange?.({ cartItemsCount, finalTotal })
   }, [cartItemsCount, finalTotal, onCartSummaryChange])
 
+  useEffect(() => {
+    if (!user || typeof window === "undefined") return
+
+    const pendingOrder = localStorage.getItem(PENDING_PATISSERIE_ORDER_KEY)
+    if (!pendingOrder) return
+
+    try {
+      const parsed = JSON.parse(pendingOrder) as {
+        cart?: CartItem[]
+        offerCart?: OfferCartItem[]
+        customerNote?: string
+        tableNumber?: string
+      }
+
+      setCart(Array.isArray(parsed.cart) ? parsed.cart : [])
+      setOfferCart(Array.isArray(parsed.offerCart) ? parsed.offerCart : [])
+      setCustomerNote(parsed.customerNote || "")
+      setTableNumber(parsed.tableNumber || "")
+      setShowRecap(true)
+      localStorage.removeItem(PENDING_PATISSERIE_ORDER_KEY)
+    } catch (error) {
+      console.error("Failed to restore pending patisserie order:", error)
+      localStorage.removeItem(PENDING_PATISSERIE_ORDER_KEY)
+    }
+  }, [user])
+
   // ============================================
   // CART FUNCTIONS
   // ============================================
@@ -342,6 +389,14 @@ export const PatisserieMenu = forwardRef<PatisserieMenuHandle, PatisserieMenuPro
   // Handle order submission
   const handleSubmitOrder = async () => {
     if (cartItemsCount === 0) return
+
+    if (!user) {
+      savePendingOrder()
+      setShowCartSummary(false)
+      setShowRecap(false)
+      setShowLoginPrompt(true)
+      return
+    }
 
     if (cartTotal < deliveryConfig.minOrderAmount) {
       addNotification({
@@ -1301,6 +1356,13 @@ export const PatisserieMenu = forwardRef<PatisserieMenuHandle, PatisserieMenuPro
                 {/* Submit button */}
                 <Button
                   onClick={() => {
+                    if (!user) {
+                      savePendingOrder()
+                      setShowRecap(false)
+                      setShowLoginPrompt(true)
+                      return
+                    }
+
                     void handleSubmitOrder()
                     setShowRecap(false)
                   }}
@@ -1314,6 +1376,41 @@ export const PatisserieMenu = forwardRef<PatisserieMenuHandle, PatisserieMenuPro
           </motion.div>
         )}
       </AnimatePresence>
+
+      <Dialog open={showLoginPrompt} onOpenChange={setShowLoginPrompt}>
+        <DialogContent className="z-[200] max-w-md">
+          <DialogHeader>
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-amber-100">
+              <UserIcon className="h-7 w-7 text-amber-600" />
+            </div>
+            <DialogTitle className="text-center text-xl">Connectez-vous pour continuer</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-center">
+            <p className="text-sm text-stone-600">
+              Votre panier est pret. Connectez-vous pour envoyer votre commande et gagner vos points fidelite.
+            </p>
+            <div className="flex flex-col gap-2">
+              <Button
+                className="h-11 bg-amber-500 hover:bg-amber-600 text-white"
+                onClick={() => {
+                  savePendingOrder()
+                  router.push("/client/login?redirect=/menu")
+                }}
+              >
+                <UserIcon className="mr-2 h-4 w-4" />
+                Se connecter
+              </Button>
+              <Button
+                variant="outline"
+                className="h-11"
+                onClick={() => setShowLoginPrompt(false)}
+              >
+                Continuer mes achats
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Fixed Bottom Bar */}
       {!showRecap && (
