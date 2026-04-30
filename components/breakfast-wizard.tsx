@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { forwardRef, useImperativeHandle, useState, useMemo, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useBreakfast, type BreakfastItem, type BreakfastCategory, type SelectedSupplement } from "@/contexts/breakfast-context"
 import { SupplementsModal } from "@/components/supplements-modal"
@@ -33,7 +33,6 @@ import {
   CrownIcon,
   IceCreamIcon,
   StarIcon,
-  ShoppingCartIcon,
   XIcon,
   SendIcon,
   SkipForwardIcon,
@@ -82,7 +81,14 @@ const getFormulaImageSrc = (image?: string) => {
   return `${process.env.NEXT_PUBLIC_API_IMAGE_URL}/menu/${image}`
 }
 
-export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
+export interface BreakfastWizardHandle {
+  openCartSummary: () => void
+}
+
+export const BreakfastWizard = forwardRef<BreakfastWizardHandle, { onClose?: () => void }>(function BreakfastWizard(
+  { onClose },
+  ref
+) {
   const { user } = useAuth()
   const { addNotification } = useNotification()
   const { getClientByEmail } = useLoyalty()
@@ -149,6 +155,10 @@ export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
   const finalTotal = useMemo(() => {
     return Math.round((subtotal - calculateSmartDiscount.discountAmount) * 100) / 100
   }, [subtotal, calculateSmartDiscount.discountAmount])
+
+  useImperativeHandle(ref, () => ({
+    openCartSummary: () => setShowCartSummary(true),
+  }), [])
 
   // Total points to earn
   const totalPoints = useMemo(() => cartTotalPoints + getFormulaPoints(), [cartTotalPoints, getFormulaPoints])
@@ -1022,7 +1032,7 @@ export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 flex flex-col">
       {/* Progress Header */}
-      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-lg border-b border-stone-200">
+      <div className="sticky top-[132px] z-10 bg-white/80 backdrop-blur-lg border-b border-stone-200">
         <div className="max-w-6xl mx-auto px-4 py-4">
           {/* Back and Cart */}
           <div className="flex items-center justify-between mb-4">
@@ -1050,28 +1060,7 @@ export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
               {wizardMode === "suggestions" ? "Nos Suggestions" : "Composer"}
             </h1>
 
-            <button
-              onClick={() => setShowCartSummary(true)}
-              className="relative flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500 text-white hover:bg-amber-600 transition-colors"
-            >
-              <ShoppingCartIcon className="h-5 w-5" />
-              <div className="flex items-center gap-1">
-                {calculateSmartDiscount.discountAmount > 0 && (
-                  <span className="text-xs line-through text-white/60">{(cartTotal + getFormulaPrice()).toFixed(2)}</span>
-                )}
-                <span className="font-semibold">{finalTotal.toFixed(2)} TND</span>
-              </div>
-              {(cartItemsCount > 0 || selectedFormula) && (
-                <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
-                  {cartItemsCount + (selectedFormula ? 1 : 0)}
-                </span>
-              )}
-              {calculateSmartDiscount.discountAmount > 0 && (
-                <span className="absolute -bottom-1 -right-1 h-5 px-1.5 rounded-full bg-emerald-500 text-white text-[10px] flex items-center justify-center">
-                  -{calculateSmartDiscount.discountPercent}%
-                </span>
-              )}
-            </button>
+            <div className="w-[84px]" />
           </div>
 
           {/* Step Progress */}
@@ -1387,4 +1376,4 @@ export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
       )}
     </div>
   )
-}
+})

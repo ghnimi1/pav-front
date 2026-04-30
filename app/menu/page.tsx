@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useCallback, useRef, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { StockProvider, useStock } from "@/contexts/stock-context"
 import { AuthProvider, useAuth } from "@/contexts/auth-context"
@@ -56,8 +56,8 @@ import type { MenuItem, Supplement } from "@/contexts/stock-context"
 import { LoyaltyBadge } from "@/components/loyalty-badge"
 import { CartDialog } from "@/components/cart-dialog"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BreakfastWizard } from "@/components/breakfast-wizard"
-import { PatisserieMenu } from "@/components/patisserie-menu"
+import { BreakfastWizard, type BreakfastWizardHandle } from "@/components/breakfast-wizard"
+import { PatisserieMenu, type PatisserieMenuHandle } from "@/components/patisserie-menu"
 import Image from "next/image"
 
 // Icon mapping for breakfast categories
@@ -133,8 +133,24 @@ function MenuContent() {
   const [selectedSupplements, setSelectedSupplements] = useState<Supplement[]>([])
   const [orderSent, setOrderSent] = useState(false)
   const [customerNote, setCustomerNote] = useState("")
+  const patisserieMenuRef = useRef<PatisserieMenuHandle>(null)
+  const breakfastWizardRef = useRef<BreakfastWizardHandle>(null)
+  const [patisserieCartSummary, setPatisserieCartSummary] = useState({ cartItemsCount: 0, finalTotal: 0 })
 
   const isAdmin = user?.role === "admin"
+
+  const handlePatisserieCartSummaryChange = useCallback((summary: { cartItemsCount: number; finalTotal: number }) => {
+    setPatisserieCartSummary((previous) => {
+      if (
+        previous.cartItemsCount === summary.cartItemsCount &&
+        previous.finalTotal === summary.finalTotal
+      ) {
+        return previous
+      }
+
+      return summary
+    })
+  }, [])
 
   const handleLogout = () => {
     logout()
@@ -324,6 +340,36 @@ function MenuContent() {
                   <span className="font-bold text-amber-700 text-sm sm:text-base">{clientPoints}</span>
                 </button>
               )}
+
+              {menuMode === "patisserie" && (
+                <Button
+                  onClick={() => patisserieMenuRef.current?.openCartSummary()}
+                  className="relative h-8 sm:h-10 px-2 sm:px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs sm:text-sm"
+                >
+                  <ShoppingCartIcon className="h-3.5 sm:h-5 w-3.5 sm:w-5 sm:mr-2" />
+                  <span>{patisserieCartSummary.cartItemsCount}</span>
+                  {patisserieCartSummary.cartItemsCount > 0 && (
+                    <span className="ml-2 hidden font-semibold sm:inline">
+                      {patisserieCartSummary.finalTotal.toFixed(2)} TND
+                    </span>
+                  )}
+                </Button>
+              )}
+
+              {menuMode === "petit-dejeuner" && (
+                <Button
+                  onClick={() => breakfastWizardRef.current?.openCartSummary()}
+                  className="relative h-8 sm:h-10 px-2 sm:px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs sm:text-sm"
+                >
+                  <ShoppingCartIcon className="h-3.5 sm:h-5 w-3.5 sm:w-5 sm:mr-2" />
+                  <span>{breakfastCartCount + (selectedFormula ? 1 : 0)}</span>
+                  {(breakfastCartCount > 0 || selectedFormula) && (
+                    <span className="ml-2 hidden font-semibold sm:inline">
+                      {breakfastFinalTotal.toFixed(2)} TND
+                    </span>
+                  )}
+                </Button>
+              )}
               
               {/* Commander a distance button */}
               <Button
@@ -420,12 +466,15 @@ function MenuContent() {
       <main>
         {/* Patisserie Mode Content - Uses PatisserieMenu component */}
         {menuMode === "patisserie" && (
-          <PatisserieMenu />
+          <PatisserieMenu
+            ref={patisserieMenuRef}
+            onCartSummaryChange={handlePatisserieCartSummaryChange}
+          />
         )}
         
         {/* Petit Dejeuner Mode Content - Wizard */}
         {menuMode === "petit-dejeuner" && (
-          <BreakfastWizard onClose={() => setMenuMode("patisserie")} />
+          <BreakfastWizard ref={breakfastWizardRef} onClose={() => setMenuMode("patisserie")} />
         )}
       </main>
 

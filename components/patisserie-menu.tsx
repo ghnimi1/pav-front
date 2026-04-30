@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { forwardRef, useImperativeHandle, useState, useMemo, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useStock, type MenuItem, type Offer, type MenuCategory } from "@/contexts/stock-context"
 import { SupplementsModal } from "@/components/supplements-modal-menu"
@@ -69,7 +69,19 @@ interface OfferCartItem {
   quantity: number
 }
 
-export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
+export interface PatisserieMenuHandle {
+  openCartSummary: () => void
+}
+
+interface PatisserieMenuProps {
+  onClose?: () => void
+  onCartSummaryChange?: (summary: { cartItemsCount: number; finalTotal: number }) => void
+}
+
+export const PatisserieMenu = forwardRef<PatisserieMenuHandle, PatisserieMenuProps>(function PatisserieMenu(
+  { onClose, onCartSummaryChange },
+  ref
+) {
   const { user } = useAuth()
   const { addNotification } = useNotification()
   const { getClientByEmail } = useLoyalty()
@@ -213,6 +225,14 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
   const finalTotal = useMemo(() => {
     return Math.round((cartTotal - calculateSmartDiscount.discountAmount) * 100) / 100
   }, [cartTotal, calculateSmartDiscount.discountAmount])
+
+  useImperativeHandle(ref, () => ({
+    openCartSummary: () => setShowCartSummary(true),
+  }), [])
+
+  useEffect(() => {
+    onCartSummaryChange?.({ cartItemsCount, finalTotal })
+  }, [cartItemsCount, finalTotal, onCartSummaryChange])
 
   // ============================================
   // CART FUNCTIONS
@@ -485,37 +505,8 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50/50 to-white">
-      {/* Header */}
-      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-stone-200">
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
-                <CakeIcon className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-lg font-bold text-stone-900">Le Pave d&apos;Art</h1>
-                <p className="text-xs text-stone-500">Patisserie Artisanale</p>
-              </div>
-            </div>
-
-            {/* Cart Button */}
-            <Button
-              onClick={() => setShowCartSummary(true)}
-              className="relative bg-amber-500 hover:bg-amber-600 text-white"
-            >
-              <ShoppingCartIcon className="h-5 w-5 mr-2" />
-              <span>{cartItemsCount}</span>
-              {cartItemsCount > 0 && (
-                <span className="ml-2 font-semibold">{finalTotal.toFixed(2)} TND</span>
-              )}
-            </Button>
-          </div>
-        </div>
-      </div>
-
       {/* Search and Categories Header */}
-      <div className="sticky top-[72px] z-30 bg-white/95 backdrop-blur-sm border-b border-stone-100">
+      <div className="sticky top-[132px] z-30 bg-white/95 backdrop-blur-sm border-b border-stone-100">
         <div className="max-w-7xl mx-auto px-4 py-3">
           {/* Search */}
           <div className="relative">
@@ -1428,4 +1419,4 @@ export function PatisserieMenu({ onClose }: { onClose?: () => void }) {
       {!showRecap && <div className={cn(cartItemsCount > 0 ? "h-44 sm:h-36" : "h-20 sm:h-16")} />}
     </div>
   )
-}
+})
