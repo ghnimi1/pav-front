@@ -20,7 +20,7 @@ function ProtectedDashboard() {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push("/login")
+      router.push("/menu")
     } else if (isAuthenticated && user?.role === "client") {
       router.push("/menu")
     }

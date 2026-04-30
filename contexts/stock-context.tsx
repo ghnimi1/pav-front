@@ -575,9 +575,9 @@ async function deleteSupplierAPI(id: string): Promise<void> {
 // API FUNCTIONS FOR MENU CATEGORIES
 // ============================================
 
-async function fetchMenuCategories(): Promise<MenuCategory[]> {
+async function fetchMenuCategories(includeInactive = false): Promise<MenuCategory[]> {
   try {
-    const data = await apiGet<MenuCategory[]>('/menu/categories/all')
+    const data = await apiGet<MenuCategory[]>(includeInactive ? '/menu/categories/all' : '/menu/categories')
     return data.map(c => ({
       ...c,
       id: (c as any)._id || c.id,
@@ -608,9 +608,9 @@ async function deleteMenuCategoryAPI(id: string): Promise<void> {
 // API FUNCTIONS FOR MENU ITEMS
 // ============================================
 
-async function fetchMenuItems(): Promise<MenuItem[]> {
+async function fetchMenuItems(includeInactive = false): Promise<MenuItem[]> {
   try {
-    const data = await apiGet<MenuItem[]>('/menu/items')
+    const data = await apiGet<MenuItem[]>(includeInactive ? '/menu/items/all' : '/menu/items')
     return data.map(item => ({
       ...item,
       id: (item as any)._id || item.id,
@@ -643,9 +643,9 @@ async function toggleMenuItemAvailabilityAPI(id: string): Promise<void> {
 // API FUNCTIONS FOR OFFERS
 // ============================================
 
-async function fetchOffers(): Promise<Offer[]> {
+async function fetchOffers(includeInactive = false): Promise<Offer[]> {
   try {
-    const data = await apiGet<Offer[]>('/menu/offers/all')
+    const data = await apiGet<Offer[]>(includeInactive ? '/menu/offers/all' : '/menu/offers/current')
     return data.map(offer => ({
       ...offer,
       id: (offer as any)._id || offer.id,
@@ -735,9 +735,9 @@ async function deleteRewardAPI(id: string): Promise<void> {
 // API FUNCTIONS FOR SUPPLEMENTS
 // ============================================
 
-async function fetchSupplements(): Promise<Supplement[]> {
+async function fetchSupplements(includeInactive = false): Promise<Supplement[]> {
   try {
-    const data = await apiGet<Supplement[]>('/menu/supplements/all')
+    const data = await apiGet<Supplement[]>(includeInactive ? '/menu/supplements/all' : '/menu/supplements')
     return data.map(s => ({
       ...s,
       id: (s as any)._id || s.id,
@@ -956,32 +956,38 @@ export function StockProvider({ children }: { children: ReactNode }) {
     const loadData = async () => {
       try {
         const hasToken = !!localStorage.getItem(AUTH_TOKEN_KEY)
-        
+
+        // Load the client menu for everyone. Without a token we use public
+        // endpoints, so visitors can still see products and current offers.
+        const apiMenuCategories = await fetchMenuCategories(hasToken)
+        if (!cancelled && apiMenuCategories.length > 0) {
+          setMenuCategories(apiMenuCategories)
+        } else if (!cancelled && apiMenuCategories.length === 0) {
+          setMenuCategories(initialMenuCategories)
+        }
+
+        const apiMenuItems = await fetchMenuItems(hasToken)
+        if (!cancelled && apiMenuItems.length > 0) {
+          setMenuItems(apiMenuItems)
+        } else if (!cancelled && apiMenuItems.length === 0) {
+          setMenuItems(initialMenuItems)
+        }
+
+        const apiOffers = await fetchOffers(hasToken)
+        if (!cancelled && apiOffers.length > 0) {
+          setOffers(apiOffers)
+        } else if (!cancelled && apiOffers.length === 0) {
+          setOffers(initialOffers)
+        }
+
+        const apiSupplements = await fetchSupplements(hasToken)
+        if (!cancelled && apiSupplements.length > 0) {
+          setSupplements(apiSupplements)
+        } else if (!cancelled && apiSupplements.length === 0) {
+          setSupplements(initialSupplements)
+        }
+
         if (hasToken) {
-          // Load menu categories from API
-          const apiMenuCategories = await fetchMenuCategories()
-          if (!cancelled && apiMenuCategories.length > 0) {
-            setMenuCategories(apiMenuCategories)
-          } else if (!cancelled && apiMenuCategories.length === 0) {
-            setMenuCategories(initialMenuCategories)
-          }
-
-          // Load menu items from API
-          const apiMenuItems = await fetchMenuItems()
-          if (!cancelled && apiMenuItems.length > 0) {
-            setMenuItems(apiMenuItems)
-          } else if (!cancelled && apiMenuItems.length === 0) {
-            setMenuItems(initialMenuItems)
-          }
-
-          // Load offers from API
-          const apiOffers = await fetchOffers()
-          if (!cancelled && apiOffers.length > 0) {
-            setOffers(apiOffers)
-          } else if (!cancelled && apiOffers.length === 0) {
-            setOffers(initialOffers)
-          }
-
           // Load rewards from API
           const apiRewards = await fetchRewards()
           if (!cancelled && apiRewards.length > 0) {
@@ -997,14 +1003,6 @@ export function StockProvider({ children }: { children: ReactNode }) {
             setSupplementCategories(apiSupplementCategories)
           } else if (!cancelled && apiSupplementCategories.length === 0) {
             setSupplementCategories(initialSupplementCategories)
-          }
-
-          // Load supplements from API
-          const apiSupplements = await fetchSupplements()
-          if (!cancelled && apiSupplements.length > 0) {
-            setSupplements(apiSupplements)
-          } else if (!cancelled && apiSupplements.length === 0) {
-            setSupplements(initialSupplements)
           }
         }
 
