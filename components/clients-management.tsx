@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { apiGet } from "@/lib/api-client"
+import { apiGet, apiPost } from "@/lib/api-client"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Card } from "./ui/card"
@@ -60,6 +60,7 @@ export function ClientsManagement() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    password: "",
     phone: "",
     loyaltyPoints: 0,
     loyaltyTier: "bronze" as LoyaltyTier,
@@ -89,7 +90,12 @@ export function ClientsManagement() {
     } catch (error) {
       console.error("Failed to load clients from backend:", error)
       setClients([])
-      addNotification("error", "Chargement impossible", "La liste des clients n'a pas pu etre chargee depuis le serveur")
+      addNotification({
+        type: "error",
+        category: "client",
+        title: "Chargement impossible",
+        message: "La liste des clients n'a pas pu etre chargee depuis le serveur",
+      })
     }
   }
 
@@ -97,6 +103,7 @@ export function ClientsManagement() {
     setFormData({
       name: "",
       email: "",
+      password: "",
       phone: "",
       loyaltyPoints: 0,
       loyaltyTier: "bronze",
@@ -104,35 +111,87 @@ export function ClientsManagement() {
     })
   }
 
-  const handleAdd = () => {
-    if (!formData.name || !formData.email) {
-      addNotification("error", "Champs obligatoires", "Veuillez remplir le nom et l'email")
+  const handleAdd = async () => {
+    if (!formData.name || !formData.email || !formData.password) {
+      addNotification({
+        type: "error",
+        category: "client",
+        title: "Champs obligatoires",
+        message: "Veuillez remplir le nom, l'email et le mot de passe",
+      })
       return
     }
 
-    addNotification("info", "Backend requis", "L'ajout de client doit maintenant passer par le serveur")
-    setIsAddDialogOpen(false)
-    resetForm()
+    if (formData.password.length < 6) {
+      addNotification({
+        type: "error",
+        category: "client",
+        title: "Mot de passe trop court",
+        message: "Le mot de passe doit contenir au moins 6 caracteres",
+      })
+      return
+    }
+
+    try {
+      const response = await apiPost<{ client: ClientApiUser }>("/auth/clients", {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        phone: formData.phone,
+        loyaltyPoints: formData.loyaltyPoints,
+        loyaltyTier: formData.loyaltyTier === "platinum" ? "diamond" : formData.loyaltyTier,
+        totalSpent: formData.totalSpent,
+      })
+
+      setClients((prev) => [normalizeClient(response.client), ...prev])
+      addNotification({
+        type: "success",
+        category: "client",
+        title: "Client ajoute",
+        message: `${formData.name} a ete ajoute avec succes`,
+      })
+      setIsAddDialogOpen(false)
+      resetForm()
+    } catch (error) {
+      addNotification({
+        type: "error",
+        category: "client",
+        title: "Ajout impossible",
+        message: error instanceof Error ? error.message : "Impossible d'ajouter le client",
+      })
+    }
   }
 
   const handleEdit = () => {
     if (!selectedClient || !formData.name || !formData.email) {
-      addNotification("error", "Champs obligatoires", "Veuillez remplir le nom et l'email")
+      addNotification({
+        type: "error",
+        category: "client",
+        title: "Champs obligatoires",
+        message: "Veuillez remplir le nom et l'email",
+      })
       return
     }
+
+    const { password, ...clientUpdates } = formData
 
     setClients((prev) =>
       prev.map((client) =>
         client.id === selectedClient.id
           ? {
               ...client,
-              ...formData,
+              ...clientUpdates,
             }
           : client
       )
     )
 
-    addNotification("info", "Backend requis", "La modification client doit maintenant etre persistee cote serveur")
+    addNotification({
+      type: "info",
+      category: "client",
+      title: "Backend requis",
+      message: "La modification client doit maintenant etre persistee cote serveur",
+    })
     setIsEditDialogOpen(false)
     setSelectedClient(null)
     resetForm()
@@ -142,7 +201,12 @@ export function ClientsManagement() {
     if (!selectedClient) return
 
     setClients((prev) => prev.filter((client) => client.id !== selectedClient.id))
-    addNotification("info", "Backend requis", "La suppression client doit maintenant etre persistee cote serveur")
+    addNotification({
+      type: "info",
+      category: "client",
+      title: "Backend requis",
+      message: "La suppression client doit maintenant etre persistee cote serveur",
+    })
     setIsDeleteDialogOpen(false)
     setSelectedClient(null)
   }
@@ -152,6 +216,7 @@ export function ClientsManagement() {
     setFormData({
       name: client.name,
       email: client.email,
+      password: "",
       phone: client.phone || "",
       loyaltyPoints: client.loyaltyPoints || 0,
       loyaltyTier: client.loyaltyTier || "bronze",
@@ -366,6 +431,10 @@ export function ClientsManagement() {
             <div className="space-y-2">
               <Label htmlFor="email">Email *</Label>
               <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="email@exemple.com" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Mot de passe *</Label>
+              <Input id="password" type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="Minimum 6 caracteres" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Telephone</Label>
