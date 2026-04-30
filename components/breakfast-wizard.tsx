@@ -266,7 +266,12 @@ export function BreakfastWizard({ onClose }: { onClose?: () => void }) {
         },
         undefined,
         undefined,
-        [customerNote, tableNumber ? `Table: ${tableNumber}` : ""].filter(Boolean).join(" | ")
+        [customerNote, tableNumber ? `Table: ${tableNumber}` : ""].filter(Boolean).join(" | "),
+        {
+          amount: calculateSmartDiscount.discountAmount,
+          percent: calculateSmartDiscount.discountPercent,
+          description: calculateSmartDiscount.tier ? `Reduction ${calculateSmartDiscount.tier.name}` : undefined,
+        }
       )
 
       if (clientOrder) {

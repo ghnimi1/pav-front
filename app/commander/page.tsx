@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -53,12 +53,14 @@ import {
   CakeIcon,
   CroissantIcon,
   UtensilsCrossedIcon,
+  PercentIcon,
 } from "lucide-react"
 import { AuthProvider, useAuth } from "@/contexts/auth-context"
 import { OrdersProvider, useOrders, type OrderItem, type DeliveryMode, type DeliveryAddress } from "@/contexts/orders-context"
 import { StockProvider, useStock } from "@/contexts/stock-context"
 import { LoyaltyProvider, useLoyalty } from "@/contexts/loyalty-context"
 import { NotificationProvider, useNotification } from "@/contexts/notification-context"
+import { DiscountProvider, useDiscount } from "@/contexts/discount-context"
 import { NotificationContainer } from "@/components/notification-container"
 
 function OrderPageContent() {
@@ -83,6 +85,7 @@ function OrderPageContent() {
     orders,
     getOrdersByClient,
   } = useOrders()
+  const { calculateDiscount } = useDiscount()
 
   // Get client orders for history
   const clientOrders = user?.email ? getOrdersByClient(user.email) : []
@@ -130,9 +133,15 @@ function OrderPageContent() {
     return matchesCategory && matchesSearch && item.isAvailable
   })
 
+  const cartDiscount = useMemo(
+    () => calculateDiscount(cartTotal, cartItemsCount),
+    [calculateDiscount, cartTotal, cartItemsCount]
+  )
+  const discountedSubtotal = Math.max(0, cartTotal - cartDiscount.discountAmount)
+
   // Calculate delivery fee
-  const deliveryFee = deliveryMode === "delivery" ? getDeliveryFee(cartTotal) : 0
-  const orderTotal = cartTotal + deliveryFee
+  const deliveryFee = deliveryMode === "delivery" ? getDeliveryFee(discountedSubtotal) : 0
+  const orderTotal = discountedSubtotal + deliveryFee
   const estimatedTime = getEstimatedTime(deliveryMode)
 
   // Add item to cart
@@ -185,7 +194,12 @@ function OrderPageContent() {
       clientInfo,
       deliveryMode === "delivery" ? deliveryAddress : undefined,
       undefined,
-      customerNote
+      customerNote,
+      {
+        amount: cartDiscount.discountAmount,
+        percent: cartDiscount.discountPercent,
+        description: cartDiscount.tier ? `Reduction ${cartDiscount.tier.name}` : undefined,
+      }
     )
 
     if (order) {
@@ -383,6 +397,20 @@ function OrderPageContent() {
                               <span className="text-stone-500">Sous-total</span>
                               <span className="font-medium">{cartTotal.toFixed(2)} TND</span>
                             </div>
+                            {cartDiscount.discountAmount > 0 && cartDiscount.tier && (
+                              <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                                <span className="flex items-center gap-2 font-medium">
+                                  <PercentIcon className="h-4 w-4" />
+                                  Remise {cartDiscount.tier.name} (-{cartDiscount.discountPercent}%)
+                                </span>
+                                <span className="font-semibold">-{cartDiscount.discountAmount.toFixed(2)} TND</span>
+                              </div>
+                            )}
+                            {cartDiscount.nextTier && cartTotal > 0 && cartDiscount.discountAmount === 0 && (
+                              <div className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                                Ajoutez {cartDiscount.nextTier.amountNeeded} TND pour debloquer -{cartDiscount.nextTier.discount}%
+                              </div>
+                            )}
                             {isAuthenticated && cartTotalPoints > 0 && (
                               <div className="flex justify-between text-sm">
                                 <span className="text-emerald-600">Points a gagner</span>
@@ -470,14 +498,14 @@ function OrderPageContent() {
                           )}
                         </RadioGroup>
 
-                        {deliveryMode === "delivery" && deliveryFee === 0 && cartTotal >= deliveryConfig.freeDeliveryThreshold && (
+                        {deliveryMode === "delivery" && deliveryFee === 0 && discountedSubtotal >= deliveryConfig.freeDeliveryThreshold && (
                           <div className="p-3 bg-emerald-50 rounded-lg text-sm text-emerald-700">
                             <CheckCircleIcon className="h-4 w-4 inline mr-2" />
                             Livraison gratuite! (commande {">="} {deliveryConfig.freeDeliveryThreshold} TND)
                           </div>
                         )}
 
-                        {deliveryMode === "delivery" && cartTotal < deliveryConfig.freeDeliveryThreshold && (
+                        {deliveryMode === "delivery" && discountedSubtotal < deliveryConfig.freeDeliveryThreshold && (
                           <div className="p-3 bg-stone-100 rounded-lg text-sm text-stone-600">
                             <InfoIcon className="h-4 w-4 inline mr-2" />
                             Livraison gratuite a partir de {deliveryConfig.freeDeliveryThreshold.toFixed(2)} TND
@@ -490,6 +518,12 @@ function OrderPageContent() {
                           <span className="text-stone-500">Sous-total</span>
                           <span>{cartTotal.toFixed(2)} TND</span>
                         </div>
+                        {cartDiscount.discountAmount > 0 && (
+                          <div className="flex justify-between text-sm text-emerald-600">
+                            <span>Remise {cartDiscount.tier?.name} (-{cartDiscount.discountPercent}%)</span>
+                            <span>-{cartDiscount.discountAmount.toFixed(2)} TND</span>
+                          </div>
+                        )}
                         {deliveryFee > 0 && (
                           <div className="flex justify-between text-sm">
                             <span className="text-stone-500">Frais de livraison</span>
@@ -714,6 +748,12 @@ function OrderPageContent() {
                           <span className="text-stone-500">Sous-total</span>
                           <span>{cartTotal.toFixed(2)} TND</span>
                         </div>
+                        {cartDiscount.discountAmount > 0 && (
+                          <div className="flex justify-between text-sm text-emerald-600">
+                            <span>Remise {cartDiscount.tier?.name} (-{cartDiscount.discountPercent}%)</span>
+                            <span>-{cartDiscount.discountAmount.toFixed(2)} TND</span>
+                          </div>
+                        )}
                         {deliveryFee > 0 && (
                           <div className="flex justify-between text-sm">
                             <span className="text-stone-500">Frais de livraison</span>
@@ -1035,9 +1075,11 @@ export default function OrderPage() {
       <AuthProvider>
         <LoyaltyProvider>
           <StockProvider>
-            <OrdersProvider>
-              <OrderPageContent />
-            </OrdersProvider>
+            <DiscountProvider>
+              <OrdersProvider>
+                <OrderPageContent />
+              </OrdersProvider>
+            </DiscountProvider>
           </StockProvider>
         </LoyaltyProvider>
         <NotificationContainer />

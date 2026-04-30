@@ -60,6 +60,7 @@ import {
   LayoutGridIcon,
   ClipboardListIcon,
   HistoryIcon,
+  PercentIcon,
 } from "lucide-react"
 import { AuthProvider, useAuth } from "@/contexts/auth-context"
 import { OrdersProvider, useOrders, type RemoteOrder, type OrderStatus } from "@/contexts/orders-context"
@@ -349,6 +350,12 @@ function AdminOrdersContent() {
         <div className="flex items-center justify-between">
           <div>
             <span className="text-lg font-bold text-amber-600">{order.total.toFixed(2)} TND</span>
+            {order.discount > 0 && (
+              <p className="flex items-center gap-1 text-xs text-emerald-600">
+                <PercentIcon className="h-3 w-3" />
+                -{order.discount.toFixed(2)} TND
+              </p>
+            )}
             {order.totalPoints > 0 && (
               <p className="text-xs text-emerald-600">+{order.totalPoints} pts</p>
             )}

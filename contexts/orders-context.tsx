@@ -34,6 +34,9 @@ export interface RemoteOrder {
   orderNumber: string
   items: OrderItem[]
   subtotal: number
+  discount: number
+  discountPercent?: number
+  discountDescription?: string
   deliveryFee: number
   total: number
   totalPoints: number
@@ -90,7 +93,8 @@ interface OrdersContextType {
     clientInfo: { id?: string; email?: string; name?: string; phone?: string },
     deliveryAddress?: DeliveryAddress,
     pickupTime?: string,
-    customerNote?: string
+    customerNote?: string,
+    discountInfo?: { amount: number; percent?: number; description?: string }
   ) => Promise<RemoteOrder | null>
   createOrderFromItems: (
     items: OrderItem[],
@@ -99,7 +103,8 @@ interface OrdersContextType {
     clientInfo: { id?: string; email?: string; name?: string; phone?: string },
     deliveryAddress?: DeliveryAddress,
     pickupTime?: string,
-    customerNote?: string
+    customerNote?: string,
+    discountInfo?: { amount: number; percent?: number; description?: string }
   ) => Promise<RemoteOrder | null>
   updateOrderStatus: (orderId: string, status: OrderStatus, staffId?: string) => Promise<void>
   cancelOrder: (orderId: string, reason?: string) => Promise<void>
@@ -145,6 +150,7 @@ function normalizeOrder(order: any): RemoteOrder {
   return {
     ...order,
     id: order.id || order._id,
+    discount: order.discount || 0,
   }
 }
 
@@ -278,9 +284,10 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
     clientInfo,
     deliveryAddress,
     pickupTime,
-    customerNote
+    customerNote,
+    discountInfo
   ) => {
-    return createOrderFromItems(cart, deliveryMode, paymentMethod, clientInfo, deliveryAddress, pickupTime, customerNote, true)
+    return createOrderFromItems(cart, deliveryMode, paymentMethod, clientInfo, deliveryAddress, pickupTime, customerNote, discountInfo, true)
   }
 
   const createOrderFromItems = async (
@@ -291,6 +298,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
     deliveryAddress: any,
     pickupTime: any,
     customerNote: any,
+    discountInfo?: { amount: number; percent?: number; description?: string },
     clearProviderCart = false
   ): Promise<RemoteOrder | null> => {
     if (items.length === 0) return null
@@ -306,13 +314,17 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
     )
 
     if (itemsTotal < deliveryConfig.minOrderAmount) return null
+    const discountAmount = Math.min(itemsTotal, Math.max(0, discountInfo?.amount || 0))
 
     try {
       const order = normalizeOrder(
         await apiPost<RemoteOrder>("/orders", {
             items,
             subtotal: itemsTotal,
-            total: itemsTotal + (deliveryMode === "delivery" ? getDeliveryFee(itemsTotal) : 0),
+            discount: discountAmount,
+            discountPercent: discountInfo?.percent || 0,
+            discountDescription: discountInfo?.description,
+            total: itemsTotal - discountAmount + (deliveryMode === "delivery" ? getDeliveryFee(itemsTotal - discountAmount) : 0),
             totalPoints: itemsTotalPoints,
             deliveryMode,
             paymentMethod,

@@ -1,6 +1,7 @@
 "use client"
 
-import React, { createContext, useContext, useState, useMemo, useCallback, type ReactNode } from "react"
+import React, { createContext, useContext, useState, useMemo, useCallback, useEffect, type ReactNode } from "react"
+import { apiGet, apiPut } from "@/lib/api-client"
 
 // ============================================
 // TYPES
@@ -17,9 +18,11 @@ export interface DiscountTier {
 }
 
 export interface DiscountConfig {
+  _id?: string
   isEnabled: boolean
   minItemsForDiscount: number // Minimum number of items to qualify for discount
   tiers: DiscountTier[]
+  updatedAt?: string | Date
 }
 
 export interface DiscountResult {
@@ -79,15 +82,29 @@ const defaultConfig: DiscountConfig = {
 // ============================================
 
 const DiscountContext = createContext<DiscountContextType | undefined>(undefined)
+const DISCOUNT_STORAGE_KEY = "patisserie-discount-config"
+
+function normalizeConfig(config: DiscountConfig): DiscountConfig {
+  return {
+    ...defaultConfig,
+    ...config,
+    minItemsForDiscount: Math.max(1, Number(config.minItemsForDiscount || defaultConfig.minItemsForDiscount)),
+    tiers: Array.isArray(config.tiers) ? config.tiers : defaultConfig.tiers,
+  }
+}
+
+function formatAmountNeeded(minAmount: number, subtotal: number) {
+  return Math.max(0, minAmount - subtotal).toFixed(2)
+}
 
 export function DiscountProvider({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<DiscountConfig>(() => {
     // Try to load from localStorage
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("patisserie-discount-config")
+      const saved = localStorage.getItem(DISCOUNT_STORAGE_KEY)
       if (saved) {
         try {
-          return JSON.parse(saved)
+          return normalizeConfig(JSON.parse(saved))
         } catch {
           return defaultConfig
         }
@@ -96,12 +113,44 @@ export function DiscountProvider({ children }: { children: ReactNode }) {
     return defaultConfig
   })
 
+  useEffect(() => {
+    let cancelled = false
+
+    const loadConfig = async () => {
+      try {
+        const remoteConfig = await apiGet<DiscountConfig>("/discounts/config", { skipAuth: true })
+        if (cancelled) return
+        const nextConfig = normalizeConfig(remoteConfig)
+        setConfig(nextConfig)
+        localStorage.setItem(DISCOUNT_STORAGE_KEY, JSON.stringify(nextConfig))
+      } catch (error) {
+        console.error("Failed to load discount config:", error)
+      }
+    }
+
+    void loadConfig()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   // Save to localStorage whenever config changes
   const saveConfig = useCallback((newConfig: DiscountConfig) => {
-    setConfig(newConfig)
+    const nextConfig = normalizeConfig(newConfig)
+    setConfig(nextConfig)
     if (typeof window !== "undefined") {
-      localStorage.setItem("patisserie-discount-config", JSON.stringify(newConfig))
+      localStorage.setItem(DISCOUNT_STORAGE_KEY, JSON.stringify(nextConfig))
     }
+    void apiPut<DiscountConfig>("/discounts/config", nextConfig).then((remoteConfig) => {
+      const normalizedRemoteConfig = normalizeConfig(remoteConfig)
+      setConfig(normalizedRemoteConfig)
+      if (typeof window !== "undefined") {
+        localStorage.setItem(DISCOUNT_STORAGE_KEY, JSON.stringify(normalizedRemoteConfig))
+      }
+    }).catch((error) => {
+      console.error("Failed to save discount config:", error)
+    })
   }, [])
 
   // Update entire config
@@ -186,7 +235,7 @@ export function DiscountProvider({ children }: { children: ReactNode }) {
         nextTier: firstTier ? {
           minAmount: firstTier.minAmount,
           discount: firstTier.percent,
-          amountNeeded: (firstTier.minAmount - subtotal).toFixed(2),
+          amountNeeded: formatAmountNeeded(firstTier.minAmount, subtotal),
           savings: (firstTier.minAmount * (firstTier.percent / 100)).toFixed(2),
           name: firstTier.name,
         } : null,
@@ -216,7 +265,7 @@ export function DiscountProvider({ children }: { children: ReactNode }) {
         nextTier: firstTier ? {
           minAmount: firstTier.minAmount,
           discount: firstTier.percent,
-          amountNeeded: (firstTier.minAmount - subtotal).toFixed(2),
+          amountNeeded: formatAmountNeeded(firstTier.minAmount, subtotal),
           savings: (firstTier.minAmount * (firstTier.percent / 100)).toFixed(2),
           name: firstTier.name,
         } : null,
@@ -246,7 +295,7 @@ export function DiscountProvider({ children }: { children: ReactNode }) {
       nextTier: nextTier ? {
         minAmount: nextTier.minAmount,
         discount: nextTier.percent,
-        amountNeeded: (nextTier.minAmount - subtotal).toFixed(2),
+        amountNeeded: formatAmountNeeded(nextTier.minAmount, subtotal),
         savings: (nextTier.minAmount * (nextTier.percent / 100)).toFixed(2),
         name: nextTier.name,
       } : null,
@@ -288,7 +337,7 @@ function createFallbackCalculation() {
         nextTier: firstTier ? {
           minAmount: firstTier.minAmount,
           discount: firstTier.percent,
-          amountNeeded: (firstTier.minAmount - subtotal).toFixed(2),
+          amountNeeded: formatAmountNeeded(firstTier.minAmount, subtotal),
           savings: (firstTier.minAmount * (firstTier.percent / 100)).toFixed(2),
           name: firstTier.name,
         } : null,
@@ -315,7 +364,7 @@ function createFallbackCalculation() {
         nextTier: firstTier ? {
           minAmount: firstTier.minAmount,
           discount: firstTier.percent,
-          amountNeeded: (firstTier.minAmount - subtotal).toFixed(2),
+          amountNeeded: formatAmountNeeded(firstTier.minAmount, subtotal),
           savings: (firstTier.minAmount * (firstTier.percent / 100)).toFixed(2),
           name: firstTier.name,
         } : null,
@@ -333,7 +382,7 @@ function createFallbackCalculation() {
       nextTier: nextTier ? {
         minAmount: nextTier.minAmount,
         discount: nextTier.percent,
-        amountNeeded: (nextTier.minAmount - subtotal).toFixed(2),
+        amountNeeded: formatAmountNeeded(nextTier.minAmount, subtotal),
         savings: (nextTier.minAmount * (nextTier.percent / 100)).toFixed(2),
         name: nextTier.name,
       } : null,
@@ -349,7 +398,7 @@ export function useDiscount() {
   // If not in provider, return a fallback with default tiers
   if (!context) {
     return {
-      config: { isEnabled: true, minItems: 1, tiers: defaultTiers },
+      config: defaultConfig,
       isEnabled: true,
       tiers: defaultTiers,
       updateConfig: () => {},
