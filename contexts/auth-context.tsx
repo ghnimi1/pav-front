@@ -173,7 +173,7 @@ function normalizeUser(apiUser: AuthApiUser): User {
     loyaltyTier: apiUser.loyaltyTier === "diamond" ? "platinum" : apiUser.loyaltyTier,
     totalSpent: apiUser.totalSpent,
     employeeRole: apiUser.employeeRole,
-    permissions: apiUser.permissions,
+    permissions: Array.isArray(apiUser.permissions) ? apiUser.permissions : [],
   }
 }
 
@@ -496,11 +496,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const hasPermission = (permission: PermissionKey): boolean => {
     if (!user) return false
+    
+    // Old admin accounts (no employeeRole) have all permissions
     if (user.role === "admin" && !user.employeeRole) return true
-    if (user.permissions) {
-      return user.permissions.includes(permission)
-    }
-    return false
+    
+    // Super admins have all permissions
+    if (user.employeeRole === "super_admin") return true
+    
+    // Check employee permissions (ensure it's an array)
+    const userPermissions = Array.isArray(user.permissions) ? user.permissions : []
+    return userPermissions.includes(permission)
   }
 
   return (

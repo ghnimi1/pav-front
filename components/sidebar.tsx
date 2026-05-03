@@ -83,6 +83,16 @@ interface SidebarProps {
 export function Sidebar({ currentView, onViewChange, isOpen, onClose, isAdmin }: SidebarProps) {
   const { user, hasPermission } = useAuth()
 
+  // Debug logging
+  if (user?.employeeRole) {
+    console.log("=== SIDEBAR DEBUG ===")
+    console.log("User role:", user.employeeRole)
+    console.log("User permissions:", user.permissions)
+    console.log("Has dashboard:", hasPermission("dashboard"))
+    console.log("Has articles:", hasPermission("articles"))
+    console.log("Has menu:", hasPermission("menu"))
+  }
+
   const navItems: {
     id: NavItem
     label: string
@@ -321,21 +331,24 @@ export function Sidebar({ currentView, onViewChange, isOpen, onClose, isAdmin }:
     onClose()
   }
 
-  // Filter items based on admin status and permissions
+  // Filter items based on user role and permissions
   const visibleNavItems = navItems.filter((item) => {
-    // Non-admin users only see non-admin items
-    if (!isAdmin && item.adminOnly) return false
-    
-    // For employee users with permissions, check specific permission
-    if (user?.permissions && item.permission) {
-      return hasPermission(item.permission)
+    // For employee users with employeeRole, check permissions first
+    if (user?.employeeRole) {
+      // If item requires a permission, check if user has it
+      if (item.permission) {
+        return hasPermission(item.permission)
+      }
+      // If no permission requirement, show item if it's not admin-only
+      return !item.adminOnly
     }
     
-    // For old admin accounts without employee system, show all admin items
-    if (isAdmin && user?.role === "admin" && !user?.employeeRole) {
+    // For old admin accounts without employeeRole, show all items
+    if (user?.role === "admin" && !user?.employeeRole) {
       return true
     }
     
+    // For client users (no employeeRole), only show non-admin items
     return !item.adminOnly
   })
 
