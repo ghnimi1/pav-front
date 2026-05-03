@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useMemo, useState, useCallback, type ReactNode } from "react"
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api-client"
 import { useLoyalty } from "@/contexts/loyalty-context"
 import { useNavigation } from "@/contexts/navigation-context"
@@ -161,6 +161,7 @@ interface BreakfastContextType {
   pendingOrders: BreakfastOrder[]
   validatedOrders: BreakfastOrder[]
   userTotalPoints: number
+  refreshBreakfastData: () => Promise<void>
 }
 
 const BreakfastContext = createContext<BreakfastContextType | undefined>(undefined)
@@ -311,67 +312,59 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
   // Track if data has been loaded to avoid reloading on nav away and back
   const [hasLoadedData, setHasLoadedData] = useState(false)
 
-  useEffect(() => {
-    // Load breakfast data when breakfast-menu-admin or menu is active
-    if (currentNavItem !== "breakfast-menu-admin" && currentNavItem !== "menu" && currentNavItem !== "menu-client") {
-      return
-    }
-
-    // Skip if already loaded
-    if (hasLoadedData) {
-      return
-    }
-
-    let cancelled = false
-
+  // Core load function that can be called on-demand
+  const loadBreakfastData = useCallback(async () => {
     const savedOrders = localStorage.getItem("breakfast-orders")
     const savedUserPoints = localStorage.getItem("user-total-points")
 
     if (savedOrders) setOrders(JSON.parse(savedOrders))
     if (savedUserPoints) setUserTotalPoints(parseInt(savedUserPoints) || 0)
 
-    const loadBreakfastMenu = async () => {
-      try {
-        let [apiCategories, apiItems, apiFormulas] = await Promise.all([
-          apiGet<Array<ApiEntity & Omit<BreakfastCategory, "id">>>("/menu/breakfast/categories"),
-          apiGet<Array<ApiEntity & Omit<BreakfastItem, "id">>>("/menu/breakfast/items"),
-          apiGet<Array<ApiEntity & Omit<BaseFormula, "id">>>("/menu/breakfast/formulas"),
-        ])
+    try {
+      let [apiCategories, apiItems, apiFormulas] = await Promise.all([
+        apiGet<Array<ApiEntity & Omit<BreakfastCategory, "id">>>("/menu/breakfast/categories"),
+        apiGet<Array<ApiEntity & Omit<BreakfastItem, "id">>>("/menu/breakfast/items"),
+        apiGet<Array<ApiEntity & Omit<BaseFormula, "id">>>("/menu/breakfast/formulas"),
+      ])
 
-        const hasToken = !!localStorage.getItem(AUTH_TOKEN_KEY)
-        if (apiCategories.length === 0 && apiItems.length === 0 && apiFormulas.length === 0 && hasToken) {
-          const bootstrapped = await bootstrapBreakfastMenu()
-          apiCategories = bootstrapped.categories
-          apiItems = bootstrapped.items
-          apiFormulas = bootstrapped.formulas
-        }
-
-        if (cancelled) return
-
-        if (apiCategories.length > 0) {
-          setCategories(apiCategories.map(mapCategory))
-        }
-
-        if (apiItems.length > 0) {
-          setItems(apiItems.map(mapItem))
-        }
-
-        if (apiFormulas.length > 0) {
-          setBaseFormulas(apiFormulas.map(mapFormula))
-        }
-
-        setHasLoadedData(true)
-      } catch (error) {
-        console.error("Failed to load breakfast menu from backend:", error)
+      const hasToken = !!localStorage.getItem(AUTH_TOKEN_KEY)
+      if (apiCategories.length === 0 && apiItems.length === 0 && apiFormulas.length === 0 && hasToken) {
+        const bootstrapped = await bootstrapBreakfastMenu()
+        apiCategories = bootstrapped.categories
+        apiItems = bootstrapped.items
+        apiFormulas = bootstrapped.formulas
       }
+
+      if (apiCategories.length > 0) {
+        setCategories(apiCategories.map(mapCategory))
+      }
+
+      if (apiItems.length > 0) {
+        setItems(apiItems.map(mapItem))
+      }
+
+      if (apiFormulas.length > 0) {
+        setBaseFormulas(apiFormulas.map(mapFormula))
+      }
+
+      setHasLoadedData(true)
+    } catch (error) {
+      console.error("Failed to load breakfast menu from backend:", error)
+    }
+  }, [])
+
+  // Auto-load for breakfast-menu-admin only (for admin page)
+  useEffect(() => {
+    if (currentNavItem !== "breakfast-menu-admin") {
+      return
     }
 
-    void loadBreakfastMenu()
-
-    return () => {
-      cancelled = true
+    if (hasLoadedData) {
+      return
     }
-  }, [currentNavItem, hasLoadedData])
+
+    void loadBreakfastData()
+  }, [currentNavItem, hasLoadedData, loadBreakfastData])
 
   useEffect(() => {
     localStorage.setItem("breakfast-orders", JSON.stringify(orders))
@@ -819,6 +812,7 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
         pendingOrders,
         validatedOrders,
         userTotalPoints,
+        refreshBreakfastData: loadBreakfastData,
       }}
     >
       {children}

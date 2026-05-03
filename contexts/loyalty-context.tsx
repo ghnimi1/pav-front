@@ -814,6 +814,7 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     "games",
     "referrals",
     "dashboard",
+    "client-fidelite",
   ] as const
 
   // Track what has been loaded
@@ -831,7 +832,7 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
 
   // Load clients data - for clients management views and dashboard
   useEffect(() => {
-    if (!isInNavItems(["clients-management", "clients", "dashboard"])) {
+    if (!isInNavItems(["clients-management", "clients", "dashboard", "client-fidelite"])) {
       return
     }
 
@@ -850,7 +851,7 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
 
   // Load missions data - for missions view
   useEffect(() => {
-    if (!isInNavItems(["missions"])) {
+    if (!isInNavItems(["missions", "client-fidelite"])) {
       return
     }
 
@@ -873,7 +874,7 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
 
   // Load games data - for games view
   useEffect(() => {
-    if (!isInNavItems(["games"])) {
+    if (!isInNavItems(["games", "client-fidelite"])) {
       return
     }
 
@@ -896,7 +897,7 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
 
   // Load special days data - for special-days view
   useEffect(() => {
-    if (!isInNavItems(["special-days"])) {
+    if (!isInNavItems(["special-days", "client-fidelite"])) {
       return
     }
 
@@ -916,7 +917,7 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
 
   // Load referrals data - for referrals view
   useEffect(() => {
-    if (!isInNavItems(["referrals"])) {
+    if (!isInNavItems(["referrals", "client-fidelite"])) {
       return
     }
 
@@ -938,7 +939,7 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
 
   // Load rewards data - for rewards view (also loaded by stock-context, so just sync here)
   useEffect(() => {
-    if (!isInNavItems(["rewards"])) {
+    if (!isInNavItems(["rewards", "client-fidelite"])) {
       return
     }
 

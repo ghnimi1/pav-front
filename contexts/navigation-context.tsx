@@ -34,6 +34,7 @@ export type NavItem =
   | "discount-settings"
   | "notifications-history"
   | "supplements"
+  | "client-fidelite"
 
 interface NavigationContextType {
   currentNavItem: NavItem

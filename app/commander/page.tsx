@@ -61,6 +61,7 @@ import { StockProvider, useStock } from "@/contexts/stock-context"
 import { LoyaltyProvider, useLoyalty } from "@/contexts/loyalty-context"
 import { NotificationProvider, useNotification } from "@/contexts/notification-context"
 import { DiscountProvider, useDiscount } from "@/contexts/discount-context"
+import { NavigationProvider } from "@/contexts/navigation-context"
 import { NotificationContainer } from "@/components/notification-container"
 
 function OrderPageContent() {
@@ -84,11 +85,17 @@ function OrderPageContent() {
     getEstimatedTime,
     orders,
     getOrdersByClient,
+    loadOrders,
   } = useOrders()
   const { calculateDiscount } = useDiscount()
 
   // Get client orders for history
   const clientOrders = user?.email ? getOrdersByClient(user.email) : []
+
+  useEffect(() => {
+    // Load client orders on demand when visiting commander page
+    loadOrders()
+  }, [])
 
   // States
   const [activeTab, setActiveTab] = useState<"menu" | "history">("menu")
@@ -1072,18 +1079,20 @@ function OrderPageContent() {
 export default function OrderPage() {
   return (
     <NotificationProvider>
-      <AuthProvider>
-        <LoyaltyProvider>
-          <StockProvider>
-            <DiscountProvider>
-              <OrdersProvider>
-                <OrderPageContent />
-              </OrdersProvider>
-            </DiscountProvider>
-          </StockProvider>
-        </LoyaltyProvider>
-        <NotificationContainer />
-      </AuthProvider>
+      <NavigationProvider initialNavItem="menu-client">
+        <AuthProvider>
+          <LoyaltyProvider>
+            <StockProvider>
+              <DiscountProvider>
+                <OrdersProvider>
+                  <OrderPageContent />
+                </OrdersProvider>
+              </DiscountProvider>
+            </StockProvider>
+          </LoyaltyProvider>
+        </AuthProvider>
+      </NavigationProvider>
+      <NotificationContainer />
     </NotificationProvider>
   )
 }

@@ -10,6 +10,7 @@ import { useStock } from "@/contexts/stock-context"
 import { BreakfastProvider, useBreakfast, type BreakfastOrder } from "@/contexts/breakfast-context"
 import { OrdersProvider, useOrders, type RemoteOrder } from "@/contexts/orders-context"
 import { UnifiedSalesProvider, useUnifiedSales, type UnifiedSale } from "@/contexts/unified-sales-context"
+import { NavigationProvider, useNavigation } from "@/contexts/navigation-context"
 import { NotificationContainer } from "@/components/notification-container"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -57,6 +58,7 @@ import { ChichBichGameModal } from "@/components/chichbich-game-modal"
 import { useNotification } from "@/contexts/notification-context"
 
 function ClientFideliteContent() {
+  const { setCurrentNavItem } = useNavigation()
   const { user, isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
   const { addNotification } = useNotification()
@@ -73,7 +75,7 @@ function ClientFideliteContent() {
     updateMissionProgress,
   } = useLoyalty()
   const { orders, items: breakfastItems } = useBreakfast()
-  const { orders: remoteOrders, getOrdersByClient } = useOrders()
+  const { orders: remoteOrders, getOrdersByClient, loadOrders } = useOrders()
   const { sales } = useUnifiedSales()
   
   // Loyalty cards
@@ -113,6 +115,16 @@ function ClientFideliteContent() {
     winCondition: string
     rewardName: string
   } | null>(null)
+
+  useEffect(() => {
+    // Set navigation item for loyalty data loading
+    setCurrentNavItem("client-fidelite")
+  }, [setCurrentNavItem])
+
+  useEffect(() => {
+    // Load client orders on demand when visiting fidelite page
+    loadOrders()
+  }, [])
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -1214,22 +1226,24 @@ function ClientFideliteContent() {
 export default function ClientFidelitePage() {
   return (
     <NotificationProvider>
-      <AuthProvider>
-        <StockProvider>
-          <LoyaltyProvider>
-            <OrdersProvider>
-<BreakfastProvider>
-              <UnifiedSalesProvider>
-                <LoyaltyCardsProvider>
-                  <ClientFideliteContent />
-                </LoyaltyCardsProvider>
-              </UnifiedSalesProvider>
-            </BreakfastProvider>
-            </OrdersProvider>
-            <NotificationContainer />
-          </LoyaltyProvider>
-        </StockProvider>
-      </AuthProvider>
+      <NavigationProvider initialNavItem="client-fidelite">
+        <AuthProvider>
+          <StockProvider>
+            <LoyaltyProvider>
+              <OrdersProvider>
+                <BreakfastProvider>
+                  <UnifiedSalesProvider>
+                    <LoyaltyCardsProvider>
+                      <ClientFideliteContent />
+                    </LoyaltyCardsProvider>
+                  </UnifiedSalesProvider>
+                </BreakfastProvider>
+              </OrdersProvider>
+              <NotificationContainer />
+            </LoyaltyProvider>
+          </StockProvider>
+        </AuthProvider>
+      </NavigationProvider>
     </NotificationProvider>
   )
 }

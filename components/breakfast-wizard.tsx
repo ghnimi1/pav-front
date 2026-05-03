@@ -112,7 +112,13 @@ export const BreakfastWizard = forwardRef<BreakfastWizardHandle, { onClose?: () 
     selectFormula,
     getFormulaPrice,
     getFormulaPoints,
+    refreshBreakfastData,
   } = useBreakfast()
+
+  // Load breakfast data when wizard mounts (on-demand loading)
+  useEffect(() => {
+    void refreshBreakfastData()
+  }, [refreshBreakfastData])
 
   // Wizard state
   const [wizardMode, setWizardMode] = useState<WizardMode>("selection")

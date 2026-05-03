@@ -931,36 +931,6 @@ const initialSupplementCategories: SupplementCategory[] = []
 const initialSupplements: Supplement[] = []
 
 const initialOffers: Offer[] = [
-  {
-    id: "offer-1",
-    name: "Offre Matinale",
-    description: "Cafe + Croissant a prix reduit",
-    originalPrice: 7.0,
-    discountedPrice: 4.9,
-    points: 5,
-    items: [],
-    schedule: { daysOfWeek: [0, 1, 2, 3, 4, 5, 6], startTime: "00:00", endTime: "23:59" },
-    isActive: true,
-    validFrom: undefined,
-    validUntil: undefined,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "offer-2",
-    name: "Pause Gourmande",
-    description: "The + Patisserie de l'apres-midi",
-    originalPrice: 9.0,
-    discountedPrice: 6.5,
-    points: 7,
-    items: [],
-    schedule: { daysOfWeek: [0, 1, 2, 3, 4, 5, 6], startTime: "00:00", endTime: "23:59" },
-    isActive: true,
-    validFrom: undefined,
-    validUntil: undefined,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
 ]
 
 const DATA_VERSION = "v2.0"
@@ -987,6 +957,7 @@ const MENU_NAV_ITEMS = [
   "menu-client",
   "menu-admin",
   "supplements",
+  "loyalty-cards",
 ] as const
 
 // NavItems that need rewards data
@@ -1038,10 +1009,16 @@ export function StockProvider({ children }: { children: ReactNode }) {
 
     const loadMenuData = async () => {
       try {
-        const hasToken = !!localStorage.getItem(AUTH_TOKEN_KEY)
-
-        // Try API first, then fall back to localStorage
-        let apiMenuCategories = hasToken ? await fetchMenuCategories(hasToken) : []
+        // Always try API first (menu items are public), then fall back to localStorage
+        let apiMenuCategories: MenuCategory[] = []
+        let apiMenuItems: MenuItem[] = []
+        
+        try {
+          apiMenuCategories = await fetchMenuCategories()
+        } catch (catError) {
+          console.warn("Failed to fetch menu categories from API:", catError)
+        }
+        
         if (apiMenuCategories.length === 0) {
           const storedCategories = localStorage.getItem("pastry-menu-categories")
           if (storedCategories) {
@@ -1053,7 +1030,12 @@ export function StockProvider({ children }: { children: ReactNode }) {
           setMenuCategories(apiMenuCategories)
         }
 
-        let apiMenuItems = hasToken ? await fetchMenuItems(hasToken) : []
+        try {
+          apiMenuItems = await fetchMenuItems()
+        } catch (itemError) {
+          console.warn("Failed to fetch menu items from API:", itemError)
+        }
+        
         if (apiMenuItems.length === 0) {
           const storedItems = localStorage.getItem("pastry-menu-items")
           if (storedItems) {
@@ -1065,8 +1047,16 @@ export function StockProvider({ children }: { children: ReactNode }) {
           setMenuItems(apiMenuItems)
         }
 
-        // Always try to fetch offers from API (public access allowed)
-        let apiOffers = await fetchOffers(hasToken)
+        // Fetch offers from API based on context
+        // Admin views (menu-admin, menu-client) use /menu/offers/all, client views use /menu/offers/current
+        let apiOffers: Offer[] = []
+        try {
+          const isAdminView = currentNavItem === "menu-admin" || currentNavItem === "menu-client"
+          apiOffers = await fetchOffers(isAdminView) // true = /menu/offers/all, false = /menu/offers/current
+        } catch (offerError) {
+          console.warn("Failed to fetch offers from API:", offerError)
+        }
+        
         if (apiOffers.length === 0) {
           const storedOffers = localStorage.getItem("pastry-offers")
           if (storedOffers) {
@@ -1991,21 +1981,8 @@ export function StockProvider({ children }: { children: ReactNode }) {
 
   const getActiveOffers = () => offers.filter(o => o.isActive)
 
-  const getCurrentOffers = () => {
-    const now = new Date()
-    const currentDay = now.getDay()
-    const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
-
-    return offers.filter(offer => {
-      if (!offer.isActive) return false
-      if (!offer.schedule.daysOfWeek.includes(currentDay)) return false
-      const { startTime, endTime } = offer.schedule
-      if (currentTime < startTime || currentTime > endTime) return false
-      if (offer.validFrom && new Date(offer.validFrom) > now) return false
-      if (offer.validUntil && new Date(offer.validUntil) < now) return false
-      return true
-    })
-  }
+  // Show all active offers (no date filtering)
+  const getCurrentOffers = () => offers.filter(o => o.isActive)
 
   return (
     <StockContext.Provider

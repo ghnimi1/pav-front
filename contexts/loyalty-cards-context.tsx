@@ -162,8 +162,8 @@ export function LoyaltyCardsProvider({ children }: { children: ReactNode }) {
   }, [isAuthenticated, user])
 
   useEffect(() => {
-    // Only load loyalty cards when viewing loyalty-cards
-    if (currentNavItem !== "loyalty-cards") {
+    // Load loyalty cards when viewing loyalty-cards or client-fidelite
+    if (currentNavItem !== "loyalty-cards" && currentNavItem !== "client-fidelite") {
       return
     }
 

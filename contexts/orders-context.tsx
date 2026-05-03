@@ -76,6 +76,8 @@ export interface DeliveryConfig {
 
 interface OrdersContextType {
   orders: RemoteOrder[]
+  isLoadingOrders: boolean
+  loadOrders: () => Promise<void>
   getOrderById: (id: string) => RemoteOrder | undefined
   getOrdersByStatus: (status: OrderStatus) => RemoteOrder[]
   getOrdersByClient: (clientEmail: string) => RemoteOrder[]
@@ -156,10 +158,41 @@ function normalizeOrder(order: any): RemoteOrder {
 
 export function OrdersProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<RemoteOrder[]>([])
+  const [isLoadingOrders, setIsLoadingOrders] = useState(false)
   const [cart, setCart] = useState<OrderItem[]>([])
   const [deliveryConfig, setDeliveryConfig] = useState<DeliveryConfig>(defaultDeliveryConfig)
   const [orderCounter, setOrderCounter] = useState(1000)
   const { referrals, validateReferralFirstPurchase } = useLoyalty()
+
+  // Load orders function - called on-demand for clients, automatically for admins
+  const loadOrders = async () => {
+    try {
+      const currentUser = getCurrentUser()
+      const token = getAuthToken()
+      if (!token || !currentUser?.role) return
+
+      setIsLoadingOrders(true)
+
+      if (currentUser.role === "admin") {
+        const apiOrders = await apiGet<RemoteOrder[]>("/orders/all")
+        const normalizedOrders = apiOrders.map(normalizeOrder)
+        setOrders(normalizedOrders)
+        localStorage.setItem("remote-orders", JSON.stringify(normalizedOrders))
+        return
+      }
+
+      if (currentUser.role === "client") {
+        const apiOrders = await apiGet<RemoteOrder[]>("/orders/my")
+        const normalizedOrders = apiOrders.map(normalizeOrder)
+        setOrders(normalizedOrders)
+        localStorage.setItem("remote-orders", JSON.stringify(normalizedOrders))
+      }
+    } catch (error) {
+      console.error("Failed to load orders:", error)
+    } finally {
+      setIsLoadingOrders(false)
+    }
+  }
 
   useEffect(() => {
     const savedCart = localStorage.getItem("remote-cart")
@@ -181,28 +214,15 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
         console.error("Failed to load delivery config:", error)
       }
 
-      try {
-        const currentUser = getCurrentUser()
-        const token = getAuthToken()
-        if (!token || !currentUser?.role) return
+      // Only auto-load orders for admin; clients load on-demand
+      const currentUser = getCurrentUser()
+      const token = getAuthToken()
+      if (!token || !currentUser?.role) return
 
-        if (currentUser.role === "admin") {
-          const apiOrders = await apiGet<RemoteOrder[]>("/orders/all")
-          const normalizedOrders = apiOrders.map(normalizeOrder)
-          setOrders(normalizedOrders)
-          localStorage.setItem("remote-orders", JSON.stringify(normalizedOrders))
-          return
-        }
-
-        if (currentUser.role === "client") {
-          const apiOrders = await apiGet<RemoteOrder[]>("/orders/my")
-          const normalizedOrders = apiOrders.map(normalizeOrder)
-          setOrders(normalizedOrders)
-          localStorage.setItem("remote-orders", JSON.stringify(normalizedOrders))
-        }
-      } catch (error) {
-        console.error("Failed to load orders:", error)
+      if (currentUser.role === "admin") {
+        await loadOrders()
       }
+      // For clients, orders will be loaded when they navigate to their account or order page
     }
 
     void loadData()
@@ -448,6 +468,8 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
     <OrdersContext.Provider
       value={{
         orders,
+        isLoadingOrders,
+        loadOrders,
         getOrderById,
         getOrdersByStatus,
         getOrdersByClient,

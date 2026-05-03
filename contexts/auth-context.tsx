@@ -245,22 +245,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const [{ user: apiUser }, employeeResponse] = await Promise.all([
-          fetchWithAuth<{ user: AuthApiUser }>("/auth/me", token),
-          fetchWithAuth<EmployeesApiResponse>("/auth/employees", token).catch(() => ({ employees: [] })),
-        ])
+        const { user: apiUser } = await fetchWithAuth<{ user: AuthApiUser }>("/auth/me", token)
 
         if (!isMounted) {
           return
         }
 
         const normalizedUser = normalizeUser(apiUser)
-        const normalizedEmployees = employeeResponse.employees.map(normalizeEmployee)
+
+        // Only fetch employees if user is NOT a client
+        if (normalizedUser.role !== "client") {
+          try {
+            const employeeResponse = await fetchWithAuth<EmployeesApiResponse>("/auth/employees", token).catch(() => ({ employees: [] }))
+            const normalizedEmployees = employeeResponse.employees.map(normalizeEmployee)
+            setEmployees(normalizedEmployees)
+            localStorage.setItem("employees", JSON.stringify(normalizedEmployees))
+          } catch {
+            setEmployees([])
+            localStorage.removeItem("employees")
+          }
+        } else {
+          // Clear employees for client role
+          setEmployees([])
+          localStorage.removeItem("employees")
+        }
 
         setUser(normalizedUser)
-        setEmployees(normalizedEmployees)
         localStorage.setItem("currentUser", JSON.stringify(normalizedUser))
-        localStorage.setItem("employees", JSON.stringify(normalizedEmployees))
         syncClientUserStorage(normalizedUser)
       } catch {
         localStorage.removeItem(AUTH_TOKEN_KEY)
@@ -294,12 +305,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(AUTH_TOKEN_KEY, token)
       syncClientUserStorage(normalizedUser)
 
-      try {
-        const employeeResponse = await fetchWithAuth<EmployeesApiResponse>("/auth/employees", token)
-        const normalizedEmployees = employeeResponse.employees.map(normalizeEmployee)
-        setEmployees(normalizedEmployees)
-        localStorage.setItem("employees", JSON.stringify(normalizedEmployees))
-      } catch {
+      // Only fetch employees if user is NOT a client
+      if (normalizedUser.role !== "client") {
+        try {
+          const employeeResponse = await fetchWithAuth<EmployeesApiResponse>("/auth/employees", token)
+          const normalizedEmployees = employeeResponse.employees.map(normalizeEmployee)
+          setEmployees(normalizedEmployees)
+          localStorage.setItem("employees", JSON.stringify(normalizedEmployees))
+        } catch {
+          setEmployees([])
+          localStorage.removeItem("employees")
+        }
+      } else {
+        // Clear employees for client role
         setEmployees([])
         localStorage.removeItem("employees")
       }
