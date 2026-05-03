@@ -510,17 +510,17 @@ function ClientCardsContent() {
 export default function ClientCartesPage() {
   return (
     <NotificationProvider>
-    <AuthProvider>
-      <StockProvider>
-        <BreakfastProvider>
-          <LoyaltyProvider>
-            <LoyaltyCardsProvider>
-              <ClientCardsContent />
-            </LoyaltyCardsProvider>
-          </LoyaltyProvider>
-        </BreakfastProvider>
-      </StockProvider>
-    </AuthProvider>
+      <AuthProvider>
+        <StockProvider>
+          <BreakfastProvider>
+            <LoyaltyProvider>
+              <LoyaltyCardsProvider>
+                <ClientCardsContent />
+              </LoyaltyCardsProvider>
+            </LoyaltyProvider>
+          </BreakfastProvider>
+        </StockProvider>
+      </AuthProvider>
     </NotificationProvider>
   )
 }
