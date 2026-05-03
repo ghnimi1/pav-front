@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api-client"
 import { useLoyalty } from "@/contexts/loyalty-context"
+import { useNavigation } from "@/contexts/navigation-context"
 
 // ============================================
 // TYPES ET INTERFACES
@@ -305,8 +306,22 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<BreakfastOrder[]>([])
   const [userTotalPoints, setUserTotalPoints] = useState(0)
   const { addPoints, getClientById, getClientByEmail, updateClient, referrals, validateReferralFirstPurchase } = useLoyalty()
+  const { currentNavItem } = useNavigation()
+
+  // Track if data has been loaded to avoid reloading on nav away and back
+  const [hasLoadedData, setHasLoadedData] = useState(false)
 
   useEffect(() => {
+    // Load breakfast data when breakfast-menu-admin or menu is active
+    if (currentNavItem !== "breakfast-menu-admin" && currentNavItem !== "menu" && currentNavItem !== "menu-client") {
+      return
+    }
+
+    // Skip if already loaded
+    if (hasLoadedData) {
+      return
+    }
+
     let cancelled = false
 
     const savedOrders = localStorage.getItem("breakfast-orders")
@@ -344,6 +359,8 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
         if (apiFormulas.length > 0) {
           setBaseFormulas(apiFormulas.map(mapFormula))
         }
+
+        setHasLoadedData(true)
       } catch (error) {
         console.error("Failed to load breakfast menu from backend:", error)
       }
@@ -354,7 +371,7 @@ export function BreakfastProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [currentNavItem, hasLoadedData])
 
   useEffect(() => {
     localStorage.setItem("breakfast-orders", JSON.stringify(orders))

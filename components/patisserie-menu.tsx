@@ -143,7 +143,7 @@ export const PatisserieMenu = forwardRef<PatisserieMenuHandle, PatisserieMenuPro
     )
   }
 
-  // Current offers (based on day/time)
+  // Show all active offers (not filtered by time)
   const currentOffers = useMemo(() => getCurrentOffers(), [getCurrentOffers])
 
   // Active categories
@@ -557,7 +557,6 @@ export const PatisserieMenu = forwardRef<PatisserieMenuHandle, PatisserieMenuPro
   const getOfferQuantityInCart = (offerId: string) => {
     return offerCart.find(c => c.offer.id === offerId)?.quantity || 0
   }
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50/50 to-white">
       {/* Search and Categories Header */}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Sidebar } from "./sidebar"
 import { TopBar } from "./top-bar"
 import { DashboardOverview } from "./dashboard-overview"
@@ -31,58 +31,34 @@ import { MenuClientAdminContent } from "./menu-client-admin-content"
 import { BreakfastMenuAdmin } from "./breakfast-menu-admin"
 import { UnifiedSalesManagement } from "./unified-sales-management"
 import { useAuth } from "@/contexts/auth-context"
+import { useNavigation, type NavItem } from "@/contexts/navigation-context"
 import { ShieldAlertIcon } from "lucide-react"
 import { MenuAdminContent } from "./menu-admin"
 import LoyaltyCardsAdminPage from "./cartes-fidelite"
 import DiscountSettingsPage from "./remises"
 import NotificationsHistoryPage from "@/app/admin/notifications/page"
 
-type NavItem =
-  | "dashboard"
-  | "recipes"
-  | "showcases"
-  | "production"
-  | "showcase-stock"
-  | "unified-sales"
-  | "breakfast-menu-admin"
-  | "stock-categories"
-  | "sub-categories"
-  | "products"
-  | "storage-locations"
-  | "articles"
-  | "categories"
-  | "suppliers"
-  | "batches"
-  | "menu"
-  | "clients-management"
-  | "clients"
-  | "rewards"
-  | "missions"
-  | "special-days"
-  | "games"
-  | "referrals"
-  | "staff-pos"
-  | "employees"
-  | "menu-client"
-  | "menu-admin"
-  | "loyalty-cards"
-  | "discount-settings"
-  | "notifications-history"
-
 export function Dashboard() {
-  const [currentView, setCurrentView] = useState<NavItem>("dashboard")
+  const { currentNavItem, setCurrentNavItem } = useNavigation()
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { user, hasPermission } = useAuth()
 
+  // Use the navigation context's currentNavItem directly as currentView
+  const currentView = currentNavItem
+
+  const handleViewChange = (view: NavItem) => {
+    setCurrentNavItem(view)
+  }
+
   const navigateToBatches = (productId: string) => {
     setSelectedProductId(productId)
-    setCurrentView("batches")
+    setCurrentNavItem("batches")
   }
 
   const navigateBack = () => {
     setSelectedProductId(null)
-    setCurrentView("articles")
+    setCurrentNavItem("articles")
   }
 
   // Check if user is admin (either old admin role or employee with permissions)
@@ -102,7 +78,7 @@ export function Dashboard() {
       {/* Sidebar */}
       <Sidebar
         currentView={currentView}
-        onViewChange={setCurrentView}
+        onViewChange={handleViewChange}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         isAdmin={isAdmin}
@@ -146,24 +122,24 @@ export function Dashboard() {
           {/* Stock Views */}
           {currentView === "stock-categories" && canAccess("categories") && (
             <StockCategoriesManagement 
-              onSelectCategory={(catId) => {
-                setCurrentView("sub-categories")
+              onSelectCategory={() => {
+                setCurrentNavItem("sub-categories")
               }} 
             />
           )}
 
           {currentView === "sub-categories" && canAccess("categories") && (
             <SubCategoriesManagement 
-              onBack={() => setCurrentView("stock-categories")}
-              onSelectSubCategory={(subId) => {
-                setCurrentView("products")
+              onBack={() => setCurrentNavItem("stock-categories")}
+              onSelectSubCategory={() => {
+                setCurrentNavItem("products")
               }}
             />
           )}
 
           {currentView === "products" && canAccess("articles") && (
             <ProductsManagement 
-              onBack={() => setCurrentView("sub-categories")}
+              onBack={() => setCurrentNavItem("sub-categories")}
             />
           )}
 

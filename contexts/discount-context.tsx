@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useMemo, useCallback, useEffect, type ReactNode } from "react"
 import { apiGet, apiPut } from "@/lib/api-client"
+import { useNavigation } from "@/contexts/navigation-context"
 
 // ============================================
 // TYPES
@@ -98,6 +99,7 @@ function formatAmountNeeded(minAmount: number, subtotal: number) {
 }
 
 export function DiscountProvider({ children }: { children: ReactNode }) {
+  const { currentNavItem } = useNavigation()
   const [config, setConfig] = useState<DiscountConfig>(() => {
     // Try to load from localStorage
     if (typeof window !== "undefined") {
@@ -113,7 +115,18 @@ export function DiscountProvider({ children }: { children: ReactNode }) {
     return defaultConfig
   })
 
+  const [hasLoadedConfig, setHasLoadedConfig] = useState(false)
+
   useEffect(() => {
+    // Only load discount config when viewing discount-settings
+    if (currentNavItem !== "discount-settings") {
+      return
+    }
+
+    if (hasLoadedConfig) {
+      return
+    }
+
     let cancelled = false
 
     const loadConfig = async () => {
@@ -123,6 +136,7 @@ export function DiscountProvider({ children }: { children: ReactNode }) {
         const nextConfig = normalizeConfig(remoteConfig)
         setConfig(nextConfig)
         localStorage.setItem(DISCOUNT_STORAGE_KEY, JSON.stringify(nextConfig))
+        setHasLoadedConfig(true)
       } catch (error) {
         console.error("Failed to load discount config:", error)
       }
@@ -133,7 +147,7 @@ export function DiscountProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [currentNavItem, hasLoadedConfig])
 
   // Save to localStorage whenever config changes
   const saveConfig = useCallback((newConfig: DiscountConfig) => {

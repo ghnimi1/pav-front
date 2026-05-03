@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { useStock } from "./stock-context"
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api-client"
+import { useNavigation } from "@/contexts/navigation-context"
 
 // ============================================
 // PRODUCTION FLOW: Recipe > Production Order > Showcase Stock > Sale
@@ -756,8 +757,17 @@ const initialRecipes: Recipe[] = [
   }, */
 ]
 
+// NavItems that need production data
+const PRODUCTION_NAV_ITEMS = [
+  "recipes",
+  "showcases",
+  "production",
+  "showcase-stock",
+] as const
+
 export function ProductionProvider({ children }: { children: ReactNode }) {
   const { products, batches, consumeFromBatches } = useStock()
+  const { currentNavItem } = useNavigation()
   
   // State
   const [recipeCategories, setRecipeCategories] = useState<RecipeCategory[]>([])
@@ -767,7 +777,22 @@ export function ProductionProvider({ children }: { children: ReactNode }) {
   const [showcaseItems, setShowcaseItems] = useState<ShowcaseItem[]>([])
   const [sales, setSales] = useState<Sale[]>([])
 
+  // Track if data has been loaded
+  const [hasLoadedData, setHasLoadedData] = useState(false)
+
+  const isInNavItems = (navItems: readonly string[]) => {
+    return navItems.includes(currentNavItem as any)
+  }
+
   useEffect(() => {
+    if (!isInNavItems(PRODUCTION_NAV_ITEMS)) {
+      return
+    }
+
+    if (hasLoadedData) {
+      return
+    }
+
     let isMounted = true
 
     const loadProductionData = async () => {
@@ -786,6 +811,7 @@ export function ProductionProvider({ children }: { children: ReactNode }) {
       setShowcases(showcasesData)
       setProductionOrders(ordersData)
       setShowcaseItems(itemsData)
+      setHasLoadedData(true)
     }
 
     void loadProductionData()
@@ -793,7 +819,7 @@ export function ProductionProvider({ children }: { children: ReactNode }) {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [currentNavItem, hasLoadedData])
   // ============================================
   // RECIPE CATEGORIES CRUD
   // ============================================

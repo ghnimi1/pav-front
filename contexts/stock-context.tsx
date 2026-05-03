@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "@/lib/api-client"
+import { useNavigation } from "@/contexts/navigation-context"
 
 // ============================================
 // STOCK HIERARCHY: Category > SubCategory > Product > Batch (FIFO)
@@ -929,9 +930,69 @@ const initialSupplementCategories: SupplementCategory[] = []
 
 const initialSupplements: Supplement[] = []
 
-const initialOffers: Offer[] = []
+const initialOffers: Offer[] = [
+  {
+    id: "offer-1",
+    name: "Offre Matinale",
+    description: "Cafe + Croissant a prix reduit",
+    originalPrice: 7.0,
+    discountedPrice: 4.9,
+    points: 5,
+    items: [],
+    schedule: { daysOfWeek: [0, 1, 2, 3, 4, 5, 6], startTime: "00:00", endTime: "23:59" },
+    isActive: true,
+    validFrom: undefined,
+    validUntil: undefined,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "offer-2",
+    name: "Pause Gourmande",
+    description: "The + Patisserie de l'apres-midi",
+    originalPrice: 9.0,
+    discountedPrice: 6.5,
+    points: 7,
+    items: [],
+    schedule: { daysOfWeek: [0, 1, 2, 3, 4, 5, 6], startTime: "00:00", endTime: "23:59" },
+    isActive: true,
+    validFrom: undefined,
+    validUntil: undefined,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+]
 
 const DATA_VERSION = "v2.0"
+
+// NavItems that need stock management data (categories, products, batches, etc.)
+const STOCK_MANAGEMENT_NAV_ITEMS = [
+  "stock-categories",
+  "sub-categories",
+  "products",
+  "storage-locations",
+  "articles",
+  "categories",
+  "suppliers",
+  "batches",
+  "recipes",
+  "showcases",
+  "production",
+  "showcase-stock",
+] as const
+
+// NavItems that need menu data (menu items, categories, offers, supplements)
+const MENU_NAV_ITEMS = [
+  "menu",
+  "menu-client",
+  "menu-admin",
+  "supplements",
+] as const
+
+// NavItems that need rewards data
+const REWARDS_NAV_ITEMS = [
+  "rewards",
+] as const
 
 export function StockProvider({ children }: { children: ReactNode }) {
   const [stockCategories, setStockCategories] = useState<StockCategory[]>([])
@@ -948,65 +1009,188 @@ export function StockProvider({ children }: { children: ReactNode }) {
   const [supplements, setSupplements] = useState<Supplement[]>([])
   const [supplementCategories, setSupplementCategories] = useState<SupplementCategory[]>([])
   const [offers, setOffers] = useState<Offer[]>([])
+  const { currentNavItem } = useNavigation()
 
-  // Load data from API and localStorage
+  // Track what has been loaded to avoid reloading on nav away and back
+  const [loadedData, setLoadedData] = useState({
+    menu: false,
+    stock: false,
+    rewards: false,
+    supplements: false,
+  })
+
+  // Helper to check if current nav item is in a list
+  const isInNavItems = (navItems: readonly string[]) => {
+    return navItems.includes(currentNavItem as any)
+  }
+
+  // Load menu data (menu categories, items, offers) - loaded for menu-related views
   useEffect(() => {
+    if (!isInNavItems(MENU_NAV_ITEMS)) {
+      return
+    }
+
+    if (loadedData.menu) {
+      return
+    }
+
     let cancelled = false
 
-    const loadData = async () => {
+    const loadMenuData = async () => {
       try {
         const hasToken = !!localStorage.getItem(AUTH_TOKEN_KEY)
 
-        // Load the client menu for everyone. Without a token we use public
-        // endpoints, so visitors can still see products and current offers.
-        const apiMenuCategories = await fetchMenuCategories(hasToken)
-        if (!cancelled && apiMenuCategories.length > 0) {
-          setMenuCategories(apiMenuCategories)
-        } else if (!cancelled && apiMenuCategories.length === 0) {
-          setMenuCategories(initialMenuCategories)
-        }
-
-        const apiMenuItems = await fetchMenuItems(hasToken)
-        if (!cancelled && apiMenuItems.length > 0) {
-          setMenuItems(apiMenuItems)
-        } else if (!cancelled && apiMenuItems.length === 0) {
-          setMenuItems(initialMenuItems)
-        }
-
-        const apiOffers = await fetchOffers(hasToken)
-        if (!cancelled && apiOffers.length > 0) {
-          setOffers(apiOffers)
-        } else if (!cancelled && apiOffers.length === 0) {
-          setOffers(initialOffers)
-        }
-
-        const apiSupplements = await fetchSupplements(hasToken)
-        if (!cancelled && apiSupplements.length > 0) {
-          setSupplements(apiSupplements)
-        } else if (!cancelled && apiSupplements.length === 0) {
-          setSupplements(initialSupplements)
-        }
-
-        if (hasToken) {
-          // Load rewards from API
-          const apiRewards = await fetchRewards()
-          if (!cancelled && apiRewards.length > 0) {
-            setRewards(apiRewards)
-          } else if (!cancelled && apiRewards.length === 0) {
-            const storedRewards = localStorage.getItem("pastry-rewards")
-            setRewards(storedRewards ? JSON.parse(storedRewards) : initialRewards)
+        // Try API first, then fall back to localStorage
+        let apiMenuCategories = hasToken ? await fetchMenuCategories(hasToken) : []
+        if (apiMenuCategories.length === 0) {
+          const storedCategories = localStorage.getItem("pastry-menu-categories")
+          if (storedCategories) {
+            setMenuCategories(JSON.parse(storedCategories))
+          } else {
+            setMenuCategories(initialMenuCategories)
           }
+        } else if (!cancelled) {
+          setMenuCategories(apiMenuCategories)
+        }
 
-          // Load supplement categories from API
-          const apiSupplementCategories = await fetchSupplementCategories()
-          if (!cancelled && apiSupplementCategories.length > 0) {
+        let apiMenuItems = hasToken ? await fetchMenuItems(hasToken) : []
+        if (apiMenuItems.length === 0) {
+          const storedItems = localStorage.getItem("pastry-menu-items")
+          if (storedItems) {
+            setMenuItems(JSON.parse(storedItems))
+          } else {
+            setMenuItems(initialMenuItems)
+          }
+        } else if (!cancelled) {
+          setMenuItems(apiMenuItems)
+        }
+
+        // Always try to fetch offers from API (public access allowed)
+        let apiOffers = await fetchOffers(hasToken)
+        if (apiOffers.length === 0) {
+          const storedOffers = localStorage.getItem("pastry-offers")
+          if (storedOffers) {
+            setOffers(JSON.parse(storedOffers))
+          } else {
+            setOffers(initialOffers)
+          }
+        } else if (!cancelled) {
+          setOffers(apiOffers)
+        }
+
+        // Save to localStorage for future use
+        if (!cancelled) {
+          localStorage.setItem("pastry-data-version", DATA_VERSION)
+        }
+
+        setLoadedData(prev => ({ ...prev, menu: true }))
+      } catch (error) {
+        console.error("Failed to load menu data:", error)
+        if (!cancelled) {
+          // Fall back to localStorage on error
+          const storedCategories = localStorage.getItem("pastry-menu-categories")
+          const storedItems = localStorage.getItem("pastry-menu-items")
+          const storedOffers = localStorage.getItem("pastry-offers")
+          setMenuCategories(storedCategories ? JSON.parse(storedCategories) : initialMenuCategories)
+          setMenuItems(storedItems ? JSON.parse(storedItems) : initialMenuItems)
+          setOffers(storedOffers ? JSON.parse(storedOffers) : initialOffers)
+        }
+      }
+    }
+
+    void loadMenuData()
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentNavItem, loadedData.menu])
+
+  // Load supplements data - loaded for menu-related views
+  useEffect(() => {
+    if (!isInNavItems(MENU_NAV_ITEMS)) {
+      return
+    }
+
+    if (loadedData.supplements) {
+      return
+    }
+
+    let cancelled = false
+
+    const loadSupplementsData = async () => {
+      try {
+        const hasToken = !!localStorage.getItem(AUTH_TOKEN_KEY)
+
+        // Always try to fetch supplements from API (public access allowed)
+        let apiSupplements = await fetchSupplements(hasToken)
+        if (apiSupplements.length === 0) {
+          const storedSupplements = localStorage.getItem("pastry-supplements")
+          if (storedSupplements) {
+            setSupplements(JSON.parse(storedSupplements))
+          } else {
+            setSupplements(initialSupplements)
+          }
+        } else if (!cancelled) {
+          setSupplements(apiSupplements)
+        }
+
+        // Always try to fetch supplement categories from API (public access allowed)
+        let apiSupplementCategories = await fetchSupplementCategories()
+          if (apiSupplementCategories.length === 0) {
+            const storedCategories = localStorage.getItem("pastry-supplement-categories")
+            if (storedCategories) {
+              setSupplementCategories(JSON.parse(storedCategories))
+            } else {
+              setSupplementCategories(initialSupplementCategories)
+            }
+          } else if (!cancelled) {
             setSupplementCategories(apiSupplementCategories)
-          } else if (!cancelled && apiSupplementCategories.length === 0) {
+          }
+        if (apiSupplementCategories.length === 0) {
+          const storedCategories = localStorage.getItem("pastry-supplement-categories")
+          if (storedCategories) {
+            setSupplementCategories(JSON.parse(storedCategories))
+          } else {
             setSupplementCategories(initialSupplementCategories)
           }
+        } else if (!cancelled) {
+          setSupplementCategories(apiSupplementCategories)
         }
+      } catch (error) {
+        console.error("Failed to load supplements data:", error)
+        if (!cancelled) {
+          const storedSupplements = localStorage.getItem("pastry-supplements")
+          const storedCategories = localStorage.getItem("pastry-supplement-categories")
+          setSupplements(storedSupplements ? JSON.parse(storedSupplements) : initialSupplements)
+          setSupplementCategories(storedCategories ? JSON.parse(storedCategories) : initialSupplementCategories)
+        }
+      }
+    }
 
-        // Load other data from localStorage (stock management data)
+    void loadSupplementsData()
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentNavItem, loadedData.supplements])
+
+  // Load stock management data (categories, products, batches, suppliers, etc.)
+  useEffect(() => {
+    if (!isInNavItems(STOCK_MANAGEMENT_NAV_ITEMS)) {
+      return
+    }
+
+    if (loadedData.stock) {
+      return
+    }
+
+    let cancelled = false
+
+    const loadStockData = async () => {
+      try {
+        const hasToken = !!localStorage.getItem(AUTH_TOKEN_KEY)
+
+        // Clean up old data version if needed
         const storedVersion = localStorage.getItem("pastry-data-version")
         if (storedVersion !== DATA_VERSION) {
           localStorage.removeItem("pastry-menu-items")
@@ -1024,7 +1208,6 @@ export function StockProvider({ children }: { children: ReactNode }) {
           items: localStorage.getItem("pastry-stock"),
           categories: localStorage.getItem("pastry-categories"),
           suppliers: localStorage.getItem("pastry-suppliers"),
-          rewards: localStorage.getItem("pastry-rewards"),
         }
 
         const [fetchedStockCategories, fetchedSubCategories, fetchedProducts, fetchedBatches, fetchedStorageLocations, fetchedSuppliers] = hasToken
@@ -1065,28 +1248,67 @@ export function StockProvider({ children }: { children: ReactNode }) {
             fetchedSuppliers ||
               (stored.suppliers ? JSON.parse(stored.suppliers) : initialSuppliers)
           )
-          if (!hasToken) {
-            setRewards(stored.rewards ? JSON.parse(stored.rewards) : initialRewards)
-          }
         }
+
+        setLoadedData(prev => ({ ...prev, stock: true }))
       } catch (error) {
-        console.error("Failed to load data:", error)
-        if (!cancelled) {
-          setMenuCategories(initialMenuCategories)
-          setMenuItems(initialMenuItems)
-          setOffers(initialOffers)
-          setSupplementCategories(initialSupplementCategories)
-          setSupplements(initialSupplements)
-        }
+        console.error("Failed to load stock data:", error)
       }
     }
 
-    loadData()
+    void loadStockData()
 
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [currentNavItem, loadedData.stock])
+
+  // Load rewards data - loaded for rewards view
+  useEffect(() => {
+    if (!isInNavItems(REWARDS_NAV_ITEMS)) {
+      return
+    }
+
+    if (loadedData.rewards) {
+      return
+    }
+
+    let cancelled = false
+
+    const loadRewardsData = async () => {
+      try {
+        const hasToken = !!localStorage.getItem(AUTH_TOKEN_KEY)
+
+        if (hasToken) {
+          const apiRewards = await fetchRewards()
+          if (!cancelled && apiRewards.length > 0) {
+            setRewards(apiRewards)
+          } else if (!cancelled && apiRewards.length === 0) {
+            const storedRewards = localStorage.getItem("pastry-rewards")
+            setRewards(storedRewards ? JSON.parse(storedRewards) : initialRewards)
+          }
+        } else {
+          const storedRewards = localStorage.getItem("pastry-rewards")
+          if (!cancelled) {
+            setRewards(storedRewards ? JSON.parse(storedRewards) : initialRewards)
+          }
+        }
+
+        setLoadedData(prev => ({ ...prev, rewards: true }))
+      } catch (error) {
+        console.error("Failed to load rewards data:", error)
+        if (!cancelled) {
+          setRewards(initialRewards)
+        }
+      }
+    }
+
+    void loadRewardsData()
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentNavItem, loadedData.rewards])
 
   // Save stock data to localStorage (only for non-menu data)
   useEffect(() => { if (stockCategories.length) localStorage.setItem("stock-categories", JSON.stringify(stockCategories)) }, [stockCategories])

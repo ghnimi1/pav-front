@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { StockProvider, useStock } from "@/contexts/stock-context"
 import { AuthProvider, useAuth } from "@/contexts/auth-context"
 import { NotificationProvider } from "@/contexts/notification-context"
+import { NavigationProvider } from "@/contexts/navigation-context"
 import { BreakfastProvider, useBreakfast } from "@/contexts/breakfast-context"
 import { LoyaltyProvider, useLoyalty } from "@/contexts/loyalty-context"
 import { LoyaltyCardsProvider } from "@/contexts/loyalty-cards-context"
@@ -591,27 +592,29 @@ function MenuContent() {
 
 export default function MenuPage() {
   return (
-    <NotificationProvider>
-      <AuthProvider>
-        <LoyaltyProvider>
+    <NavigationProvider initialNavItem="menu">
+      <NotificationProvider>
+        <AuthProvider>
+          <LoyaltyProvider>
           <StockProvider>
             <ProductionProvider>
               <BreakfastProvider>
                 <UnifiedSalesProvider>
                   <DiscountProvider>
                     <OrdersProvider>
-                      <LoyaltyCardsProvider>
-                        <MenuContent />
-                      </LoyaltyCardsProvider>
-                    </OrdersProvider>
-                  </DiscountProvider>
-                </UnifiedSalesProvider>
-              </BreakfastProvider>
-            </ProductionProvider>
-          </StockProvider>
-        </LoyaltyProvider>
-        <NotificationContainer />
-      </AuthProvider>
-    </NotificationProvider>
+            <LoyaltyCardsProvider>
+              <MenuContent />
+            </LoyaltyCardsProvider>
+          </OrdersProvider>
+        </DiscountProvider>
+      </UnifiedSalesProvider>
+    </BreakfastProvider>
+  </ProductionProvider>
+            </StockProvider>
+          </LoyaltyProvider>
+          <NotificationContainer />
+        </AuthProvider>
+      </NotificationProvider>
+    </NavigationProvider>
   )
 }

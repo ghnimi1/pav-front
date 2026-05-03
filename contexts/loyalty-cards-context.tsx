@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { apiGet, apiPost, apiPut } from "@/lib/api-client"
 import { useAuth } from "@/contexts/auth-context"
+import { useNavigation } from "@/contexts/navigation-context"
 
 export interface StampPosition {
   position: number
@@ -133,6 +134,7 @@ const defaultState: LoyaltyCardsResponse = {
 
 export function LoyaltyCardsProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated } = useAuth()
+  const { currentNavItem } = useNavigation()
   const [state, setState] = useState<LoyaltyCardsResponse>(defaultState)
   const [isLoaded, setIsLoaded] = useState(false)
 
@@ -160,8 +162,13 @@ export function LoyaltyCardsProvider({ children }: { children: ReactNode }) {
   }, [isAuthenticated, user])
 
   useEffect(() => {
+    // Only load loyalty cards when viewing loyalty-cards
+    if (currentNavItem !== "loyalty-cards") {
+      return
+    }
+
     void fetchCards()
-  }, [fetchCards])
+  }, [currentNavItem, fetchCards])
 
   const persistSettings = useCallback(async (next: Partial<LoyaltyCardsResponse>) => {
     const result = await apiPut<{ isEnabled: boolean; cardConfigs: LoyaltyCardConfig[] }>("/auth/loyalty-cards/settings", {

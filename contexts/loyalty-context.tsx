@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api-client"
+import { useNavigation } from "@/contexts/navigation-context"
 
 // ============================================
 // CONFIGURATION DU PROGRAMME DE FIDELITE
@@ -800,52 +801,179 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  useEffect(() => {
-    const storedTransactions = localStorage.getItem("loyalty_transactions")
-    const storedRewards = localStorage.getItem("loyalty_rewards")
-    const storedMissions = localStorage.getItem("loyalty_missions")
-    const storedClientMissions = localStorage.getItem("loyalty_client_missions")
-    const storedGamePlays = localStorage.getItem("loyalty_game_plays")
-    const storedSpecialDays = localStorage.getItem("loyalty_special_days")
-    const storedReferralConfig = localStorage.getItem("loyalty_referral_config")
-    const storedShareLinks = localStorage.getItem("loyalty_share_links")
-    const storedGamesConfig = localStorage.getItem("loyalty_games_config")
+  const navigation = useNavigation()
+  const currentNavItem = navigation?.currentNavItem ?? "dashboard"
 
+  // NavItems that need loyalty/clients data
+  const LOYALTY_NAV_ITEMS = [
+    "clients-management",
+    "clients",
+    "rewards",
+    "missions",
+    "special-days",
+    "games",
+    "referrals",
+    "dashboard",
+  ] as const
+
+  // Track what has been loaded
+  const [loadedLoyaltyData, setLoadedLoyaltyData] = useState({
+    clients: false,
+    missions: false,
+    games: false,
+    specialDays: false,
+    referrals: false,
+  })
+
+  const isInNavItems = (navItems: readonly string[]) => {
+    return navItems.includes(currentNavItem as any)
+  }
+
+  // Load clients data - for clients management views and dashboard
+  useEffect(() => {
+    if (!isInNavItems(["clients-management", "clients", "dashboard"])) {
+      return
+    }
+
+    if (loadedLoyaltyData.clients) {
+      return
+    }
+
+    const storedTransactions = localStorage.getItem("loyalty_transactions")
     syncClientsFromCurrentUser()
     if (storedTransactions) setTransactions(JSON.parse(storedTransactions))
-    if (storedRewards) setRewards(JSON.parse(storedRewards))
-    else setRewards(getInitialRewards())
+
+    void loadClientsFromBackend()
+
+    setLoadedLoyaltyData(prev => ({ ...prev, clients: true }))
+  }, [currentNavItem, loadedLoyaltyData.clients])
+
+  // Load missions data - for missions view
+  useEffect(() => {
+    if (!isInNavItems(["missions"])) {
+      return
+    }
+
+    if (loadedLoyaltyData.missions) {
+      return
+    }
+
+    const storedMissions = localStorage.getItem("loyalty_missions")
+    const storedClientMissions = localStorage.getItem("loyalty_client_missions")
+
     if (storedMissions) setMissions(JSON.parse(storedMissions))
     else setMissions(getInitialMissions())
     if (storedClientMissions) setClientMissions(JSON.parse(storedClientMissions))
+
+    void loadMissionsFromBackend()
+    void loadClientMissionsFromBackend()
+
+    setLoadedLoyaltyData(prev => ({ ...prev, missions: true }))
+  }, [currentNavItem, loadedLoyaltyData.missions])
+
+  // Load games data - for games view
+  useEffect(() => {
+    if (!isInNavItems(["games"])) {
+      return
+    }
+
+    if (loadedLoyaltyData.games) {
+      return
+    }
+
+    const storedGamePlays = localStorage.getItem("loyalty_game_plays")
+    const storedGamesConfig = localStorage.getItem("loyalty_games_config")
+
     if (storedGamePlays) setGamePlays(JSON.parse(storedGamePlays))
     if (storedGamesConfig) setGamesConfig(JSON.parse(storedGamesConfig))
     else setGamesConfig(getInitialGamesConfig())
-    if (storedSpecialDays) setSpecialDays(JSON.parse(storedSpecialDays))
-    else setSpecialDays(getInitialSpecialDays())
-    if (storedReferralConfig) setReferralConfig(JSON.parse(storedReferralConfig))
-    if (storedShareLinks) setShareLinks(JSON.parse(storedShareLinks))
 
-    void loadClientsFromBackend()
-    void loadRewardsFromBackend()
-    void loadReferralsFromBackend()
-    void loadReferralConfigFromBackend()
-    void loadMissionsFromBackend()
-    void loadSpecialDaysFromBackend()
-    void loadClientMissionsFromBackend()
     void loadGamesConfigFromBackend()
     void loadGamePlaysFromBackend()
 
+    setLoadedLoyaltyData(prev => ({ ...prev, games: true }))
+  }, [currentNavItem, loadedLoyaltyData.games])
+
+  // Load special days data - for special-days view
+  useEffect(() => {
+    if (!isInNavItems(["special-days"])) {
+      return
+    }
+
+    if (loadedLoyaltyData.specialDays) {
+      return
+    }
+
+    const storedSpecialDays = localStorage.getItem("loyalty_special_days")
+
+    if (storedSpecialDays) setSpecialDays(JSON.parse(storedSpecialDays))
+    else setSpecialDays(getInitialSpecialDays())
+
+    void loadSpecialDaysFromBackend()
+
+    setLoadedLoyaltyData(prev => ({ ...prev, specialDays: true }))
+  }, [currentNavItem, loadedLoyaltyData.specialDays])
+
+  // Load referrals data - for referrals view
+  useEffect(() => {
+    if (!isInNavItems(["referrals"])) {
+      return
+    }
+
+    if (loadedLoyaltyData.referrals) {
+      return
+    }
+
+    const storedReferralConfig = localStorage.getItem("loyalty_referral_config")
+    const storedShareLinks = localStorage.getItem("loyalty_share_links")
+
+    if (storedReferralConfig) setReferralConfig(JSON.parse(storedReferralConfig))
+    if (storedShareLinks) setShareLinks(JSON.parse(storedShareLinks))
+
+    void loadReferralsFromBackend()
+    void loadReferralConfigFromBackend()
+
+    setLoadedLoyaltyData(prev => ({ ...prev, referrals: true }))
+  }, [currentNavItem, loadedLoyaltyData.referrals])
+
+  // Load rewards data - for rewards view (also loaded by stock-context, so just sync here)
+  useEffect(() => {
+    if (!isInNavItems(["rewards"])) {
+      return
+    }
+
+    const storedRewards = localStorage.getItem("loyalty_rewards")
+
+    if (storedRewards) setRewards(JSON.parse(storedRewards))
+    else setRewards(getInitialRewards())
+
+    void loadRewardsFromBackend()
+  }, [currentNavItem])
+
+  // Global auth sync listener
+  useEffect(() => {
     const handleAuthSync = () => {
-      void loadClientsFromBackend()
-      void loadRewardsFromBackend()
-      void loadReferralsFromBackend()
-      void loadReferralConfigFromBackend()
-      void loadMissionsFromBackend()
-      void loadSpecialDaysFromBackend()
-      void loadClientMissionsFromBackend()
-      void loadGamesConfigFromBackend()
-      void loadGamePlaysFromBackend()
+      if (isInNavItems(["clients-management", "clients", "dashboard"])) {
+        void loadClientsFromBackend()
+      }
+      if (isInNavItems(["missions"])) {
+        void loadMissionsFromBackend()
+        void loadClientMissionsFromBackend()
+      }
+      if (isInNavItems(["games"])) {
+        void loadGamesConfigFromBackend()
+        void loadGamePlaysFromBackend()
+      }
+      if (isInNavItems(["special-days"])) {
+        void loadSpecialDaysFromBackend()
+      }
+      if (isInNavItems(["referrals"])) {
+        void loadReferralsFromBackend()
+        void loadReferralConfigFromBackend()
+      }
+      if (isInNavItems(["rewards"])) {
+        void loadRewardsFromBackend()
+      }
     }
 
     window.addEventListener(AUTH_STORAGE_SYNC_EVENT, handleAuthSync)
@@ -855,7 +983,7 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
       window.removeEventListener(AUTH_STORAGE_SYNC_EVENT, handleAuthSync)
       window.removeEventListener("focus", handleAuthSync)
     }
-  }, [])
+  }, [currentNavItem])
 
   useEffect(() => {
     localStorage.setItem("loyalty_transactions", JSON.stringify(transactions))

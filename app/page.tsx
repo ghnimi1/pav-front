@@ -13,6 +13,7 @@ import { UnifiedSalesProvider } from "@/contexts/unified-sales-context"
 import { OrdersProvider } from "@/contexts/orders-context"
 import { NotificationContainer } from "@/components/notification-container"
 import { ExpirationMonitor } from "@/components/expiration-monitor"
+import { NavigationProvider } from "@/contexts/navigation-context"
 
 function ProtectedDashboard() {
   const { user, isAuthenticated, isLoading } = useAuth()
@@ -64,7 +65,9 @@ export default function Home() {
   return (
     <NotificationProvider>
       <AuthProvider>
-        <ProtectedDashboard />
+        <NavigationProvider>
+          <ProtectedDashboard />
+        </NavigationProvider>
       </AuthProvider>
     </NotificationProvider>
   )

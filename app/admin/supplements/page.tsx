@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -38,6 +38,7 @@ import {
 import { StockProvider, useStock, type Supplement, type SupplementCategory } from "@/contexts/stock-context"
 import { AuthProvider, useAuth } from "@/contexts/auth-context"
 import { NotificationProvider, useNotification } from "@/contexts/notification-context"
+import { NavigationProvider, useNavigation } from "@/contexts/navigation-context"
 import { NotificationContainer } from "@/components/notification-container"
 
 // Color options for categories
@@ -58,6 +59,11 @@ const colorOptions = [
 
 function AdminSupplementsContent() {
   const router = useRouter()
+  // Set the navigation item to supplements to trigger data loading
+  const { setCurrentNavItem } = useNavigation()
+  useEffect(() => {
+    setCurrentNavItem("supplements")
+  }, [setCurrentNavItem])
   const { user, isAuthenticated } = useAuth()
   const { addNotification } = useNotification()
   const { 
@@ -298,7 +304,17 @@ function AdminSupplementsContent() {
   }
 
   const getCategoryConfig = (categoryId: string) => {
-    return supplementCategories.find(c => c.id === categoryId) || supplementCategories[supplementCategories.length - 1]
+    const found = supplementCategories.find(c => c.id === categoryId)
+    if (found) return found
+    // Return a default category config if not found
+    return {
+      id: categoryId,
+      name: categoryId === "autre" ? "Autre" : categoryId,
+      color: "bg-gray-100 text-gray-700",
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
   }
 
   // Count products using each supplement
@@ -758,13 +774,15 @@ function AdminSupplementsContent() {
 
 export default function AdminSupplementsPage() {
   return (
-    <NotificationProvider>
-      <AuthProvider>
-        <StockProvider>
-          <AdminSupplementsContent />
-          <NotificationContainer />
-        </StockProvider>
-      </AuthProvider>
-    </NotificationProvider>
+    <NavigationProvider initialNavItem="supplements">
+      <NotificationProvider>
+        <AuthProvider>
+          <StockProvider>
+            <AdminSupplementsContent />
+            <NotificationContainer />
+          </StockProvider>
+        </AuthProvider>
+      </NotificationProvider>
+    </NavigationProvider>
   )
 }
