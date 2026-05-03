@@ -512,13 +512,13 @@ export default function ClientCartesPage() {
     <NotificationProvider>
       <AuthProvider>
         <StockProvider>
-          <BreakfastProvider>
-            <LoyaltyProvider>
+          <LoyaltyProvider>
+            <BreakfastProvider>
               <LoyaltyCardsProvider>
                 <ClientCardsContent />
               </LoyaltyCardsProvider>
-            </LoyaltyProvider>
-          </BreakfastProvider>
+            </BreakfastProvider>
+          </LoyaltyProvider>
         </StockProvider>
       </AuthProvider>
     </NotificationProvider>
