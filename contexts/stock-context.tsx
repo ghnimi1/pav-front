@@ -911,27 +911,15 @@ const initialRewards: Reward[] = [
   { id: "r2", name: "Reduction 5 TND", description: "5 TND de reduction sur votre prochaine commande", pointsCost: 100, type: "discount", value: "5 TND", isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
 ]
 
-const initialMenuCategories: MenuCategory[] = [/* 
-  { id: "0", name: "Petit dejeuner", slug: "petit-dejeuner", icon: "🍳", order: 0, isActive: true },
-  { id: "1", name: "Viennoiseries", slug: "viennoiseries", icon: "🥐", order: 1, isActive: true },
-  { id: "2", name: "Patisseries", slug: "patisseries", icon: "🎂", order: 2, isActive: true },
-  { id: "3", name: "Specialites Tunisiennes", slug: "specialites-tunisiennes", icon: "⭐", order: 3, isActive: true },
-  { id: "4", name: "Thes & Infusions", slug: "thes-infusions", icon: "☕", order: 4, isActive: true },
-  { id: "5", name: "Boissons", slug: "boissons", icon: "🥤", order: 5, isActive: true }, */
-]
+const initialMenuCategories: MenuCategory[] = []
 
-const initialMenuItems: MenuItem[] = [
-  /* { id: "0", name: "Petit Dejeuner Gourmand pour 2", description: "Assortiment complet pour deux personnes", price: 32.0, points: 32, category: "0", image: "/placeholder.svg", allergens: ["Gluten", "Lait", "Oeufs"], isAvailable: true, tags: ["Pour 2 personnes", "Complet"], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "1", name: "Croissant Artisanal", description: "Croissant pur beurre croustillant et fondant", price: 4.5, points: 5, category: "1", image: "/placeholder.svg", allergens: ["Gluten", "Lait"], isAvailable: true, availableSupplements: [{ supplementId: "sup-16", isEnabled: true }, { supplementId: "sup-17", isEnabled: true }, { supplementId: "sup-18", isEnabled: true }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "2", name: "Pain au Chocolat", description: "Viennoiserie pur beurre garnie de chocolat noir", price: 5.5, points: 6, category: "1", image: "/placeholder.svg", allergens: ["Gluten", "Lait"], isAvailable: true, availableSupplements: [{ supplementId: "sup-16", isEnabled: true }, { supplementId: "sup-9", isEnabled: true }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, */
-]
+const initialMenuItems: MenuItem[] = []
 
 const initialSupplementCategories: SupplementCategory[] = []
 
 const initialSupplements: Supplement[] = []
 
-const initialOffers: Offer[] = [
-]
+const initialOffers: Offer[] = []
 
 const DATA_VERSION = "v2.0"
 
@@ -988,6 +976,7 @@ export function StockProvider({ children }: { children: ReactNode }) {
     stock: false,
     rewards: false,
     supplements: false,
+    loyaltyCards: false,
   })
 
   // Helper to check if current nav item is in a list
@@ -1300,6 +1289,122 @@ export function StockProvider({ children }: { children: ReactNode }) {
     }
   }, [currentNavItem, loadedData.rewards])
 
+  // ============================================
+  // LOAD LOYALTY CARDS DATA (Offers and Products)
+  // ============================================
+  
+  // Specific effect for loyalty-cards to fetch offers and menu items
+  useEffect(() => {
+    if (currentNavItem !== "loyalty-cards") {
+      return
+    }
+
+    if (loadedData.loyaltyCards) {
+      return
+    }
+
+    let cancelled = false
+
+    const loadLoyaltyCardsData = async () => {
+      try {
+        const hasToken = !!localStorage.getItem(AUTH_TOKEN_KEY)
+        
+        // Fetch active offers for loyalty cards (client view - only current offers)
+        let apiOffers: Offer[] = []
+        try {
+          apiOffers = await fetchOffers(false) // false = /menu/offers/current
+          if (!cancelled && apiOffers.length > 0) {
+            setOffers(apiOffers)
+          } else if (!cancelled && apiOffers.length === 0) {
+            const storedOffers = localStorage.getItem("pastry-offers")
+            if (storedOffers) {
+              setOffers(JSON.parse(storedOffers))
+            }
+          }
+        } catch (offerError) {
+          console.warn("Failed to fetch offers for loyalty cards:", offerError)
+          if (!cancelled) {
+            const storedOffers = localStorage.getItem("pastry-offers")
+            if (storedOffers) {
+              setOffers(JSON.parse(storedOffers))
+            }
+          }
+        }
+        
+        // Fetch menu items (products) for loyalty cards
+        let apiMenuItems: MenuItem[] = []
+        try {
+          apiMenuItems = await fetchMenuItems(hasToken) // include inactive if admin
+          if (!cancelled && apiMenuItems.length > 0) {
+            setMenuItems(apiMenuItems)
+          } else if (!cancelled && apiMenuItems.length === 0) {
+            const storedItems = localStorage.getItem("pastry-menu-items")
+            if (storedItems) {
+              setMenuItems(JSON.parse(storedItems))
+            }
+          }
+        } catch (itemError) {
+          console.warn("Failed to fetch menu items for loyalty cards:", itemError)
+          if (!cancelled) {
+            const storedItems = localStorage.getItem("pastry-menu-items")
+            if (storedItems) {
+              setMenuItems(JSON.parse(storedItems))
+            }
+          }
+        }
+        
+        // Fetch menu categories
+        let apiMenuCategories: MenuCategory[] = []
+        try {
+          apiMenuCategories = await fetchMenuCategories(hasToken)
+          if (!cancelled && apiMenuCategories.length > 0) {
+            setMenuCategories(apiMenuCategories)
+          } else if (!cancelled && apiMenuCategories.length === 0) {
+            const storedCategories = localStorage.getItem("pastry-menu-categories")
+            if (storedCategories) {
+              setMenuCategories(JSON.parse(storedCategories))
+            }
+          }
+        } catch (catError) {
+          console.warn("Failed to fetch menu categories for loyalty cards:", catError)
+          if (!cancelled) {
+            const storedCategories = localStorage.getItem("pastry-menu-categories")
+            if (storedCategories) {
+              setMenuCategories(JSON.parse(storedCategories))
+            }
+          }
+        }
+        
+        // Fetch rewards if user is authenticated
+        if (hasToken && !cancelled) {
+          try {
+            const apiRewards = await fetchRewards()
+            if (apiRewards.length > 0) {
+              setRewards(apiRewards)
+            }
+          } catch (rewardError) {
+            console.warn("Failed to fetch rewards for loyalty cards:", rewardError)
+          }
+        }
+
+        if (!cancelled) {
+          setLoadedData(prev => ({ ...prev, loyaltyCards: true }))
+        }
+      } catch (error) {
+        console.error("Failed to load loyalty cards data:", error)
+        if (!cancelled) {
+          setLoadedData(prev => ({ ...prev, loyaltyCards: true }))
+        }
+      }
+    }
+
+    void loadLoyaltyCardsData()
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentNavItem, loadedData.loyaltyCards])
+
   // Save stock data to localStorage (only for non-menu data)
   useEffect(() => { if (stockCategories.length) localStorage.setItem("stock-categories", JSON.stringify(stockCategories)) }, [stockCategories])
   useEffect(() => { if (subCategories.length) localStorage.setItem("sub-categories", JSON.stringify(subCategories)) }, [subCategories])
@@ -1310,6 +1415,11 @@ export function StockProvider({ children }: { children: ReactNode }) {
   useEffect(() => { localStorage.setItem("pastry-categories", JSON.stringify(categories)) }, [categories])
   useEffect(() => { localStorage.setItem("pastry-suppliers", JSON.stringify(suppliers)) }, [suppliers])
   useEffect(() => { localStorage.setItem("pastry-rewards", JSON.stringify(rewards)) }, [rewards])
+  useEffect(() => { if (menuCategories.length) localStorage.setItem("pastry-menu-categories", JSON.stringify(menuCategories)) }, [menuCategories])
+  useEffect(() => { if (menuItems.length) localStorage.setItem("pastry-menu-items", JSON.stringify(menuItems)) }, [menuItems])
+  useEffect(() => { if (offers.length) localStorage.setItem("pastry-offers", JSON.stringify(offers)) }, [offers])
+  useEffect(() => { if (supplements.length) localStorage.setItem("pastry-supplements", JSON.stringify(supplements)) }, [supplements])
+  useEffect(() => { if (supplementCategories.length) localStorage.setItem("pastry-supplement-categories", JSON.stringify(supplementCategories)) }, [supplementCategories])
 
   // Stock Category CRUD
   const addStockCategory = (cat: Omit<StockCategory, "id" | "createdAt" | "updatedAt">) => {
