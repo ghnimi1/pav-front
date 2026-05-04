@@ -946,6 +946,7 @@ const MENU_NAV_ITEMS = [
   "menu-admin",
   "supplements",
   "loyalty-cards",
+  "client-fidelite",
 ] as const
 
 // NavItems that need rewards data
@@ -978,6 +979,8 @@ export function StockProvider({ children }: { children: ReactNode }) {
     supplements: false,
     loyaltyCards: false,
   })
+  // Track the last nav item that triggered menu loading
+  const [lastMenuNavItem, setLastMenuNavItem] = useState<string | null>(null)
 
   // Helper to check if current nav item is in a list
   const isInNavItems = (navItems: readonly string[]) => {
@@ -990,7 +993,8 @@ export function StockProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    if (loadedData.menu) {
+    // Allow re-load if navigating to a different menu-related page
+    if (loadedData.menu && lastMenuNavItem === currentNavItem) {
       return
     }
 
@@ -1063,6 +1067,7 @@ export function StockProvider({ children }: { children: ReactNode }) {
         }
 
         setLoadedData(prev => ({ ...prev, menu: true }))
+        setLastMenuNavItem(currentNavItem)
       } catch (error) {
         console.error("Failed to load menu data:", error)
         if (!cancelled) {
