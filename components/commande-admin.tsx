@@ -544,32 +544,32 @@ function AdminOrdersContent() {
 
         {/* Kanban View */}
         {viewMode === "kanban" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            {kanbanColumns.map(column => {
-              const columnOrders = filteredOrders.filter(o => o.status === column.status)
-              return (
-                <div key={column.status} className={`bg-white rounded-xl border-t-4 ${column.color} shadow-sm`}>
-                  <div className="p-4 border-b">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold">{column.title}</h3>
-                      <Badge variant="secondary">{columnOrders.length}</Badge>
-                    </div>
-                  </div>
-                  <div className="p-3 space-y-3 max-h-[calc(100vh-400px)] overflow-y-auto">
-                    {columnOrders.length === 0 ? (
-                      <div className="text-center py-8 text-stone-400">
-                        <PackageIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">Aucune commande</p>
-                      </div>
-                    ) : (
-                      columnOrders.map(order => renderOrderCard(order))
-                    )}
-                  </div>
-                </div>
-              )
-            })}
+  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
+    {kanbanColumns.map(column => {
+      const columnOrders = filteredOrders.filter(o => o.status === column.status)
+      return (
+        <div key={column.status} className={`bg-white rounded-xl border-t-4 ${column.color} shadow-sm flex flex-col h-full min-h-[700px]`}>
+          <div className="p-4 border-b flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">{column.title}</h3>
+              <Badge variant="secondary">{columnOrders.length}</Badge>
+            </div>
           </div>
-        )}
+          <div className="p-3 space-y-3 flex-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 100px)' }}>
+            {columnOrders.length === 0 ? (
+              <div className="text-center py-8 text-stone-400">
+                <PackageIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Aucune commande</p>
+              </div>
+            ) : (
+              columnOrders.map(order => renderOrderCard(order))
+            )}
+          </div>
+        </div>
+      )
+    })}
+  </div>
+)}
 
         {/* List View */}
         {viewMode === "list" && (
