@@ -73,6 +73,7 @@ function ClientFideliteContent() {
     redeemReward,
     getClientStats,
     updateMissionProgress,
+    createShareLink,
   } = useLoyalty()
   const { orders, items: breakfastItems } = useBreakfast()
   const { orders: remoteOrders, getOrdersByClient, loadOrders } = useOrders()
@@ -114,6 +115,7 @@ function ClientFideliteContent() {
     chances: number
     winCondition: string
     rewardName: string
+    rewardProductIds: string[]
   } | null>(null)
 
   useEffect(() => {
@@ -190,8 +192,20 @@ function ClientFideliteContent() {
       chances: posConfig.gameConfig.chances,
       winCondition: posConfig.gameConfig.winCondition,
       rewardName: config.productName,
+      rewardProductIds: posConfig.gameConfig.rewardProductIds || [],
     })
     setShowChichBichModal(true)
+  }
+
+  // Handle sharing a product from Chich Bich game
+  const handleShareProduct = async (productId: string, productName: string): Promise<string> => {
+    const clientId = loyaltyClient?.id || user?.id || "guest"
+    const code = createShareLink(clientId, productId, productName, "chichbich")
+    
+    // Créer l'URL complète du lien de partage
+    const shareUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/share/${code}`
+    
+    return shareUrl
   }
 
   const stats = getClientStats(loyaltyClient.id)
@@ -1217,6 +1231,8 @@ function ClientFideliteContent() {
           chances={chichBichGameData.chances}
           winCondition={chichBichGameData.winCondition}
           rewardName={chichBichGameData.rewardName}
+          productId={chichBichGameData.rewardProductIds[0]}
+          onShare={handleShareProduct}
         />
       )}
     </div>

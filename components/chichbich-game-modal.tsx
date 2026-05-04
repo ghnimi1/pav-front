@@ -5,16 +5,18 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { DicesIcon, GiftIcon, SparklesIcon, XIcon, RotateCcwIcon } from "lucide-react"
+import { DicesIcon, GiftIcon, SparklesIcon, XIcon, RotateCcwIcon, ShareIcon, CheckIcon, CopyIcon } from "lucide-react"
 import confetti from "canvas-confetti"
 
 interface ChichBichGameModalProps {
   isOpen: boolean
   onClose: () => void
-  onPlay: () => { won: boolean; diceResults: [number, number][] }
+  onPlay: () => Promise<{ won: boolean; diceResults: [number, number][] }> | { won: boolean; diceResults: [number, number][] }
   chances: number
   winCondition: string
   rewardName?: string
+  productId?: string
+  onShare?: (productId: string, rewardName: string) => Promise<string> // Retourne le lien de partage
 }
 
 // Composant Dé 3D
@@ -92,6 +94,8 @@ export function ChichBichGameModal({
   chances,
   winCondition,
   rewardName = "un produit",
+  productId,
+  onShare,
 }: ChichBichGameModalProps) {
   const [gameState, setGameState] = useState<"ready" | "rolling" | "result">("ready")
   const [currentChance, setCurrentChance] = useState(1)
@@ -99,6 +103,10 @@ export function ChichBichGameModal({
   const [rollHistory, setRollHistory] = useState<[number, number][]>([])
   const [won, setWon] = useState(false)
   const [gameEnded, setGameEnded] = useState(false)
+  const [shareLink, setShareLink] = useState<string | null>(null)
+  const [isSharing, setIsSharing] = useState(false)
+  const [showShareDialog, setShowShareDialog] = useState(false)
+  const [copiedToClipboard, setCopiedToClipboard] = useState(false)
 
   // Reset le jeu quand le modal s'ouvre
   useEffect(() => {
@@ -109,6 +117,9 @@ export function ChichBichGameModal({
       setRollHistory([])
       setWon(false)
       setGameEnded(false)
+      setShareLink(null)
+      setShowShareDialog(false)
+      setCopiedToClipboard(false)
     }
   }, [isOpen])
 
@@ -147,7 +158,7 @@ export function ChichBichGameModal({
     }
   }
 
-  const rollDice = () => {
+  const rollDice = async () => {
     setGameState("rolling")
     
     // Animation de roulement
@@ -159,11 +170,11 @@ export function ChichBichGameModal({
     }, 100)
 
     // Arrêter après 1 seconde
-    setTimeout(() => {
+    setTimeout(async () => {
       clearInterval(rollInterval)
       
       // Obtenir le vrai résultat
-      const result = onPlay()
+      const result = await onPlay()
       const finalDice = result.diceResults[result.diceResults.length - 1] || [
         Math.floor(Math.random() * 6) + 1,
         Math.floor(Math.random() * 6) + 1,
@@ -205,8 +216,50 @@ export function ChichBichGameModal({
     }
   }
 
+  const handleShare = async () => {
+    if (!onShare || !productId) return
+    
+    try {
+      setIsSharing(true)
+      const link = await onShare(productId, rewardName)
+      setShareLink(link)
+      setShowShareDialog(true)
+    } catch (error) {
+      console.error("Erreur lors du partage:", error)
+    } finally {
+      setIsSharing(false)
+    }
+  }
+
+  const copyShareLink = () => {
+    if (!shareLink) return
+    
+    navigator.clipboard.writeText(shareLink)
+    setCopiedToClipboard(true)
+    setTimeout(() => setCopiedToClipboard(false), 2000)
+  }
+
+  const shareViaWeb = async () => {
+    if (!shareLink) return
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "Découvrez ce produit!",
+          text: `J'ai gagné ${rewardName} en jouant au Chich Bich! 🎲`,
+          url: shareLink,
+        })
+      } catch (err) {
+        console.log("Partage annulé ou erreur:", err)
+      }
+    } else {
+      copyShareLink()
+    }
+  }
+
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <>
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md bg-gradient-to-br from-stone-900 to-stone-800 text-white border-stone-700">
         <DialogHeader>
           <DialogTitle className="text-center text-2xl font-bold flex items-center justify-center gap-2">
@@ -326,7 +379,7 @@ export function ChichBichGameModal({
           <div className="flex justify-center gap-3">
             {!gameEnded && gameState !== "rolling" && (
               <Button
-                onClick={rollDice}
+                onClick={() => rollDice()}
                 className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold px-8 py-6 text-lg rounded-xl"
               >
                 <DicesIcon className="w-6 h-6 mr-2" />
@@ -334,32 +387,128 @@ export function ChichBichGameModal({
               </Button>
             )}
             
-            {gameEnded && (
+            {gameEnded && won && !shareLink && (
+              <>
+                <Button
+                  onClick={handleShare}
+                  disabled={isSharing || !onShare}
+                  className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold px-6 py-6 text-lg rounded-xl disabled:opacity-50"
+                >
+                  <ShareIcon className="w-6 h-6 mr-2" />
+                  {isSharing ? "Partage..." : "Partager"}
+                </Button>
+                <Button
+                  onClick={onClose}
+                  className="bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-bold px-8 py-6 text-lg rounded-xl"
+                >
+                  <GiftIcon className="w-6 h-6 mr-2" />
+                  Reclamer ma recompense
+                </Button>
+              </>
+            )}
+            
+            {gameEnded && won && shareLink && (
               <Button
                 onClick={onClose}
-                className={cn(
-                  "font-bold px-8 py-6 text-lg rounded-xl",
-                  won 
-                    ? "bg-emerald-500 hover:bg-emerald-600 text-white" 
-                    : "bg-stone-700 hover:bg-stone-600 text-white"
-                )}
+                className="bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-bold px-8 py-6 text-lg rounded-xl"
               >
-                {won ? (
-                  <>
-                    <GiftIcon className="w-6 h-6 mr-2" />
-                    Reclamer ma recompense
-                  </>
-                ) : (
-                  <>
-                    <XIcon className="w-6 h-6 mr-2" />
-                    Fermer
-                  </>
-                )}
+                <GiftIcon className="w-6 h-6 mr-2" />
+                Reclamer ma recompense
+              </Button>
+            )}
+            
+            {gameEnded && !won && (
+              <Button
+                onClick={onClose}
+                className="bg-stone-700 hover:bg-stone-600 text-white font-bold px-8 py-6 text-lg rounded-xl"
+              >
+                <XIcon className="w-6 h-6 mr-2" />
+                Fermer
               </Button>
             )}
           </div>
         </div>
       </DialogContent>
     </Dialog>
+
+      {/* Share Dialog */}
+      <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
+        <DialogContent className="sm:max-w-md bg-gradient-to-br from-stone-900 to-stone-800 text-white border-stone-700">
+          <DialogHeader>
+            <DialogTitle className="text-center text-2xl font-bold flex items-center justify-center gap-2">
+              <CheckIcon className="w-8 h-8 text-blue-400" />
+              Partager ce produit
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-6">
+            {/* Message de partage */}
+            <div className="text-center">
+              <p className="text-stone-300 text-sm mb-2">
+                Vous venez de gagner <span className="text-emerald-400 font-bold">{rewardName}</span>!
+              </p>
+              <p className="text-stone-400 text-xs">
+                Partagez ce produit avec vos amis pour leur en faire profiter!
+              </p>
+            </div>
+
+            {/* Lien de partage */}
+            {shareLink && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-2"
+              >
+                <div className="bg-stone-700 rounded-lg p-3 flex items-center justify-between gap-2">
+                  <code className="text-xs text-stone-300 break-all flex-1 max-h-12 overflow-y-auto">
+                    {shareLink}
+                  </code>
+                  <Button
+                    onClick={copyShareLink}
+                    size="sm"
+                    className={cn(
+                      "flex-shrink-0",
+                      copiedToClipboard 
+                        ? "bg-emerald-600 hover:bg-emerald-700" 
+                        : "bg-amber-600 hover:bg-amber-700"
+                    )}
+                  >
+                    <CopyIcon className="w-4 h-4" />
+                  </Button>
+                </div>
+                {copiedToClipboard && (
+                  <motion.p 
+                    initial={{ opacity: 0 }} 
+                    animate={{ opacity: 1 }}
+                    className="text-xs text-emerald-400 text-center"
+                  >
+                    ✓ Lien copié dans le presse-papiers!
+                  </motion.p>
+                )}
+              </motion.div>
+            )}
+
+            {/* Boutons de partage */}
+            <div className="space-y-2">
+              <Button
+                onClick={shareViaWeb}
+                className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold py-3 rounded-lg"
+              >
+                <ShareIcon className="w-5 h-5 mr-2" />
+                Partager via...
+              </Button>
+              
+              <Button
+                onClick={() => setShowShareDialog(false)}
+                variant="outline"
+                className="w-full"
+              >
+                Fermer
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

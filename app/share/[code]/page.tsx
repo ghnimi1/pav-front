@@ -2,18 +2,40 @@
 
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
-import { useLoyalty } from "@/contexts/loyalty-context"
+import { useLoyalty, LoyaltyProvider } from "@/contexts/loyalty-context"
+import { NavigationProvider } from "@/contexts/navigation-context"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { CheckCircleIcon, GiftIcon, SparklesIcon, StoreIcon } from "lucide-react"
 import Link from "next/link"
 
-export default function ShareValidationPage() {
+function ShareValidationContent() {
   const params = useParams()
   const code = params.code as string
-  const { validateShareLink, shareLinks } = useLoyalty()
+  const { validateShareLink, shareLinks: contextShareLinks } = useLoyalty()
   const [status, setStatus] = useState<"loading" | "success" | "already_used" | "expired" | "not_found">("loading")
   const [shareInfo, setShareInfo] = useState<{ productName: string; platform: string } | null>(null)
+  const [shareLinks, setShareLinks] = useState(contextShareLinks)
+
+  // Load shareLinks from localStorage as a fallback
+  useEffect(() => {
+    // If context has shareLinks, use them
+    if (contextShareLinks.length > 0) {
+      setShareLinks(contextShareLinks)
+      return
+    }
+
+    // Otherwise, try to load from localStorage
+    const storedShareLinks = localStorage.getItem("loyalty_share_links")
+    if (storedShareLinks) {
+      try {
+        const parsed = JSON.parse(storedShareLinks)
+        setShareLinks(parsed)
+      } catch (err) {
+        console.error("Failed to parse stored share links:", err)
+      }
+    }
+  }, [contextShareLinks])
 
   useEffect(() => {
     if (!code) {
@@ -21,34 +43,39 @@ export default function ShareValidationPage() {
       return
     }
 
-    // Trouver le lien
-    const link = shareLinks.find(l => l.code === code)
-    
-    if (!link) {
-      setStatus("not_found")
-      return
-    }
+    // Wait a bit for data to load
+    const timer = setTimeout(() => {
+      // Trouver le lien
+      const link = shareLinks.find(l => l.code === code)
+      
+      if (!link) {
+        setStatus("not_found")
+        return
+      }
 
-    if (link.isClicked) {
-      setStatus("already_used")
-      setShareInfo({ productName: link.productName, platform: link.platform })
-      return
-    }
+      if (link.isClicked) {
+        setStatus("already_used")
+        setShareInfo({ productName: link.productName, platform: link.platform })
+        return
+      }
 
-    if (new Date(link.expiresAt) < new Date()) {
-      setStatus("expired")
-      setShareInfo({ productName: link.productName, platform: link.platform })
-      return
-    }
+      if (new Date(link.expiresAt) < new Date()) {
+        setStatus("expired")
+        setShareInfo({ productName: link.productName, platform: link.platform })
+        return
+      }
 
-    // Valider le lien
-    const success = validateShareLink(code)
-    if (success) {
-      setStatus("success")
-      setShareInfo({ productName: link.productName, platform: link.platform })
-    } else {
-      setStatus("not_found")
-    }
+      // Valider le lien
+      const success = validateShareLink(code)
+      if (success) {
+        setStatus("success")
+        setShareInfo({ productName: link.productName, platform: link.platform })
+      } else {
+        setStatus("not_found")
+      }
+    }, 100)
+
+    return () => clearTimeout(timer)
   }, [code, shareLinks, validateShareLink])
 
   return (
@@ -188,5 +215,15 @@ export default function ShareValidationPage() {
         )}
       </Card>
     </div>
+  )
+}
+
+export default function ShareValidationPage() {
+  return (
+    <NavigationProvider initialNavItem="client-fidelite">
+      <LoyaltyProvider>
+        <ShareValidationContent />
+      </LoyaltyProvider>
+    </NavigationProvider>
   )
 }
