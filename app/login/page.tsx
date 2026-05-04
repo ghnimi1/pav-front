@@ -115,11 +115,11 @@ function LoginForm() {
           </p>
         </div>
 
-        <div className="mt-6 p-4 bg-amber-50 rounded-lg">
+        {/* <div className="mt-6 p-4 bg-amber-50 rounded-lg">
           <p className="text-xs text-gray-600 font-medium mb-2">Comptes de test :</p>
           <p className="text-xs text-gray-600">Admin: admin@patisserie.tn / admin123</p>
           <p className="text-xs text-gray-600">Client: client@test.com / client123</p>
-        </div>
+        </div> */}
       </Card>
     </div>
   )
