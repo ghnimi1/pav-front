@@ -334,7 +334,7 @@ function AdminSupplementsContent() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => router.push("/admin")}
+                onClick={() => router.back()}
                 className="rounded-full"
               >
                 <ArrowLeftIcon className="h-5 w-5" />
