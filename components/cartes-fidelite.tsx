@@ -903,9 +903,9 @@ function LoyaltyCardsAdminContent() {
                                     }
                                   />
                                   <span className="flex-1">{product.name}</span>
-                                  <Badge variant="outline" className="text-xs">
+                                  {/* <Badge variant="outline" className="text-xs">
                                     {product.source === "breakfast" ? "Petit-dej" : product.category}
-                                  </Badge>
+                                  </Badge> */}
                                   <span className="text-sm text-stone-500">{product.price} DT</span>
                                 </label>
                               )
@@ -955,9 +955,9 @@ function LoyaltyCardsAdminContent() {
                       onCheckedChange={() => toggleProductEligible(product.id)}
                     />
                     <span className="flex-1">{product.name}</span>
-                    <Badge variant="outline" className="text-xs">
+                    {/* <Badge variant="outline" className="text-xs">
                       {product.source === "breakfast" ? "Petit-dej" : product.category}
-                    </Badge>
+                    </Badge> */}
                     <span className="text-sm text-stone-500">{product.price} DT</span>
                   </label>
                 ))}
