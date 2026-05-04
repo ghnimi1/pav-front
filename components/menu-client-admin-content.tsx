@@ -43,6 +43,22 @@ import {
   FlameIcon,
   StarIcon,
   UploadIcon,
+  CoffeeIcon,
+  CroissantIcon,
+  SandwichIcon,
+  PizzaIcon,
+  SaladIcon,
+  SoupIcon,
+  IceCreamIcon,
+  MartiniIcon,
+  UtensilsIcon,
+  BeefIcon,
+  FishIcon,
+  EggIcon,
+  MilkIcon,
+  AppleIcon,
+  CarrotIcon,
+  ChevronDownIcon,
 } from "lucide-react"
 import { Pagination } from "@/components/pagination"
 
@@ -55,6 +71,101 @@ const DAYS_OF_WEEK = [
   { value: 5, label: "Ven" },
   { value: 6, label: "Sam" },
 ]
+
+// === ICON LIBRARY ===
+const ICON_LIBRARY = {
+  // Nourriture
+  "🍕": PizzaIcon,
+  "🥗": SaladIcon,
+  "🥪": SandwichIcon,
+  "🥐": CroissantIcon,
+  "☕": CoffeeIcon,
+  "🍰": CakeIcon,
+  "🍦": IceCreamIcon,
+  "🍲": SoupIcon,
+  "🍔": BeefIcon,
+  "🍣": FishIcon,
+  "🥚": EggIcon,
+  "🥛": MilkIcon,
+  "🍎": AppleIcon,
+  "🥕": CarrotIcon,
+  "🍷": MartiniIcon,
+  // Emojis d'icônes par défaut
+  "🎂": CakeIcon,
+  "🎁": GiftIcon,
+  "⭐": StarIcon,
+  "🔥": FlameIcon,
+  "✨": SparklesIcon,
+}
+
+const EMOJI_ICONS = [
+  "🍕", "🥗", "🥪", "🥐", "☕", "🍰", "🍦", "🍲", 
+  "🍔", "🍣", "🥚", "🥛", "🍎", "🥕", "🍷", "🎂", 
+  "🎁", "⭐", "🔥", "✨", "🧁", "🥖", "🧀", "🍯",
+  "🥨", "🍩", "🍪", "🎂", "🍫", "🍬", "🍭"
+]
+
+function CategoryIconSelector({ value, onChange }: { value: string; onChange: (icon: string) => void }) {
+  const [isOpen, setIsOpen] = useState(false)
+  
+  return (
+    <div className="relative">
+      <Label>Icône de la catégorie</Label>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="mt-1.5 w-full flex items-center justify-between px-3 py-2 border rounded-md bg-white hover:bg-stone-50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">{value || "📁"}</span>
+          <span className="text-sm text-stone-600">
+            {value ? "Icône sélectionnée" : "Choisir une icône"}
+          </span>
+        </div>
+        <ChevronDownIcon className={`h-4 w-4 text-stone-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+      </button>
+      
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div className="absolute z-50 mt-1 w-full p-3 bg-white border rounded-lg shadow-lg">
+            <div className="grid grid-cols-6 gap-2 max-h-48 overflow-y-auto">
+              {EMOJI_ICONS.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => {
+                    onChange(emoji)
+                    setIsOpen(false)
+                  }}
+                  className={`p-2 text-2xl rounded-lg hover:bg-stone-100 transition-colors ${
+                    value === emoji ? "bg-amber-100 ring-2 ring-amber-400" : ""
+                  }`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 pt-2 border-t">
+              <Input
+                type="text"
+                placeholder="Ou entrez un emoji personnalisé..."
+                className="text-center text-2xl"
+                maxLength={2}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    onChange(e.target.value)
+                    setIsOpen(false)
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
 function MenuClientAdminContent() {
   const router = useRouter()
@@ -409,56 +520,57 @@ function MenuClientAdminContent() {
     setEditingProduct(product)
     setShowProductDialog(true)
   }
-const handleSaveProduct = async () => {
-  if (!productFormData.name || !productFormData.description || !productFormData.price || !productFormData.category) {
-    addNotification({ type: "error", title: "Erreur", message: "Veuillez remplir tous les champs obligatoires" })
-    return
-  }
 
-  const allergensArray = productFormData.allergens
-    .split(",")
-    .map((a) => a.trim())
-    .filter((a) => a)
-
-  let promotion: Promotion | undefined
-  if (productFormData.hasPromotion) {
-    promotion = {
-      type: productFormData.promotionType,
-      value: productFormData.promotionValue ? parseFloat(productFormData.promotionValue) : undefined,
-      label: productFormData.promotionLabel || undefined,
-      endDate: productFormData.promotionEndDate || undefined,
+  const handleSaveProduct = async () => {
+    if (!productFormData.name || !productFormData.description || !productFormData.price || !productFormData.category) {
+      addNotification({ type: "error", title: "Erreur", message: "Veuillez remplir tous les champs obligatoires" })
+      return
     }
-  }
-  
-  const productData = {
-    name: productFormData.name,
-    description: productFormData.description,
-    price: parseFloat(productFormData.price),
-    points: productFormData.points ? parseInt(productFormData.points) : undefined,
-    category: productFormData.category,
-    image: productImageFile || undefined, // Pass File object for upload
-    allergens: allergensArray,
-    isAvailable: productFormData.isAvailable,
-    supplements: supplements.length > 0 ? supplements : undefined,
-    promotion,
-  }
-  
-  try {
-    if (editingProduct) {
-      await updateMenuItem(editingProduct.id, productData)
-      addNotification({ type: "success", title: "Produit modifié", message: `Le produit "${productData.name}" a été mis à jour` })
-    } else {
-      await addMenuItem(productData)
-      addNotification({ type: "success", title: "Produit créé", message: `Le produit "${productData.name}" a été ajouté` })
+
+    const allergensArray = productFormData.allergens
+      .split(",")
+      .map((a) => a.trim())
+      .filter((a) => a)
+
+    let promotion: Promotion | undefined
+    if (productFormData.hasPromotion) {
+      promotion = {
+        type: productFormData.promotionType,
+        value: productFormData.promotionValue ? parseFloat(productFormData.promotionValue) : undefined,
+        label: productFormData.promotionLabel || undefined,
+        endDate: productFormData.promotionEndDate || undefined,
+      }
     }
     
-    setShowProductDialog(false)
-    resetProductForm()
-  } catch (error) {
-    console.error('Error saving product:', error)
-    addNotification({ type: "error", title: "Erreur", message: "Erreur lors de l'enregistrement" })
+    const productData = {
+      name: productFormData.name,
+      description: productFormData.description,
+      price: parseFloat(productFormData.price),
+      points: productFormData.points ? parseInt(productFormData.points) : undefined,
+      category: productFormData.category,
+      image: productImageFile || undefined,
+      allergens: allergensArray,
+      isAvailable: productFormData.isAvailable,
+      supplements: supplements.length > 0 ? supplements : undefined,
+      promotion,
+    }
+    
+    try {
+      if (editingProduct) {
+        await updateMenuItem(editingProduct.id, productData)
+        addNotification({ type: "success", title: "Produit modifié", message: `Le produit "${productData.name}" a été mis à jour` })
+      } else {
+        await addMenuItem(productData)
+        addNotification({ type: "success", title: "Produit créé", message: `Le produit "${productData.name}" a été ajouté` })
+      }
+      
+      setShowProductDialog(false)
+      resetProductForm()
+    } catch (error) {
+      console.error('Error saving product:', error)
+      addNotification({ type: "error", title: "Erreur", message: "Erreur lors de l'enregistrement" })
+    }
   }
-}
   
   const handleDeleteProduct = () => {
     if (!deleteProductConfirm) return
@@ -740,7 +852,12 @@ const handleSaveProduct = async () => {
                 <SelectContent>
                   <SelectItem value="all">Toutes les categories</SelectItem>
                   {menuCategories.map(cat => (
-                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                    <SelectItem key={cat.id} value={cat.id}>
+                      <span className="flex items-center gap-2">
+                        <span>{cat.icon || "📁"}</span>
+                        <span>{cat.name}</span>
+                      </span>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -765,7 +882,11 @@ const handleSaveProduct = async () => {
                         />
                       ) : (
                         <div className="h-full w-full flex items-center justify-center">
-                          <CakeIcon className="h-10 w-10 text-stone-300" />
+                          {category?.icon ? (
+                            <span className="text-4xl">{category.icon}</span>
+                          ) : (
+                            <CakeIcon className="h-10 w-10 text-stone-300" />
+                          )}
                         </div>
                       )}
                       {product.promotion && (
@@ -796,7 +917,10 @@ const handleSaveProduct = async () => {
                         <div className="flex-1 min-w-0">
                           <h3 className="font-medium text-stone-900 truncate">{product.name}</h3>
                           {category && (
-                            <Badge variant="outline" className="text-xs mt-1">{category.name}</Badge>
+                            <Badge variant="outline" className="text-xs mt-1">
+                              <span className="mr-1">{category.icon || "📁"}</span>
+                              {category.name}
+                            </Badge>
                           )}
                         </div>
                         <Switch
@@ -895,8 +1019,8 @@ const handleSaveProduct = async () => {
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-stone-100 flex items-center justify-center text-xl">
-                            {category.icon || <TagIcon className="h-5 w-5 text-stone-400" />}
+                          <div className="w-10 h-10 rounded-lg bg-stone-100 flex items-center justify-center text-2xl">
+                            {category.icon || "📁"}
                           </div>
                           <div>
                             <h3 className="font-medium text-stone-900">{category.name}</h3>
@@ -933,7 +1057,7 @@ const handleSaveProduct = async () => {
         </Tabs>
       </div>
       
-      {/* Product Dialog with Image Upload */}
+      {/* Product Dialog */}
       <Dialog open={showProductDialog} onOpenChange={(open) => {
         setShowProductDialog(open)
         if (!open) resetProductForm()
@@ -1012,7 +1136,10 @@ const handleSaveProduct = async () => {
                       .sort((a, b) => a.order - b.order)
                       .map((cat) => (
                         <SelectItem key={cat.id} value={cat.id}>
-                          {cat.icon} {cat.name}
+                          <span className="flex items-center gap-2">
+                            <span>{cat.icon || "📁"}</span>
+                            <span>{cat.name}</span>
+                          </span>
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -1102,55 +1229,6 @@ const handleSaveProduct = async () => {
               />
             </div>
 
-            {/* Supplements Section */}
-           {/*  <div className="space-y-3 rounded-lg border p-4 bg-muted/30">
-              <div className="flex items-center gap-2">
-                <TagIcon className="h-4 w-4 text-blue-600" />
-                <Label className="font-medium">Supplements / Options</Label>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Ajoutez des options payantes (ex: Thon +3 TND, Fromage +2 TND)
-              </p>
-              
-              {supplements.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {supplements.map((supp) => (
-                    <div key={supp.id} className="flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-sm">
-                      <span>{supp.name}</span>
-                      <span className="font-medium text-blue-700">+{supp.price.toFixed(2)} TND</span>
-                      <button
-                        type="button"
-                        onClick={() => removeSupplement(supp.id)}
-                        className="ml-1 text-blue-700 hover:text-red-600"
-                      >
-                        <Trash2Icon className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Nom (ex: Thon)"
-                  value={newSupplement.name}
-                  onChange={(e) => setNewSupplement({ ...newSupplement, name: e.target.value })}
-                  className="flex-1"
-                />
-                <Input
-                  type="number"
-                  step="0.1"
-                  placeholder="Prix"
-                  value={newSupplement.price}
-                  onChange={(e) => setNewSupplement({ ...newSupplement, price: e.target.value })}
-                  className="w-24"
-                />
-                <Button type="button" variant="outline" size="icon" onClick={addSupplement}>
-                  <PlusIcon className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
- */}
             {/* Promotion Section */}
             <div className="space-y-3 rounded-lg border p-4 bg-muted/30">
               <div className="flex items-center justify-between">
@@ -1418,7 +1496,7 @@ const handleSaveProduct = async () => {
         </DialogContent>
       </Dialog>
       
-      {/* Category Dialog */}
+      {/* Category Dialog with Icon Selector */}
       <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -1437,14 +1515,21 @@ const handleSaveProduct = async () => {
               />
             </div>
             
+            {/* Icon Selector */}
+            <CategoryIconSelector
+              value={categoryFormData.icon}
+              onChange={(icon) => setCategoryFormData({ ...categoryFormData, icon })}
+            />
+            
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Icone (emoji)</Label>
+                <Label>Slug (URL)</Label>
                 <Input
-                  value={categoryFormData.icon}
-                  onChange={(e) => setCategoryFormData({ ...categoryFormData, icon: e.target.value })}
-                  placeholder="🥐"
+                  value={categoryFormData.slug}
+                  onChange={(e) => setCategoryFormData({ ...categoryFormData, slug: e.target.value })}
+                  placeholder="viennoiseries"
                 />
+                <p className="text-xs text-stone-400">Laissez vide pour auto-generer</p>
               </div>
               <div className="space-y-2">
                 <Label>Ordre d&apos;affichage</Label>
@@ -1532,6 +1617,7 @@ const handleSaveProduct = async () => {
     </div>
   )
 }
+
 export { MenuClientAdminContent }
 
 export default function MenuClientAdminPage() {
