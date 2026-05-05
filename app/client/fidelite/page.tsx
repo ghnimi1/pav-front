@@ -55,6 +55,7 @@ import { LoyaltyGames } from "@/components/loyalty-games"
 import { LoyaltyCardsProvider, useLoyaltyCards } from "@/contexts/loyalty-cards-context"
 import { LoyaltyCardDisplay } from "@/components/loyalty-card-display"
 import { ChichBichGameModal } from "@/components/chichbich-game-modal"
+import { QRCodeDisplay } from "@/components/qr-code-display"
 import { useNotification } from "@/contexts/notification-context"
 
 function ClientFideliteContent() {
@@ -1043,21 +1044,21 @@ function ClientFideliteContent() {
 
       {/* QR Code Dialog */}
       <Dialog open={showQRDialog} onOpenChange={setShowQRDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Mon QR Code Fidelite</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCodeIcon className="h-5 w-5" />
+              Mon QR Code Fidelite
+            </DialogTitle>
             <DialogDescription>
               Presentez ce code en caisse pour cumuler vos points
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col items-center py-6">
-            <div className="w-48 h-48 bg-white border-2 rounded-lg flex items-center justify-center">
-              <div className="text-center">
-                <QrCodeIcon className="h-24 w-24 mx-auto text-foreground" />
-                <p className="text-xs font-mono mt-2">{loyaltyClient.qrCode}</p>
-              </div>
-            </div>
-            <p className="text-sm text-muted-foreground mt-4">{loyaltyClient.email}</p>
+          <div className="py-4">
+            <QRCodeDisplay
+              value={loyaltyClient.qrCode}
+              size={220}
+            />
           </div>
         </DialogContent>
       </Dialog>
